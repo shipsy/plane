@@ -8,6 +8,7 @@ import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import { ChevronRight, FolderPlus } from "lucide-react";
 import { Disclosure, Transition } from "@headlessui/react";
+import { useTranslation } from "@plane/i18n";
 // ui
 import { IFavorite } from "@plane/types";
 import { setToast, TOAST_TYPE, Tooltip } from "@plane/ui";
@@ -32,6 +33,7 @@ export const SidebarFavoritesMenu = observer(() => {
   const [isDragging, setIsDragging] = useState(false);
 
   // store hooks
+  const { t } = useTranslation();
   const { sidebarCollapsed } = useAppTheme();
   const { favoriteIds, groupedFavorites, deleteFavorite, removeFromFavoriteFolder } = useFavorite();
   const { workspaceSlug } = useParams();
@@ -46,43 +48,98 @@ export const SidebarFavoritesMenu = observer(() => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const elementRef = useRef(null);
 
+  const handleMoveToFolder = (sourceId: string, destinationId: string) => {
+    moveFavoriteToFolder(workspaceSlug.toString(), sourceId, {
+      parent: destinationId,
+    }).catch(() => {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: t("error"),
+        message: t("failed_to_move_favorite"),
+      });
+    });
+  };
+
+  const handleDrop = (self: DropTargetRecord, source: ElementDragPayload, location: DragLocationHistory) => {
+    const isFolder = self.data?.isGroup;
+    const dropTargets = location?.current?.dropTargets ?? [];
+    if (!dropTargets || dropTargets.length <= 0) return;
+    const dropTarget =
+      dropTargets.length > 1 ? dropTargets.find((target: DropTargetRecord) => target?.data?.isChild) : dropTargets[0];
+
+    const dropTargetData = dropTarget?.data as TargetData;
+
+    if (!dropTarget || !dropTargetData) return;
+    const instruction = getInstructionFromPayload(dropTarget, source, location);
+    const parentId = instruction === "make-child" ? dropTargetData.id : dropTargetData.parentId;
+    const droppedFavId = instruction !== "make-child" ? dropTargetData.id : undefined;
+    const sourceData = source.data as TargetData;
+
+    if (!sourceData.id) return;
+    if (isFolder) {
+      // handle move to a new parent folder if dropped on a folder
+      if (parentId && parentId !== sourceData.parentId) {
+        handleMoveToFolder(sourceData.id, parentId); /**parent id  */
+      }
+      // handle reordering at root level
+      if (droppedFavId) {
+        if (instruction != "make-child") {
+          handleReorder(sourceData.id, droppedFavId, instruction); /** sequence */
+        }
+      }
+    } else {
+      //handling reordering for favorites
+      if (droppedFavId) {
+        handleReorder(sourceData.id, droppedFavId, instruction); /** sequence */
+      }
+    }
+
+    /**remove if dropped outside and source is a child */
+    if (!parentId && sourceData.isChild) {
+      handleRemoveFromFavoritesFolder(sourceData.id); /**parent null */
+    }
+  };
+
   const handleRemoveFromFavorites = (favorite: IFavorite) => {
     deleteFavorite(workspaceSlug.toString(), favorite.id)
       .then(() => {
         setToast({
           type: TOAST_TYPE.SUCCESS,
-          title: "Success!",
-          message: "Favorite removed successfully.",
+          title: t("success"),
+          message: t("favorite_removed_successfully"),
         });
       })
       .catch(() => {
         setToast({
           type: TOAST_TYPE.ERROR,
-          title: "Error!",
-          message: "Something went wrong!",
+          title: t("error"),
+          message: t("something_went_wrong"),
         });
       });
   };
   const handleRemoveFromFavoritesFolder = (favoriteId: string) => {
-    removeFromFavoriteFolder(workspaceSlug.toString(), favoriteId, {
-      id: favoriteId,
-      parent: null,
-    })
-      .then(() => {
-        setToast({
-          type: TOAST_TYPE.SUCCESS,
-          title: "Success!",
-          message: "Favorite moved successfully.",
-        });
-      })
-      .catch(() => {
+    removeFromFavoriteFolder(workspaceSlug.toString(), favoriteId).catch(() => {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: t("error"),
+        message: t("failed_to_move_favorite"),
+      });
+    });
+  };
+
+  const handleReorder = useCallback(
+    (favoriteId: string, droppedFavId: string, edge: string | undefined) => {
+      reOrderFavorite(workspaceSlug.toString(), favoriteId, droppedFavId, edge).catch(() => {
         setToast({
           type: TOAST_TYPE.ERROR,
-          title: "Error!",
-          message: "Failed to move favorite.",
+          title: t("error"),
+          message: t("failed_to_reorder_favorite"),
         });
       });
-  };
+    },
+    [workspaceSlug, reOrderFavorite]
+  );
+
   useEffect(() => {
     if (sidebarCollapsed) toggleFavoriteMenu(true);
   }, [sidebarCollapsed, toggleFavoriteMenu]);
@@ -131,10 +188,10 @@ export const SidebarFavoritesMenu = observer(() => {
             )}
           >
             <span onClick={() => toggleFavoriteMenu(!isFavoriteMenuOpen)} className="flex-1 text-start">
-              YOUR FAVORITES
+              {t("your_favorites").toUpperCase()}
             </span>
             <span className="flex flex-shrink-0 opacity-0 pointer-events-none group-hover/workspace-button:opacity-100 group-hover/workspace-button:pointer-events-auto rounded p-0.5 ">
-              <Tooltip tooltipHeading="Create folder" tooltipContent="">
+              <Tooltip tooltipHeading={t("create_folder")} tooltipContent="">
                 <FolderPlus
                   onClick={() => {
                     setCreateNewFolder(true);
@@ -173,7 +230,9 @@ export const SidebarFavoritesMenu = observer(() => {
               {Object.keys(groupedFavorites).length === 0 ? (
                 <>
                   {!sidebarCollapsed && (
-                    <span className="text-custom-text-400 text-xs font-medium px-8 py-1.5">No favorites yet</span>
+                    <span className="text-custom-text-400 text-xs font-medium px-8 py-1.5">
+                      {t("no_favorites_yet")}
+                    </span>
                   )}
                 </>
               ) : (
