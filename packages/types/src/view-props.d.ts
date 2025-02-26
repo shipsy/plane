@@ -1,4 +1,14 @@
-import { EIssueLayoutTypes } from "constants/issue";
+// Define EIssueLayoutTypes enum to match the one in core/constants/issue.ts
+export enum EIssueLayoutTypes {
+  LIST = "list",
+  KANBAN = "kanban",
+  CALENDAR = "calendar",
+  GANTT = "gantt_chart",
+  SPREADSHEET = "spreadsheet",
+}
+
+// Define TIssueViewOptions as an alias to TIssueLayouts for backward compatibility
+export type TIssueViewOptions = TIssueLayouts;
 
 export type TIssueLayouts =
   | "list"
@@ -209,6 +219,14 @@ export interface IWorkspaceViewProps {
   display_filters: IIssueDisplayFilterOptions | undefined;
   display_properties: IIssueDisplayProperties;
 }
+export interface IWorkspaceIssueDisplayFilterOptions {
+  // Define this interface to match IWorkspaceGlobalViewDisplayFilterOptions
+  order_by?: string | undefined;
+  type?: "active" | "backlog" | null;
+  sub_issue?: boolean;
+  layout?: TIssueLayouts;
+}
+
 export interface IWorkspaceGlobalViewProps {
   filters: IWorkspaceIssueFilterOptions;
   display_filters: IWorkspaceGlobalViewDisplayFilterOptions | undefined;

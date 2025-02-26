@@ -242,7 +242,7 @@ export const ProjectViewForm: React.FC<Props> = observer((props) => {
                         layout: selectedValue,
                       })
                     }
-                    value={displayFilters.layout}
+                    value={displayFilters.layout || EIssueLayoutTypes.LIST}
                   />
 
                   {/* filters dropdown */}
@@ -270,7 +270,7 @@ export const ProjectViewForm: React.FC<Props> = observer((props) => {
                               [key]: newValues,
                             });
                           }}
-                          layoutDisplayFiltersOptions={ISSUE_DISPLAY_FILTERS_BY_LAYOUT.issues[displayFilters.layout]}
+                          layoutDisplayFiltersOptions={ISSUE_DISPLAY_FILTERS_BY_LAYOUT.issues[displayFilters.layout || EIssueLayoutTypes.LIST]}
                           labels={projectLabels ?? undefined}
                           memberIds={projectMemberIds ?? undefined}
                           states={projectStates}
@@ -288,7 +288,7 @@ export const ProjectViewForm: React.FC<Props> = observer((props) => {
                     render={({ field: { onChange: onDisplayPropertiesChange, value: displayProperties } }) => (
                       <FiltersDropdown title="Display">
                         <DisplayFiltersSelection
-                          layoutDisplayFiltersOptions={ISSUE_DISPLAY_FILTERS_BY_LAYOUT.issues[displayFilters.layout]}
+                          layoutDisplayFiltersOptions={ISSUE_DISPLAY_FILTERS_BY_LAYOUT.issues[displayFilters.layout || EIssueLayoutTypes.LIST]}
                           displayFilters={displayFilters ?? {}}
                           handleDisplayFiltersUpdate={(updatedDisplayFilter: Partial<IIssueDisplayFilterOptions>) => {
                             onDisplayFiltersChange({
