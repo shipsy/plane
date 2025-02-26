@@ -61,29 +61,33 @@ export const useGroupIssuesDragNDrop = (
     const moduleKey = ISSUE_FILTER_DEFAULT_DATA["module"];
     const cycleKey = ISSUE_FILTER_DEFAULT_DATA["cycle"];
 
-    const isModuleChanged = Object.keys(data).includes(moduleKey);
-    const isCycleChanged = Object.keys(data).includes(cycleKey);
+    const isModuleChanged = Object.keys(data).indexOf(moduleKey.toString()) !== -1;
+    const isCycleChanged = Object.keys(data).indexOf(cycleKey.toString()) !== -1;
 
     if (isCycleChanged && workspaceSlug) {
-      if (data[cycleKey]) {
-        addCycleToIssue(workspaceSlug.toString(), projectId, data[cycleKey]?.toString() ?? "", issueId).catch(() =>
+      const cycleKeyStr = cycleKey.toString();
+      if (data[cycleKeyStr as keyof typeof data]) {
+        addCycleToIssue(workspaceSlug.toString(), projectId, data[cycleKeyStr as keyof typeof data]?.toString() ?? "", issueId).catch(() =>
           setToast(errorToastProps)
         );
       } else {
         removeCycleFromIssue(workspaceSlug.toString(), projectId, issueId).catch(() => setToast(errorToastProps));
       }
-      delete data[cycleKey];
+      delete data[cycleKeyStr as keyof typeof data];
     }
 
-    if (isModuleChanged && workspaceSlug && issueUpdates[moduleKey]) {
-      changeModulesInIssue(
-        workspaceSlug.toString(),
-        projectId,
-        issueId,
-        issueUpdates[moduleKey].ADD,
-        issueUpdates[moduleKey].REMOVE
-      ).catch(() => setToast(errorToastProps));
-      delete data[moduleKey];
+    if (isModuleChanged && workspaceSlug) {
+      const moduleKeyStr = moduleKey.toString();
+      if (issueUpdates[moduleKeyStr]) {
+        changeModulesInIssue(
+          workspaceSlug.toString(),
+          projectId,
+          issueId,
+          issueUpdates[moduleKeyStr].ADD,
+          issueUpdates[moduleKeyStr].REMOVE
+        ).catch(() => setToast(errorToastProps));
+        delete data[moduleKeyStr as keyof typeof data];
+      }
     }
 
     updateIssue && updateIssue(projectId, issueId, data).catch(() => setToast(errorToastProps));
