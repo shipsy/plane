@@ -180,7 +180,7 @@ export interface IWorkspaceGlobalViewDisplayFilterOptions {
   order_by?: string | undefined;
   type?: "active" | "backlog" | null;
   sub_issue?: boolean;
-  layout?: TIssueViewOptions;
+  layout?: TIssueLayouts;
 }
 
 export interface IWorkspaceViewIssuesParams {
@@ -211,7 +211,7 @@ export interface IWorkspaceViewProps {
 }
 export interface IWorkspaceGlobalViewProps {
   filters: IWorkspaceIssueFilterOptions;
-  display_filters: IWorkspaceIssueDisplayFilterOptions | undefined;
+  display_filters: IWorkspaceGlobalViewDisplayFilterOptions | undefined;
   display_properties: IIssueDisplayProperties;
 }
 
