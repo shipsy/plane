@@ -165,7 +165,7 @@ pipeline {
                                 imageName : webImageName,
                                 ecsClusterName : clusterName,
                                 ecsServiceName : frontEndServiceName,
-                                timeout : 300
+                                timeout : 1200
                             )
                         }
                     }
