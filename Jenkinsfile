@@ -193,7 +193,7 @@ pipeline {
                                 imageName : apiImageName,
                                 ecsClusterName : clusterName,
                                 ecsServiceName : apiServiceName,
-                                timeout : 1200
+                                timeout : 300
                             )
                         }
                     }
