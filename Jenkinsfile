@@ -165,7 +165,7 @@ pipeline {
                                 imageName : webImageName,
                                 ecsClusterName : clusterName,
                                 ecsServiceName : frontEndServiceName,
-                                timeout : 1200
+                                timeout : 300
                             )
                         }
                     }
@@ -193,7 +193,7 @@ pipeline {
                                 imageName : apiImageName,
                                 ecsClusterName : clusterName,
                                 ecsServiceName : apiServiceName,
-                                timeout : 300
+                                timeout : 1200
                             )
                         }
                     }
