@@ -1,30 +1,56 @@
-import React from "react";
+import React, { useState } from "react";
 
-type CustomProperty = {
+export type CustomProperty = {
   key: string;
   value: string;
   issue_type_custom_property: string;
 };
 
 type CustomPropertiesProps = {
-  customProperties?: CustomProperty[]; 
+  customProperties?: CustomProperty[];
+  // A function from the parent that calls issueOperations.update
+  updateCustomProperties: (updatedProperties: CustomProperty[]) => void;
 };
 
-export const CustomProperties: React.FC<CustomPropertiesProps> = ({ customProperties }) => {
+export const CustomProperties: React.FC<CustomPropertiesProps> = ({ customProperties, updateCustomProperties }) => {
   if (!Array.isArray(customProperties) || customProperties.length === 0) {
     return null; 
   }
 
+  // Inline editable component for each property
+  const EditableProperty: React.FC<{ property: CustomProperty }> = ({ property }) => {
+    const [value, setValue] = useState(property.value);
+
+    const handleBlur = () => {
+      // Only update if the value has actually changed
+      if (value !== property.value) {
+        // Build an updated properties array
+        const updated = customProperties.map((prop) =>
+          prop.key === property.key ? { ...prop, value } : prop
+        );
+        updateCustomProperties(updated);
+      }
+    };
+
+    return (
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={handleBlur}
+        className="text-sm border rounded px-1 py-0.5"
+      />
+    );
+  };
+
   return (
     <div className="w-full">
-      <hr className="flex-shrink-0 border-custom-sidebar-border-300 h-[0.5px] w-full mx-auto my-1" />
+      <hr className="border-custom-sidebar-border-300 h-[0.5px] w-full mx-auto my-1" />
       {customProperties.map((element) => (
-        <div key={element.key} className="flex min-h-8 gap-2 align-items-center">
-          <div className="flex w-2/5 flex-shrink-0 gap-1 pt-2 text-sm text-custom-text-300">
-            <span>{element.key}</span>
-          </div>
-          <div className="h-full min-h-8 w-3/5 mt-1 ml-5 flex-grow">
-            <span className="text-sm">{element.value}</span>
+        <div key={element.key} className="flex min-h-8 gap-2 items-center">
+          <div className="w-2/5 text-sm text-custom-text-300">{element.key}</div>
+          <div className="w-3/5 ml-5">
+            <EditableProperty property={element} />
           </div>
         </div>
       ))}
