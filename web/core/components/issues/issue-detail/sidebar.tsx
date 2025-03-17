@@ -27,6 +27,7 @@ import { IssueWorklogProperty } from "@/plane-web/components/issues";
 // components
 import type { TIssueOperations } from "./root";
 import { ISSUE_ADDITIONAL_PROPERTIES } from "@/constants/issue";
+import { CustomProperty } from '../custom-properties';
 
 type Props = {
   workspaceSlug: string;
@@ -60,6 +61,12 @@ export const IssueDetailsSidebar: React.FC<Props> = observer((props) => {
 
   const maxDate = issue.target_date ? getDate(issue.target_date) : null;
   maxDate?.setDate(maxDate.getDate());
+
+  const handleCustomPropertiesUpdate = (updatedProperties: CustomProperty[]) => {
+    issueOperations.update(workspaceSlug, projectId, issueId, {
+      custom_properties: updatedProperties,
+    });
+  };
 
   return (
     <>
@@ -315,8 +322,9 @@ export const IssueDetailsSidebar: React.FC<Props> = observer((props) => {
               ) : null
             )}
 
-            <CustomProperties 
-                customProperties={Array.isArray(customProperties) ? customProperties : []} 
+            <CustomProperties
+              customProperties={Array.isArray(customProperties) ? customProperties : []}
+              updateCustomProperties={handleCustomPropertiesUpdate}
             />
           </div>
         </div>

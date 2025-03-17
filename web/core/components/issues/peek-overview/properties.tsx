@@ -32,6 +32,7 @@ import { useIssueDetail, useMember, useProject, useProjectState } from "@/hooks/
 import { IssueAdditionalPropertyValuesUpdate } from "@/plane-web/components/issue-types/values";
 import { IssueWorklogProperty} from "@/plane-web/components/issues";
 import { ISSUE_ADDITIONAL_PROPERTIES } from "@/constants/issue";
+import { CustomProperty } from '../custom-properties';
 
 interface IPeekOverviewProperties {
   workspaceSlug: string;
@@ -64,6 +65,12 @@ export const PeekOverviewProperties: FC<IPeekOverviewProperties> = observer((pro
 
   const maxDate = getDate(issue.target_date);
   maxDate?.setDate(maxDate.getDate());
+
+  const handleCustomPropertiesUpdate = (updatedProperties: CustomProperty[]) => {
+    issueOperations.update(workspaceSlug, projectId, issueId, {
+      custom_properties: updatedProperties,
+    });
+  };
 
   return (
     <div>
@@ -315,7 +322,10 @@ export const PeekOverviewProperties: FC<IPeekOverviewProperties> = observer((pro
           ) : null
         )}
 
-        <CustomProperties customProperties={Array.isArray(customProperties) ? customProperties : []} />
+        <CustomProperties
+          customProperties={Array.isArray(customProperties) ? customProperties : []}
+          updateCustomProperties={handleCustomPropertiesUpdate}
+        />
       </div>
     </div>
   );
