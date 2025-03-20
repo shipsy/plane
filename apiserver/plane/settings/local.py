@@ -14,7 +14,7 @@ DEBUG_TOOLBAR_PATCH_SETTINGS = False
 
 # Only show emails in console don't send it to smtp
 EMAIL_BACKEND = os.environ.get(
-    "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
+    "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"
 )
 
 CACHES = {
