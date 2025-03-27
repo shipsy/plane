@@ -99,7 +99,8 @@ def issue_on_results(issues, group_by, sub_group_by):
         "customer_code",
         "worker_code",
         "reference_number",
-        "trip_reference_number"
+        "trip_reference_number",
+        "custom_propertiess"
     ]
 
     if group_by in FIELD_MAPPER:

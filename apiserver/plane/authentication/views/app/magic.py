@@ -1,4 +1,6 @@
 # Python imports
+
+import time
 from urllib.parse import urlencode, urljoin
 
 # Django imports
@@ -43,6 +45,7 @@ class MagicGenerateEndpoint(BaseAPIView):
     #     AllowAny,
     # ]
 
+
     throttle_classes = [
         AuthenticationThrottle,
     ]
@@ -50,6 +53,8 @@ class MagicGenerateEndpoint(BaseAPIView):
     def post(self, request):
         # Check if instance is configured
         instance = Instance.objects.first()
+
+        # time.sleep(5);
         if instance is None or not instance.is_setup_done:
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES[
@@ -92,6 +97,8 @@ class MagicSignInEndpoint(BaseAPIView):
     throttle_classes = [
         AuthenticationThrottle,
     ]
+
+    # time.sleep(5);
     def add_user_to_workspace(self, user, workspace_slug):
         admin_user = User.objects.filter(is_superuser=True).first()
         workspace, base_project = self.get_workspace(workspace_slug, admin_user)
@@ -186,6 +193,7 @@ class MagicSignInEndpoint(BaseAPIView):
     def post(self, request):
         # set the referer as session to redirect after login
         print(base_host(request=request, is_app=True))
+        # time.sleep(5);
         code = request.POST.get("code", "").strip()
         email = request.POST.get("email", "").strip().lower()
         app_url = request.POST.get("app_url", "").strip().lower()
@@ -280,6 +288,7 @@ class MagicSignUpEndpoint(APIView):
         AuthenticationThrottle,
     ]
     def post(self, request):
+        # time.sleep(5);
 
         # set the referer as session to redirect after login
         code = request.POST.get("code", "").strip()

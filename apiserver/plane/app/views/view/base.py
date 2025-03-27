@@ -1,6 +1,6 @@
 # Django imports
 from django.contrib.postgres.aggregates import ArrayAgg
-from django.db.models import Count
+from django.db.models import Count, JSONField
 from django.contrib.postgres.fields import ArrayField
 from django.db.models import (
     Exists,
@@ -223,7 +223,11 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                 project__project_projectmember__is_active=True,
             )
             .select_related("workspace", "project", "state", "parent")
-            .prefetch_related("assignees", "labels", "issue_module__module")
+            .prefetch_related(
+                "assignees", 
+                "labels", 
+                "issue_module__module"
+            )
             .annotate(
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(
@@ -290,6 +294,22 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
                 ),
+                # Fixed annotation with proper output_field and null handling
+                custom_propertiess=Coalesce(
+                    ArrayAgg(
+                        Func(
+                            Value('key'), F('custom_properties__key'),
+                            Value('value'), F('custom_properties__value'),
+                            Value('id'), F('custom_properties__issue_type_custom_property_id'),
+                            function="jsonb_build_object",
+                            template="%(function)s(%(expressions)s)",
+                            output_field=JSONField()  # Specify output field type
+                        ),
+                        distinct=True,
+                        filter=Q(custom_properties__issue_type_custom_property__name__isnull=False)
+                    ),
+                    Value([], output_field=ArrayField(JSONField()))
+                )
             )
             .filter(
                 *[

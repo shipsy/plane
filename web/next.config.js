@@ -18,8 +18,8 @@ const nextConfig = {
           { key: "X-Frame-Options", value: "ALLOWALL" },
           {
             key: "Content-Security-Policy",
-            value: "frame-ancestors 'self' https://*.shipsy.io http://*.localhost:3001 http://*.localhost:3002 http://5.223.42.156:3000/", // Replace with the domains allowed to embed your app
-          },
+            value: "frame-ancestors 'self' https://*.shipsy.io http://*.shipsy.io http://*.localhost:3000 http://*.localhost:30542 http://*.localhost:3001 http://*.localhost:3002 http://5.223.42.156:3000/"
+           },
           // {
           //   key: "Referrer-Policy",
           //   value: "origin-when-cross-origin",
