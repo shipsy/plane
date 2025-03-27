@@ -39,6 +39,7 @@ from plane.db.models import (
     Workspace,
     WorkspaceMember,
     DraftIssue,
+    IssueTypeCustomProperty
 )
 from plane.utils.cache import cache_response, invalidate_cache
 
@@ -310,6 +311,24 @@ class WorkspaceMemberUserEndpoint(BaseAPIView):
             .first()
         )
         serializer = WorkspaceMemberMeSerializer(workspace_member)
+        response_data = dict(serializer.data)
+        
+        # Get distinct custom property names
+        custom_properties = IssueTypeCustomProperty.objects.filter(
+            issue_type__workspace__slug=slug,
+            is_active=True
+        ).values_list('name', flat=True).distinct()
+        
+        # Create a dictionary with custom property names as keys and True as values
+        custom_props_dict = {prop: True for prop in custom_properties}
+        
+        # # Update display_properties in view_props
+        # view_props = response_data['view_props']
+        # view_props['display_properties'].update(custom_props_dict)
+        
+        # Do the same for default_props
+        default_props = response_data['default_props']
+        default_props['display_properties']['custom_property_field_names'] = custom_props_dict
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
