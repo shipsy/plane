@@ -196,6 +196,7 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     icon: Tags,
     Column: SpreadsheetStandardPropertyColumn,
   },
+<<<<<<< Updated upstream
   hub_code: {
     title: "Hub Code",
     ascendingOrderKey: "hub_code",
@@ -205,6 +206,8 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     icon: Tags,
     Column: SpreadsheetStandardPropertyColumn,
   },
+=======
+>>>>>>> Stashed changes
   hub_name: {
     title: "Hub Name",
     ascendingOrderKey: "hub_name",
@@ -214,6 +217,7 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     icon: Tags,
     Column: SpreadsheetStandardPropertyColumn,
   },
+<<<<<<< Updated upstream
   customer_code: {
     title: "Customer Code",
     ascendingOrderKey: "customer_code",
@@ -223,6 +227,8 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     icon: Tags,
     Column: SpreadsheetStandardPropertyColumn,
   },
+=======
+>>>>>>> Stashed changes
   customer_name: {
     title: "Customer Name",
     ascendingOrderKey: "customer_name",
@@ -241,6 +247,7 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     icon: Tags,
     Column: SpreadsheetStandardPropertyColumn,
   },
+<<<<<<< Updated upstream
   vendor_code: {
     title: "Vendor Code",
     ascendingOrderKey: "vendor_code",
@@ -259,6 +266,8 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     icon: Tags,
     Column: SpreadsheetStandardPropertyColumn,
   },
+=======
+>>>>>>> Stashed changes
   worker_name: {
     title: "Worker Name",
     ascendingOrderKey: "worker_name",
@@ -287,6 +296,7 @@ export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [
   "sub_issue_count",
   "trip_reference_number",
   "reference_number",
+<<<<<<< Updated upstream
   "hub_code",
   "hub_name",
   "customer_code",
@@ -294,6 +304,11 @@ export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [
   "vendor_name",
   "vendor_code",
   "worker_code",
+=======
+  "hub_name",
+  "customer_name",
+  "vendor_name",
+>>>>>>> Stashed changes
   "worker_name",
 ];
 

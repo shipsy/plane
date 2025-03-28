@@ -309,6 +309,7 @@ export const getComputedDisplayProperties = (
   issue_type: displayProperties?.issue_type ?? true,
   trip_reference_number: displayProperties?.trip_reference_number ?? true,
   reference_number: displayProperties?.reference_number ?? true,
+<<<<<<< Updated upstream
   hub_code: displayProperties?.hub_code ?? true,
   hub_name: displayProperties?.hub_name ?? true,
   customer_code: displayProperties?.customer_code ?? true,
@@ -316,5 +317,10 @@ export const getComputedDisplayProperties = (
   vendor_name: displayProperties?.vendor_name ?? true,
   vendor_code: displayProperties?.vendor_code ?? true,
   worker_code: displayProperties?.worker_code ?? true,
+=======
+  hub_name: displayProperties?.hub_name ?? true,
+  customer_name: displayProperties?.customer_name ?? true,
+  vendor_name: displayProperties?.vendor_name ?? true,
+>>>>>>> Stashed changes
   worker_name: displayProperties?.worker_name ?? true,
 });

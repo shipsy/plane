@@ -592,6 +592,7 @@ def filter_custom_properties(params, issue_filter, method, prefix=""):
 
 def filter_character_fields(params, issue_filter, method, prefix=""):
     character_fields = [
+<<<<<<< Updated upstream
         "trip_reference_number",
         "reference_number",
         "hub_code",
@@ -602,6 +603,18 @@ def filter_character_fields(params, issue_filter, method, prefix=""):
         "vendor_code",
         "worker_code",
         "worker_name",
+=======
+        "hub_code", 
+        "worker_code", 
+        "vendor_code", 
+        "trip_reference_number", 
+        "reference_number", 
+        "customer_code",
+        "hub_name",
+        "customer_name",
+        "vendor_name",
+        "worker_name"
+>>>>>>> Stashed changes
     ]
 
     for field in character_fields:

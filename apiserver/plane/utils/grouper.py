@@ -95,6 +95,7 @@ def issue_on_results(issues, group_by, sub_group_by):
         "archived_at",
         "state__group",
         "trip_reference_number",
+<<<<<<< Updated upstream
         "reference_number",
         "hub_code",
         "hub_name",
@@ -104,6 +105,12 @@ def issue_on_results(issues, group_by, sub_group_by):
         "vendor_code",
         "worker_code",
         "worker_name",
+=======
+        "hub_name",
+        "customer_name",
+        "vendor_name",
+        "worker_name"
+>>>>>>> Stashed changes
     ]
 
     if group_by in FIELD_MAPPER:

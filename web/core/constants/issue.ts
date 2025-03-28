@@ -113,6 +113,7 @@ export const ISSUE_FILTER_OPTIONS: {
 const whileListedCustomProperties = [
   { key: "trip_reference_number", title: "Trip Reference Number" },
   { key: "reference_number", title: "Reference Number" },
+<<<<<<< Updated upstream
   { key: "hub_code", title: "Hub Code" },
   { key: "hub_name", title: "Hub Name" },
   { key: "customer_code", title: "Customer Code" },
@@ -121,6 +122,13 @@ const whileListedCustomProperties = [
   { key: "vendor_code", title: "Vendor Code" },
   { key: "worker_code", title: "Worker Code" },
   { key: "worker_name", title: "Worker Name" },
+=======
+  { key: "hub_name", title: "Hub Name" },
+  { key: "customer_name", title: "Customer Name" },
+  { key: "vendor_name", title: "Vendor Name" },
+  { key: "worker_name", title: "Worker Name" },
+  
+>>>>>>> Stashed changes
 ];
 
 export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = [

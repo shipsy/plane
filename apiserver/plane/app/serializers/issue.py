@@ -717,6 +717,12 @@ class IssueSerializer(DynamicBaseSerializer):
             "vendor_name",
             "vendor_code",
             "worker_code",
+<<<<<<< Updated upstream
+=======
+            "hub_name",
+            "customer_name",
+            "vendor_name",
+>>>>>>> Stashed changes
             "worker_name",
             "priority",
             "start_date",

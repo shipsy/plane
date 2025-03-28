@@ -78,6 +78,7 @@ def get_default_display_properties():
         "updated_on": True,
         "trip_reference_number": True,
         "reference_number": True,
+<<<<<<< Updated upstream
         "hub_code": True,
         "hub_name": True,
         "customer_code": True,
@@ -85,6 +86,11 @@ def get_default_display_properties():
         "vendor_name":True,
         "vendor_code":True,
         "worker_code":True,
+=======
+        "hub_name":True,
+        "customer_name":True,
+        "vendor_name":True,
+>>>>>>> Stashed changes
         "worker_name":True,
     }
 
