@@ -82,6 +82,10 @@ def get_default_display_properties():
         "vendor_code": True,
         "trip_reference_number": True,
         "reference_number": True,
+        "hub_name":True,
+        "customer_name":True,
+        "vendor_name":True,
+        "worker_name":True,
     }
 
 
@@ -145,6 +149,10 @@ class Issue(ProjectBaseModel):
     worker_code = models.CharField(max_length=255, blank=True, null=True)
     reference_number = models.CharField(max_length=255, blank=True, null=True)
     trip_reference_number = models.CharField(max_length=255, blank=True, null=True)
+    hub_name = models.CharField(max_length=255, blank=True, null=True)
+    customer_name = models.CharField(max_length=255, blank=True, null=True)
+    vendor_name = models.CharField(max_length=255, blank=True, null=True)
+    worker_name = models.CharField(max_length=255, blank=True, null=True)
     name = models.CharField(max_length=255, verbose_name="Issue Name")
     description = models.JSONField(blank=True, default=dict)
     description_html = models.TextField(blank=True, default="<p></p>")
