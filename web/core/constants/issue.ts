@@ -110,6 +110,19 @@ export const ISSUE_FILTER_OPTIONS: {
   // { key: "draft", title: "Draft Issues" },
 ];
 
+const whileListedCustomProperties = [
+    { key: "trip_reference_number", title: "Trip Reference Number" },
+    { key: "reference_number", title: "Reference Number" },
+    { key: "hub_code", title: "Hub Code" },
+    { key: "hub_name", title: "Hub Name" },
+    { key: "customer_code", title: "Customer Code" },
+    { key: "customer_name", title: "Customer Name" },
+    { key: "vendor_name", title: "Vendor Name" },
+    { key: "vendor_code", title: "Vendor Code" },
+    { key: "worker_code", title: "Worker Code" },
+    { key: "worker_name", title: "Worker Name" },
+];
+
 export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = [
   "assignee",
   "start_date",
@@ -127,6 +140,7 @@ export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = 
   "modules",
   "cycle",
   "issue_type",
+  ...whileListedCustomProperties.map(prop => prop.key),
 ];
 
 export const ISSUE_DISPLAY_PROPERTIES: {
@@ -147,6 +161,7 @@ export const ISSUE_DISPLAY_PROPERTIES: {
   { key: "estimate", title: "Estimate" },
   { key: "modules", title: "Modules" },
   { key: "cycle", title: "Cycle" },
+  ...whileListedCustomProperties,
 ];
 
 export const ISSUE_EXTRA_OPTIONS: {
@@ -521,10 +536,14 @@ export const ISSUE_ADDITIONAL_PROPERTIES: {
     key: keyof TIssue;
     title: string;
   }[] = [
+    { key: "trip_reference_number", title: "Trip Reference Number" },
+    { key: "reference_number", title: "Reference Number" },
     { key: "hub_code", title: "Hub Code" },
+    { key: "hub_name", title: "Hub Name" },
     { key: "customer_code", title: "Customer Code" },
-    { key: "worker_code", title: "Worker Code" },
+    { key: "customer_name", title: "Customer Name" },
+    { key: "vendor_name", title: "Vendor Name" },
     { key: "vendor_code", title: "Vendor Code" },
-    { key: "trip_reference_number", title: "Trip Ref Number" },
-    { key: "reference_number", title: "Reference Number" }
+    { key: "worker_code", title: "Worker Code" },
+    { key: "worker_name", title: "Worker Name" },
   ];
