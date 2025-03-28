@@ -56,7 +56,7 @@ class IssueCustomPropertySerializer(BaseSerializer):
 class IssueSerializer(BaseSerializer):
     assignees = serializers.ListField(
         child=serializers.PrimaryKeyRelatedField(
-            queryset=User.objects.values_list("id", flat=True)
+            queryset=User.objects.all()
         ),
         write_only=True,
         required=False,
@@ -338,13 +338,19 @@ class IssueSerializer(BaseSerializer):
         if "assignees" in self.fields:
             if "assignees" in self.expand:
                 from .user import UserLiteSerializer
-
+                active_assignees = instance.assignees.filter(
+                    issue_assignee__deleted_at__isnull=True
+                ).distinct()
                 data["assignees"] = UserLiteSerializer(
-                    instance.assignees.all(), many=True
+                    active_assignees, many=True
                 ).data
             else:
+                # Only get active assignee IDs
+                active_assignee_ids = instance.assignees.filter(
+                    issue_assignee__deleted_at__isnull=True
+                ).distinct().values_list('id', flat=True)
                 data["assignees"] = [
-                    str(assignee.id) for assignee in instance.assignees.all()
+                    str(assignee_id) for assignee_id in active_assignee_ids
                 ]
         if "labels" in self.fields:
             if "labels" in self.expand:

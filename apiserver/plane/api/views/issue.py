@@ -537,6 +537,11 @@ class IssueAPIEndpoint(BaseAPIView):
                     status=status.HTTP_409_CONFLICT,
                 )
             serializer.save()
+            response_data = serializer.data
+            if 'assignees' in response_data:
+                # Use a set to remove duplicates
+                response_data['assignees'] = list(set(response_data['assignees']))
+                print("Unique assignees:", response_data['assignees'])
             issue_activity.delay(
                 type="issue.activity.updated",
                 requested_data=requested_data,
@@ -546,7 +551,7 @@ class IssueAPIEndpoint(BaseAPIView):
                 current_instance=current_instance,
                 epoch=int(timezone.now().timestamp())
             )
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(response_data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, slug, project_id, pk=None):
