@@ -294,9 +294,8 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                 custom_propertiess=Coalesce(
                     ArrayAgg(
                         Func(
-                            Value('key'), F('custom_properties__key'),
-                            Value('value'), F('custom_properties__value'),
-                            Value('id'), F('custom_properties__issue_type_custom_property_id'),
+                            F('custom_properties__key'),
+                            F('custom_properties__value'),
                             function="jsonb_build_object",
                             template="%(function)s(%(expressions)s)",
                             output_field=JSONField()  # Specify output field type
