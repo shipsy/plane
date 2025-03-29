@@ -403,7 +403,6 @@ class ProjectMemberUserEndpoint(BaseAPIView):
         )
         serializer = ProjectMemberSerializer(project_member)
         response_data = dict(serializer.data)
-        print("response",response_data)
         # Get distinct custom property names
         custom_properties = IssueTypeCustomProperty.objects.filter(
             issue_type__workspace__slug=slug,
@@ -412,7 +411,6 @@ class ProjectMemberUserEndpoint(BaseAPIView):
         
         # Create a dictionary with custom property names as keys and True as values
         custom_props_dict = {prop: True for prop in custom_properties}
-        print("iisues",custom_props_dict)
         default_props = response_data['default_props']['display_properties']=custom_props_dict
 
         return Response(serializer.data, status=status.HTTP_200_OK)

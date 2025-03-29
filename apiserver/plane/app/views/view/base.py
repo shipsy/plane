@@ -301,7 +301,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                             output_field=JSONField()  # Specify output field type
                         ),
                         distinct=True,
-                        filter=Q(custom_properties__issue_type_custom_property__name__isnull=False)
+                        filter=Q(custom_properties__key__isnull=False)
                     ),
                     Value([], output_field=ArrayField(JSONField()))
                 )
