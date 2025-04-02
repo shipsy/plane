@@ -602,6 +602,8 @@ def filter_character_fields(params, issue_filter, method, prefix=""):
         "worker_name"
         "vendor_code",
         "worker_code",
+        "worker_name",
+        "source",
     ]
 
     for field in character_fields:
