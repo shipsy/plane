@@ -50,6 +50,7 @@ from plane.db.models import (
     ProjectMember,
     CycleIssue,
     IssueCustomProperty,
+    IssueTypeCustomProperty
 )
 from plane.utils.grouper import (
     issue_group_values,
@@ -833,7 +834,7 @@ class IssueUserDisplayPropertyEndpoint(BaseAPIView):
             issue_type__workspace__slug=slug,
             is_active=True
         ).values_list('name', flat=True).distinct()
-        
+
         custom_props_dict = {prop: True for prop in custom_properties}
         default_props = response_data['default_props']
         display_properties = default_props['display_properties']
