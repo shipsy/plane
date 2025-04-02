@@ -235,9 +235,30 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
   },
 };
 
+export const CUSTOM_PROPERTY_KEYS = [
+  "Hub Code",
+  "Vendor Code",
+  "Vendor Name",
+  "Customer Name",
+  "Customer Code",
+  "Consignment Number",
+  "Trip Number",
+  "Hub Name"
+];
+
 export const getCustomPropertyDetails = (propertyKey: string) => {
+  const formatTitle = (key: string) => {
+    if (CUSTOM_PROPERTY_KEYS.indexOf(key) !== -1) {
+      return key;
+    }
+    return key
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   return {
-    title: propertyKey,
+    title: formatTitle(propertyKey),
     ascendingOrderKey: propertyKey as TIssueOrderByOptions,
     ascendingOrderTitle: "A",
     descendingOrderKey: `-${propertyKey}` as TIssueOrderByOptions,
