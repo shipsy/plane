@@ -827,6 +827,11 @@ class IssueUserDisplayPropertyEndpoint(BaseAPIView):
             user=request.user, project_id=project_id
         )
         serializer = IssueUserPropertySerializer(issue_property)
+        response_data = dict(serializer.data)
+        custom_props_dict = {prop: True for prop in custom_properties}
+        default_props = response_data['default_props']
+        display_properties = default_props['display_properties']
+        display_properties['display_custom_properties'] = custom_props_dict
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
