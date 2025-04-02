@@ -248,7 +248,7 @@ export const CUSTOM_PROPERTY_KEYS = [
 
 export const getCustomPropertyDetails = (propertyKey: string) => {
   const formatTitle = (key: string) => {
-    if (CUSTOM_PROPERTY_KEYS.indexOf(key) !== -1) {
+    if (key.indexOf(" ") !== -1) {
       return key;
     }
     return key

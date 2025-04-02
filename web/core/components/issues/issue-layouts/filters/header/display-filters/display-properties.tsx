@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // types
@@ -7,6 +7,7 @@ import { IIssueDisplayProperties } from "@plane/types";
 import { ISSUE_DISPLAY_PROPERTIES } from "@/constants/issue";
 // plane web helpers
 import { shouldRenderDisplayProperty } from "@/plane-web/helpers/issue-filter.helper";
+import { fetchCustomProperties } from "../../../../../../services/custom-properties.service";
 // components
 import { FilterHeader } from "../helpers/filter-header";
 
@@ -30,8 +31,21 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
   const { workspaceSlug, projectId: routerProjectId } = useParams();
   // states
   const [previewEnabled, setPreviewEnabled] = React.useState(true);
+  const [customPropertyKeys, setCustomPropertyKeys] = useState<string[]>([]);
   // derived values
   const projectId = !!routerProjectId ? routerProjectId?.toString() : undefined;
+  
+  useEffect(() => {
+    const getCustomProperties = async () => {
+      if (workspaceSlug) {
+        const customPropertiesData = await fetchCustomProperties(workspaceSlug.toString());
+        const keys = Object.keys(customPropertiesData);
+        setCustomPropertyKeys(keys);
+      }
+    };
+    
+    getCustomProperties();
+  }, [workspaceSlug]);
 
   // Filter out "cycle" and "module" keys if cycleViewDisabled or moduleViewDisabled is true
   // Also filter out display properties that should not be rendered
@@ -48,7 +62,14 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
   });
 
   const customProperties = Object.keys(displayProperties).filter(
-    (property) => !ISSUE_DISPLAY_PROPERTIES.some((p) => p.key === property) && displayProperties[property]
+    (property) => 
+      !ISSUE_DISPLAY_PROPERTIES.some((p) => p.key === property) && 
+      displayProperties[property] && 
+      customPropertyKeys.indexOf(property) !== -1
+  );
+  
+  const missingCustomProperties = customPropertyKeys.filter(
+    (key) => Object.keys(displayProperties).indexOf(key) === -1
   );
 
   return (
@@ -95,6 +116,24 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
                 onClick={() =>
                   handleUpdate({
                     [propertyKey]: !displayProperties?.[propertyKey],
+                  })
+                }
+              >
+                {propertyKey}
+              </button>
+            </>
+          ))}
+          
+          {/* Missing Custom Properties from API */}
+          {missingCustomProperties.map((propertyKey) => (
+            <>
+              <button
+                key={propertyKey}
+                type="button"
+                className="rounded border border-custom-border-200 px-2 py-0.5 text-xs hover:bg-custom-background-80"
+                onClick={() =>
+                  handleUpdate({
+                    [propertyKey]: true,
                   })
                 }
               >
