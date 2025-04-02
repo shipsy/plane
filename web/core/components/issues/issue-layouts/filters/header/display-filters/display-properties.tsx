@@ -47,6 +47,10 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
     }
   });
 
+  const customProperties = Object.keys(displayProperties).filter(
+    (property) => !ISSUE_DISPLAY_PROPERTIES.some((p) => p.key === property) && displayProperties[property]
+  );
+
   return (
     <>
       <FilterHeader
@@ -73,6 +77,28 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
                 }
               >
                 {displayProperty.title}
+              </button>
+            </>
+          ))}
+          
+          {/* Custom Properties */}
+          {customProperties.map((propertyKey) => (
+            <>
+              <button
+                key={propertyKey}
+                type="button"
+                className={`rounded border px-2 py-0.5 text-xs transition-all ${
+                  displayProperties?.[propertyKey]
+                    ? "border-custom-primary-100 bg-custom-primary-100 text-white"
+                    : "border-custom-border-200 hover:bg-custom-background-80"
+                }`}
+                onClick={() =>
+                  handleUpdate({
+                    [propertyKey]: !displayProperties?.[propertyKey],
+                  })
+                }
+              >
+                {propertyKey}
               </button>
             </>
           ))}

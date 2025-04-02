@@ -34,6 +34,7 @@ import {
   SpreadsheetSubIssueColumn,
   SpreadsheetUpdatedOnColumn,
   SpreadsheetStandardPropertyColumn,
+  SpreadsheetCustomPropertyColumn,
 } from "@/components/issues/issue-layouts/spreadsheet";
 
 export const SPREADSHEET_PROPERTY_DETAILS: {
@@ -232,6 +233,18 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     icon: Tags,
     Column: SpreadsheetStandardPropertyColumn,
   },
+};
+
+export const getCustomPropertyDetails = (propertyKey: string) => {
+  return {
+    title: propertyKey,
+    ascendingOrderKey: propertyKey as TIssueOrderByOptions,
+    ascendingOrderTitle: "A",
+    descendingOrderKey: `-${propertyKey}` as TIssueOrderByOptions,
+    descendingOrderTitle: "Z",
+    icon: Tag, // Default icon
+    Column: SpreadsheetCustomPropertyColumn,
+  };
 };
 
 export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [

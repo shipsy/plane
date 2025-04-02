@@ -2,6 +2,7 @@ import { useRef } from "react";
 //types
 import { observer } from "mobx-react";
 import { IIssueDisplayFilterOptions, IIssueDisplayProperties } from "@plane/types";
+import { SPREADSHEET_PROPERTY_DETAILS, getCustomPropertyDetails } from "@/constants/spreadsheet";
 //components
 import { WithDisplayPropertiesHOC } from "../properties/with-display-properties-HOC";
 import { HeaderColumn } from "./columns/header-column";
@@ -20,6 +21,8 @@ export const SpreadsheetHeaderColumn = observer((props: Props) => {
   const tableHeaderCellRef = useRef<HTMLTableCellElement | null>(null);
 
   const shouldRenderProperty = property === "estimate" ? isEstimateEnabled : true;
+  
+  const columnDetails = SPREADSHEET_PROPERTY_DETAILS[property] || getCustomPropertyDetails(property as string);
 
   return (
     <WithDisplayPropertiesHOC

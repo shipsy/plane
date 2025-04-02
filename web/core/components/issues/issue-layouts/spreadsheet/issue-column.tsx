@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 // types
 import { IIssueDisplayProperties, TIssue } from "@plane/types";
 // constants
-import { SPREADSHEET_PROPERTY_DETAILS } from "@/constants/spreadsheet";
+import { SPREADSHEET_PROPERTY_DETAILS, getCustomPropertyDetails } from "@/constants/spreadsheet";
 // hooks
 import { useEventTracker } from "@/hooks/store";
 // components
@@ -27,8 +27,9 @@ export const IssueColumn = observer((props: Props) => {
   const { captureIssueEvent } = useEventTracker();
 
   const shouldRenderProperty = property === "estimate" ? isEstimateEnabled : true;
-
-  const { Column } = SPREADSHEET_PROPERTY_DETAILS[property];
+  
+  const columnDetails = SPREADSHEET_PROPERTY_DETAILS[property] || getCustomPropertyDetails(property as string);
+  const { Column } = columnDetails;
 
   return (
     <WithDisplayPropertiesHOC

@@ -62,13 +62,19 @@ export const SpreadsheetView: React.FC<Props> = observer((props) => {
 
   const isEstimateEnabled: boolean = currentProjectDetails?.estimate !== null;
 
+  const getCustomPropertiesList = (displayProperties: IIssueDisplayProperties) => {
+    return Object.keys(displayProperties).filter(
+      (key) => !SPREADSHEET_PROPERTY_LIST.includes(key as keyof IIssueDisplayProperties) && displayProperties[key]
+    );
+  };
+
   const spreadsheetColumnsList = isWorkspaceLevel
-    ? SPREADSHEET_PROPERTY_LIST
-    : SPREADSHEET_PROPERTY_LIST.filter((property) => {
+    ? [...SPREADSHEET_PROPERTY_LIST, ...getCustomPropertiesList(displayProperties)]
+    : [...SPREADSHEET_PROPERTY_LIST.filter((property) => {
         if (property === "cycle" && !currentProjectDetails?.cycle_view) return false;
         if (property === "modules" && !currentProjectDetails?.module_view) return false;
         return true;
-      });
+      }), ...getCustomPropertiesList(displayProperties)];
 
   if (!issueIds || issueIds.length === 0)
     return (

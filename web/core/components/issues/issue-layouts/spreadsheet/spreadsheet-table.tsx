@@ -3,6 +3,7 @@ import { observer } from "mobx-react";
 // types
 import { IIssueDisplayFilterOptions, IIssueDisplayProperties, TIssue } from "@plane/types";
 import { SpreadsheetIssueRowLoader } from "@/components/ui/loader";
+import { SPREADSHEET_PROPERTY_DETAILS, getCustomPropertyDetails } from "@/constants/spreadsheet";
 //hooks
 import { useIntersectionObserver } from "@/hooks/use-intersection-observer";
 import { useIssuesStore } from "@/hooks/use-issue-layout-store";
