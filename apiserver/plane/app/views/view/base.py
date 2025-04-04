@@ -208,8 +208,8 @@ class WorkspaceViewViewSet(BaseViewSet):
 class WorkspaceViewIssuesViewSet(BaseViewSet):
     def get_queryset(self, filters):
         custom_properties = filters.get("custom_properties", {})
-        print("neeraje",custom_properties)
         custom_filters = []
+
         for key, values in custom_properties.items():
             key_parts = key.split('__')
             actual_key = key_parts[0]
@@ -224,33 +224,75 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
 
             data_type = data_type_qs[0]
 
-            # Build value field with operator based on data type
+            # Set base field based on data type
             if data_type == "number":
                 base_field = "int_value"
-            elif data_type == "boolean":
-                base_field = "bool_value"
             elif data_type == "date":
                 base_field = "date_value"
             else:
-                base_field = "value"
+                base_field = "value"  # for strings
 
-            # Determine the full Django filter lookup
-            if operator in ["gte", "lte", "gt", "lt", "exact"]:
-                value_field = f"{base_field}__{operator}"
-                value_input = values[0]  # Assume a single value for comparison ops
-            else:  # Default to `in`
-                value_field = f"{base_field}__in"
-                value_input = values
+            # String operators map
+            string_operator_map = {
+                "contains": ("icontains", False),
+                "not_contains": ("icontains", True),
+                "is_equal_to": ("exact", False),
+                "is_not_equal_to": ("exact", True),
+                "isnull": ("isnull", False),
+                "isnotnull": ("isnull", True),
+            }
 
-            custom_filters.append(
-                Q(
+            # Number or Date filters
+            if data_type in ["number", "date"]:
+                valid_comparisons = ["gte", "lte", "gt", "lt", "exact"]
+                if operator in valid_comparisons:
+                    value_field = f"{base_field}__{operator}"
+                    value_input = values[0]
+                    filter_kwargs = {value_field: value_input}
+                elif operator == "between" and len(values) == 2:
+                    filter_kwargs = {f"{base_field}__range": (values[0], values[1])}
+                elif operator in ["isnull", "isnotnull"]:
+                    is_null = operator == "isnull"
+                    filter_kwargs = {f"{base_field}__isnull": is_null}
+                else:
+                    filter_kwargs = {f"{base_field}__in": values}
+
+                q_object = Q(
                     id__in=IssueCustomProperty.objects.filter(
                         issue_id=OuterRef("id"),
                         key=actual_key,
-                        **{value_field: value_input}
+                        **filter_kwargs
                     ).values("issue_id")
                 )
-            )
+
+            # String/text filtering
+            else:
+                if operator in string_operator_map:
+                    lookup, negate = string_operator_map[operator]
+                    if lookup == "isnull":
+                        filter_kwargs = {f"{base_field}__isnull": operator == "isnull"}
+                    else:
+                        filter_kwargs = {f"{base_field}__{lookup}": values[0]}
+                    q = Q(
+                        id__in=IssueCustomProperty.objects.filter(
+                            issue_id=OuterRef("id"),
+                            key=actual_key,
+                            **filter_kwargs
+                        ).values("issue_id")
+                    )
+                    q_object = ~q if negate else q
+                else:
+                    filter_kwargs = {f"{base_field}__in": values}
+                    q_object = Q(
+                        id__in=IssueCustomProperty.objects.filter(
+                            issue_id=OuterRef("id"),
+                            key=actual_key,
+                            **filter_kwargs
+                        ).values("issue_id")
+                    )
+
+                custom_filters.append(q_object)
+
             
         return (
             Issue.issue_objects.annotate(
