@@ -208,7 +208,19 @@ class WorkspaceViewViewSet(BaseViewSet):
 class WorkspaceViewIssuesViewSet(BaseViewSet):
     def get_queryset(self, filters):
         custom_properties = filters.get("custom_properties", {})
+        return self.build_custom_property_filters(custom_properties)
+
+    def build_custom_property_filters(self, custom_properties):
         custom_filters = []
+
+        string_operator_map = {
+            "contains": ("icontains", False),
+            "not_contains": ("icontains", True),
+            "is_equal_to": ("exact", False),
+            "is_not_equal_to": ("exact", True),
+            "isnull": ("isnull", False),
+            "isnotnull": ("isnull", True),
+        }
 
         for key, values in custom_properties.items():
             key_parts = key.split('__')
@@ -223,32 +235,19 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                 continue
 
             data_type = data_type_qs[0]
-            print("data_type",data_type)
 
-            # Set base field based on data type
-            if data_type == "number":
-                base_field = "int_value"
-            elif data_type == "date":
-                base_field = "date_value"
-            else:
-                base_field = "value"  # for strings
-
-            # String operators map
-            string_operator_map = {
-                "contains": ("icontains", False),
-                "not_contains": ("icontains", True),
-                "is_equal_to": ("exact", False),
-                "is_not_equal_to": ("exact", True),
-                "isnull": ("isnull", False),
-                "isnotnull": ("isnull", True),
-            }
+            base_field = (
+                "int_value" if data_type == "number"
+                else "date_value" if data_type == "date"
+                else "value"
+            )
 
             # Number or Date filters
             if data_type in ["number", "date"]:
                 valid_comparisons = ["gte", "lte", "gt", "lt", "exact"]
                 if operator in valid_comparisons:
                     value_field = f"{base_field}__{operator}"
-                    value_input = int(values[0])  # cast to int
+                    value_input = int(values[0])
                     filter_kwargs = {value_field: value_input}
                 elif operator == "between" and len(values) == 2:
                     filter_kwargs = {
@@ -258,7 +257,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                     is_null = operator == "isnull"
                     filter_kwargs = {f"{base_field}__isnull": is_null}
                 else:
-                    filter_kwargs = {f"{base_field}__in": values}
+                    filter_kwargs = {f"{base_field}__in": list(map(int, values))}
 
                 q_object = Q(
                     id__in=IssueCustomProperty.objects.filter(
@@ -267,8 +266,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                         **filter_kwargs
                     ).values("issue_id")
                 )
-
-            # String/text filtering
+            # String filters
             else:
                 if operator in string_operator_map:
                     lookup, negate = string_operator_map[operator]
@@ -294,7 +292,6 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                         ).values("issue_id")
                     )
 
-            # ✅ Append filter regardless of data type
             custom_filters.append(q_object)
 
 
