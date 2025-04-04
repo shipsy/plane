@@ -223,6 +223,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                 continue
 
             data_type = data_type_qs[0]
+            print("data_type",data_type)
 
             # Set base field based on data type
             if data_type == "number":
@@ -247,10 +248,12 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                 valid_comparisons = ["gte", "lte", "gt", "lt", "exact"]
                 if operator in valid_comparisons:
                     value_field = f"{base_field}__{operator}"
-                    value_input = values[0]
+                    value_input = int(values[0])  # cast to int
                     filter_kwargs = {value_field: value_input}
                 elif operator == "between" and len(values) == 2:
-                    filter_kwargs = {f"{base_field}__range": (values[0], values[1])}
+                    filter_kwargs = {
+                        f"{base_field}__range": (int(values[0]), int(values[1]))
+                    }
                 elif operator in ["isnull", "isnotnull"]:
                     is_null = operator == "isnull"
                     filter_kwargs = {f"{base_field}__isnull": is_null}
@@ -291,9 +294,10 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                         ).values("issue_id")
                     )
 
-                custom_filters.append(q_object)
+            # ✅ Append filter regardless of data type
+            custom_filters.append(q_object)
 
-            
+
         return (
             Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(
