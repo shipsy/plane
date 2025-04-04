@@ -208,6 +208,50 @@ class WorkspaceViewViewSet(BaseViewSet):
 class WorkspaceViewIssuesViewSet(BaseViewSet):
     def get_queryset(self, filters):
         custom_properties = filters.get("custom_properties", {})
+        print("neeraje",custom_properties)
+        custom_filters = []
+        for key, values in custom_properties.items():
+            key_parts = key.split('__')
+            actual_key = key_parts[0]
+            operator = key_parts[1] if len(key_parts) > 1 else 'in'
+
+            data_type_qs = IssueCustomProperty.objects.filter(
+                key=actual_key
+            ).values_list("data_type", flat=True).distinct()
+
+            if not data_type_qs:
+                continue
+
+            data_type = data_type_qs[0]
+
+            # Build value field with operator based on data type
+            if data_type == "number":
+                base_field = "int_value"
+            elif data_type == "boolean":
+                base_field = "bool_value"
+            elif data_type == "date":
+                base_field = "date_value"
+            else:
+                base_field = "value"
+
+            # Determine the full Django filter lookup
+            if operator in ["gte", "lte", "gt", "lt", "exact"]:
+                value_field = f"{base_field}__{operator}"
+                value_input = values[0]  # Assume a single value for comparison ops
+            else:  # Default to `in`
+                value_field = f"{base_field}__in"
+                value_input = values
+
+            custom_filters.append(
+                Q(
+                    id__in=IssueCustomProperty.objects.filter(
+                        issue_id=OuterRef("id"),
+                        key=actual_key,
+                        **{value_field: value_input}
+                    ).values("issue_id")
+                )
+            )
+            
         return (
             Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(
@@ -307,16 +351,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                 )
             )
             .filter(
-                *[
-                    Q(
-                        id__in=IssueCustomProperty.objects.filter(
-                            issue_id=OuterRef("id"),
-                            key=group_key,
-                            value__in=values
-                        ).values("issue_id")
-                    )
-                    for group_key, values in custom_properties.items()
-                ]
+                *custom_filters
             )
         )
 
