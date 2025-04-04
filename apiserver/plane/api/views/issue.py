@@ -315,14 +315,12 @@ class IssueAPIEndpoint(BaseAPIView):
     def post(self, request, slug, project_id):
         project = Project.objects.get(pk=project_id)
         data = request.data.get("custom_properties", [])
-        # int_value=0
-        # bool_value = False
         if data:
             for item in data :
                 if item.get("data_type") == "number":
                     int_value = int(item.get("value"))
                     item["int_value"] = int_value
-                
+        request.data["custom_properties"]= data
         serializer = IssueSerializer(
             data=request.data,
             context={
@@ -331,7 +329,6 @@ class IssueAPIEndpoint(BaseAPIView):
                 "default_assignee_id": project.default_assignee_id,
             },
         )
-
         if serializer.is_valid():
             if (
                 request.data.get("external_id")
@@ -357,6 +354,7 @@ class IssueAPIEndpoint(BaseAPIView):
                     status=status.HTTP_409_CONFLICT,
                 )
             serializer.save()
+            print("mahsh",serializer.data)
             # Refetch the issue
             issue = Issue.objects.filter(
                 workspace__slug=slug,
