@@ -3,7 +3,11 @@ import uuid
 from datetime import timedelta
 
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import (
+    Q,
+    OuterRef
+)
+from plane.db.models import IssueCustomProperty
 
 # The date from pattern
 pattern = re.compile(r"\d+_(weeks|months)$")
@@ -659,3 +663,88 @@ def issue_filters(query_params, method, prefix=""):
             
     filter_character_fields(query_params, issue_filter, method, prefix)
     return issue_filter
+
+
+def build_custom_property_q_objects(custom_properties):
+    custom_filters = []
+
+    string_operator_map = {
+        "contains": ("icontains", False),
+         "not_contains": ("icontains", True),
+         "is_equal_to": ("exact", False),
+        "is_not_equal_to": ("exact", True),
+        "isnull": ("isnull", False),
+        "isnotnull": ("isnull", True),
+    }
+
+    for key, values in custom_properties.items():
+        key_parts = key.split('__')
+        actual_key = key_parts[0]
+        operator = key_parts[1] if len(key_parts) > 1 else 'in'
+
+        data_type_qs = IssueCustomProperty.objects.filter(
+            key=actual_key
+        ).values_list("data_type", flat=True).distinct()
+
+        if not data_type_qs:
+            continue
+
+        data_type = data_type_qs[0]
+
+        base_field = (
+            "int_value" if data_type == "number"
+            else "date_value" if data_type == "date"
+            else "value"
+        )
+
+        if data_type in ["number", "date"]:
+            valid_comparisons = ["gte", "lte", "gt", "lt", "exact"]
+            if operator in valid_comparisons:
+                value_field = f"{base_field}__{operator}"
+                value_input = int(values[0])
+                filter_kwargs = {value_field: value_input}
+            elif operator == "between" and len(values) == 2:
+                filter_kwargs = {
+                    f"{base_field}__range": (int(values[0]), int(values[1]))
+                }
+            elif operator in ["isnull", "isnotnull"]:
+                is_null = operator == "isnull"
+                filter_kwargs = {f"{base_field}__isnull": is_null}
+            else:
+                filter_kwargs = {f"{base_field}__in": list(map(int, values))}
+
+            q_object = Q(
+                id__in=IssueCustomProperty.objects.filter(
+                    issue_id=OuterRef("id"),
+                    key=actual_key,
+                    **filter_kwargs
+                ).values("issue_id")
+            )
+        else:
+            if operator in string_operator_map:
+                lookup, negate = string_operator_map[operator]
+                if lookup == "isnull":
+                    filter_kwargs = {f"{base_field}__isnull": operator == "isnull"}
+                else:
+                    filter_kwargs = {f"{base_field}__{lookup}": values[0]}
+                q = Q(
+                    id__in=IssueCustomProperty.objects.filter(
+                        issue_id=OuterRef("id"),
+                        key=actual_key,
+                        **filter_kwargs
+                    ).values("issue_id")
+                )
+                q_object = ~q if negate else q
+            else:
+                filter_kwargs = {f"{base_field}__in": values}
+                q_object = Q(
+                    id__in=IssueCustomProperty.objects.filter(
+                        issue_id=OuterRef("id"),
+                        key=actual_key,
+                        **filter_kwargs
+                    ).values("issue_id")
+                )
+
+        custom_filters.append(q_object)
+
+    return custom_filters

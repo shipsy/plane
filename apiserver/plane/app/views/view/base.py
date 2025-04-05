@@ -47,7 +47,7 @@ from plane.utils.grouper import (
     issue_on_results,
     issue_queryset_grouper,
 )
-from plane.utils.issue_filters import issue_filters
+from plane.utils.issue_filters import issue_filters, build_custom_property_q_objects
 from plane.utils.constants import ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP
 from plane.utils.order_queryset import order_issue_queryset
 from plane.utils.paginator import (
@@ -208,93 +208,7 @@ class WorkspaceViewViewSet(BaseViewSet):
 class WorkspaceViewIssuesViewSet(BaseViewSet):
     def get_queryset(self, filters):
         custom_properties = filters.get("custom_properties", {})
-        return self.build_custom_property_filters(custom_properties)
-
-    def build_custom_property_filters(self, custom_properties):
-        custom_filters = []
-
-        string_operator_map = {
-            "contains": ("icontains", False),
-            "not_contains": ("icontains", True),
-            "is_equal_to": ("exact", False),
-            "is_not_equal_to": ("exact", True),
-            "isnull": ("isnull", False),
-            "isnotnull": ("isnull", True),
-        }
-
-        for key, values in custom_properties.items():
-            key_parts = key.split('__')
-            actual_key = key_parts[0]
-            operator = key_parts[1] if len(key_parts) > 1 else 'in'
-
-            data_type_qs = IssueCustomProperty.objects.filter(
-                key=actual_key
-            ).values_list("data_type", flat=True).distinct()
-
-            if not data_type_qs:
-                continue
-
-            data_type = data_type_qs[0]
-
-            base_field = (
-                "int_value" if data_type == "number"
-                else "date_value" if data_type == "date"
-                else "value"
-            )
-
-            # Number or Date filters
-            if data_type in ["number", "date"]:
-                valid_comparisons = ["gte", "lte", "gt", "lt", "exact"]
-                if operator in valid_comparisons:
-                    value_field = f"{base_field}__{operator}"
-                    value_input = int(values[0])
-                    filter_kwargs = {value_field: value_input}
-                elif operator == "between" and len(values) == 2:
-                    filter_kwargs = {
-                        f"{base_field}__range": (int(values[0]), int(values[1]))
-                    }
-                elif operator in ["isnull", "isnotnull"]:
-                    is_null = operator == "isnull"
-                    filter_kwargs = {f"{base_field}__isnull": is_null}
-                else:
-                    filter_kwargs = {f"{base_field}__in": list(map(int, values))}
-
-                q_object = Q(
-                    id__in=IssueCustomProperty.objects.filter(
-                        issue_id=OuterRef("id"),
-                        key=actual_key,
-                        **filter_kwargs
-                    ).values("issue_id")
-                )
-            # String filters
-            else:
-                if operator in string_operator_map:
-                    lookup, negate = string_operator_map[operator]
-                    if lookup == "isnull":
-                        filter_kwargs = {f"{base_field}__isnull": operator == "isnull"}
-                    else:
-                        filter_kwargs = {f"{base_field}__{lookup}": values[0]}
-                    q = Q(
-                        id__in=IssueCustomProperty.objects.filter(
-                            issue_id=OuterRef("id"),
-                            key=actual_key,
-                            **filter_kwargs
-                        ).values("issue_id")
-                    )
-                    q_object = ~q if negate else q
-                else:
-                    filter_kwargs = {f"{base_field}__in": values}
-                    q_object = Q(
-                        id__in=IssueCustomProperty.objects.filter(
-                            issue_id=OuterRef("id"),
-                            key=actual_key,
-                            **filter_kwargs
-                        ).values("issue_id")
-                    )
-
-            custom_filters.append(q_object)
-
-
+        custom_filters = build_custom_property_q_objects(custom_properties)
         return (
             Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(
