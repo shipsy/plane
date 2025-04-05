@@ -431,6 +431,34 @@ export const IssueProperties: React.FC<IIssueProperties> = observer((props) => {
         </WithDisplayPropertiesHOC>
       )}
 
+      {/* custom properties */}
+      {issue.custom_properties && Object.keys(issue.custom_properties).map((key) => {
+        const value = issue.custom_properties?.[key];
+        if (value === undefined || value === null) return null;
+        
+        return (
+          <WithDisplayPropertiesHOC
+            key={key}
+            displayProperties={displayProperties}
+            displayPropertyKey={key as keyof IIssueDisplayProperties}
+          >
+            <Tooltip
+              tooltipHeading={key}
+              tooltipContent={`${value}`}
+              isMobile={isMobile}
+              renderByDefault={false}
+            >
+              <div
+                onClick={handleEventPropagation}
+                className="flex h-5 flex-shrink-0 items-center justify-center gap-2 overflow-hidden rounded border-[0.5px] border-custom-border-300 px-2.5 py-1"
+              >
+                <div className="text-xs">{value}</div>
+              </div>
+            </Tooltip>
+          </WithDisplayPropertiesHOC>
+        );
+      })}
+
       {/* extra render properties */}
       {/* sub-issues */}
       <WithDisplayPropertiesHOC
