@@ -723,7 +723,7 @@ def build_custom_property_q_objects(custom_properties):
                 ).values("issue_id")
             )
 
-        elif data_type in ["number", "date"]:
+        elif data_type in ["number"]:
             valid_comparisons = ["gte", "lte", "gt", "lt", "exact"]
             if operator in valid_comparisons:
                 value_field = f"{base_field}__{operator}"
