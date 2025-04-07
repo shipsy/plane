@@ -737,6 +737,9 @@ class IssueCustomProperty(ProjectBaseModel):
     )
     key = models.CharField(max_length=255)
     value = models.CharField(max_length=255, null=True, blank=True)
+    data_type = models.CharField(max_length=255, null=True, blank=True)
+    int_value = models.IntegerField(null=True, blank=True)
+    bool_value = models.BooleanField(null=True, blank=True)
     issue_type_custom_property = models.ForeignKey(
         "db.IssueTypeCustomProperty",
         on_delete=models.SET_NULL,

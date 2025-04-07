@@ -3,7 +3,8 @@ import uuid
 from datetime import timedelta
 
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Q, OuterRef
+from plane.db.models import IssueCustomProperty
 
 # The date from pattern
 pattern = re.compile(r"\d+_(weeks|months)$")
@@ -610,6 +611,112 @@ def filter_character_fields(params, issue_filter, method, prefix=""):
             issue_filter[f"{prefix}{field}__iexact"] = value  # Case-insensitive filtering
 
     return issue_filter
+
+def build_custom_property_q_objects(custom_properties):
+    custom_filters = []
+
+    string_operator_map = {
+        "contains": ("icontains", False),
+         "not_contains": ("icontains", True),
+         "is_equal_to": ("exact", False),
+        "is_not_equal_to": ("exact", True),
+        "isnull": ("isnull", False),
+        "isnotnull": ("isnull", True),
+    }
+
+    for key, values in custom_properties.items():
+        key_parts = key.split('__')
+        actual_key = key_parts[0]
+        operator = key_parts[1] if len(key_parts) > 1 else 'in'
+
+        data_type_qs = IssueCustomProperty.objects.filter(
+            key=actual_key
+        ).values_list("data_type", flat=True).distinct()
+
+        if not data_type_qs:
+            continue
+
+        data_type = data_type_qs[0]
+
+        base_field = (
+            "int_value" if data_type == "number"
+            else "date_value" if data_type == "date"
+            else "bool_value" if data_type == "boolean"
+            else "value"
+        )
+
+        # Boolean filters
+        if data_type == "boolean":
+            if operator == "is_true":
+                filter_kwargs = {f"{base_field}": True}
+            elif operator == "is_false":
+                filter_kwargs = {f"{base_field}": False}
+            elif operator == "isnull":
+                filter_kwargs = {f"{base_field}__isnull": True}
+            elif operator == "isnotnull":
+                filter_kwargs = {f"{base_field}__isnull": False}
+            else:
+                bool_values = [
+                    str(v).strip().lower() in ["true", "1", "yes"]
+                    for v in values
+                ]
+                filter_kwargs = {f"{base_field}__in": bool_values}
+
+            q_object = Q(
+                id__in=IssueCustomProperty.objects.filter(
+                    issue_id=OuterRef("id"),
+                    key=actual_key,
+                    **filter_kwargs
+                ).values("issue_id")
+            )
+
+        elif data_type in ["number"]:
+            valid_comparisons = ["gte", "lte", "gt", "lt", "exact"]
+            if operator in valid_comparisons:
+                value_field = f"{base_field}__{operator}"
+                value_input = int(values[0])
+                filter_kwargs = {value_field: value_input}
+            elif operator in ["isnull", "isnotnull"]:
+                is_null = operator == "isnull"
+                filter_kwargs = {f"{base_field}__isnull": is_null}
+            else:
+                filter_kwargs = {f"{base_field}__in": list(map(int, values))}
+
+            q_object = Q(
+                id__in=IssueCustomProperty.objects.filter(
+                    issue_id=OuterRef("id"),
+                    key=actual_key,
+                    **filter_kwargs
+                ).values("issue_id")
+            )
+        else:
+            if operator in string_operator_map:
+                lookup, negate = string_operator_map[operator]
+                if lookup == "isnull":
+                    filter_kwargs = {f"{base_field}__isnull": operator == "isnull"}
+                else:
+                    filter_kwargs = {f"{base_field}__{lookup}": values[0]}
+                q = Q(
+                    id__in=IssueCustomProperty.objects.filter(
+                        issue_id=OuterRef("id"),
+                        key=actual_key,
+                        **filter_kwargs
+                    ).values("issue_id")
+                )
+                q_object = ~q if negate else q
+            else:
+                filter_kwargs = {f"{base_field}__in": values}
+                q_object = Q(
+                    id__in=IssueCustomProperty.objects.filter(
+                        issue_id=OuterRef("id"),
+                        key=actual_key,
+                        **filter_kwargs
+                    ).values("issue_id")
+                )
+
+        custom_filters.append(q_object)
+
+    return custom_filters
 
 
 def issue_filters(query_params, method, prefix=""):

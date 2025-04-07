@@ -11,6 +11,7 @@ from django.db.models import (
     UUIDField,
     Value,
     Subquery,
+    JSONField
 )
 from django.db.models.functions import Coalesce
 from django.utils.decorators import method_decorator
@@ -47,7 +48,7 @@ from plane.utils.grouper import (
     issue_on_results,
     issue_queryset_grouper,
 )
-from plane.utils.issue_filters import issue_filters
+from plane.utils.issue_filters import issue_filters, build_custom_property_q_objects
 from plane.utils.constants import ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP
 from plane.utils.order_queryset import order_issue_queryset
 from plane.utils.paginator import (
@@ -208,6 +209,7 @@ class WorkspaceViewViewSet(BaseViewSet):
 class WorkspaceViewIssuesViewSet(BaseViewSet):
     def get_queryset(self, filters):
         custom_properties = filters.get("custom_properties", {})
+        custom_filters = build_custom_property_q_objects(custom_properties)
         return (
             Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(
@@ -290,18 +292,23 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
                 ),
+                custom_propertiess=Coalesce(
+                    ArrayAgg(
+                        Func(
+                            F('custom_properties__key'),
+                            F('custom_properties__value'),
+                            function="jsonb_build_object",
+                            template="%(function)s(%(expressions)s)",
+                            output_field=JSONField()  # Specify output field type
+                        ),
+                        distinct=True,
+                        filter=Q(custom_properties__key__isnull=False)
+                    ),
+                    Value([], output_field=ArrayField(JSONField()))
+                )
             )
             .filter(
-                *[
-                    Q(
-                        id__in=IssueCustomProperty.objects.filter(
-                            issue_id=OuterRef("id"),
-                            key=group_key,
-                            value__in=values
-                        ).values("issue_id")
-                    )
-                    for group_key, values in custom_properties.items()
-                ]
+                *custom_filters
             )
         )
 

@@ -24,6 +24,7 @@ from plane.db.models import (
     TeamMember,
     IssueUserProperty,
     WorkspaceMember,
+    IssueTypeCustomProperty
 )
 from plane.bgtasks.project_add_user_email_task import project_add_user_email
 from plane.utils.host import base_host
@@ -401,6 +402,16 @@ class ProjectMemberUserEndpoint(BaseAPIView):
             is_active=True,
         )
         serializer = ProjectMemberSerializer(project_member)
+        response_data = dict(serializer.data)
+        # Get distinct custom property names
+        custom_properties = IssueTypeCustomProperty.objects.filter(
+            issue_type__workspace__slug=slug,
+            is_active=True
+        ).values_list('name', flat=True).distinct()
+
+        # Create a dictionary with custom property names as keys and True as values
+        custom_props_dict = {prop: True for prop in custom_properties}
+        default_props = response_data['default_props']['display_properties']=custom_props_dict
 
         return Response(serializer.data, status=status.HTTP_200_OK)
 
