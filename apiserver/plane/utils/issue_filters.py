@@ -694,19 +694,41 @@ def build_custom_property_q_objects(custom_properties):
         base_field = (
             "int_value" if data_type == "number"
             else "date_value" if data_type == "date"
+            else "bool_value" if data_type == "boolean"
             else "value"
         )
 
-        if data_type in ["number", "date"]:
+        # Boolean filters
+        if data_type == "boolean":
+            if operator == "is_true":
+                filter_kwargs = {f"{base_field}": True}
+            elif operator == "is_false":
+                filter_kwargs = {f"{base_field}": False}
+            elif operator == "isnull":
+                filter_kwargs = {f"{base_field}__isnull": True}
+            elif operator == "isnotnull":
+                filter_kwargs = {f"{base_field}__isnull": False}
+            else:
+                bool_values = [
+                    str(v).strip().lower() in ["true", "1", "yes"]
+                    for v in values
+                ]
+                filter_kwargs = {f"{base_field}__in": bool_values}
+
+            q_object = Q(
+                id__in=IssueCustomProperty.objects.filter(
+                    issue_id=OuterRef("id"),
+                    key=actual_key,
+                    **filter_kwargs
+                ).values("issue_id")
+            )
+
+        elif data_type in ["number", "date"]:
             valid_comparisons = ["gte", "lte", "gt", "lt", "exact"]
             if operator in valid_comparisons:
                 value_field = f"{base_field}__{operator}"
                 value_input = int(values[0])
                 filter_kwargs = {value_field: value_input}
-            elif operator == "between" and len(values) == 2:
-                filter_kwargs = {
-                    f"{base_field}__range": (int(values[0]), int(values[1]))
-                }
             elif operator in ["isnull", "isnotnull"]:
                 is_null = operator == "isnull"
                 filter_kwargs = {f"{base_field}__isnull": is_null}

@@ -320,6 +320,17 @@ class IssueAPIEndpoint(BaseAPIView):
                 if item.get("data_type") == "number":
                     int_value = int(item.get("value"))
                     item["int_value"] = int_value
+                elif item.get("data_type") == "boolean":
+                    raw_value = item.get("value")
+                    if raw_value is None:
+                        bool_value = None
+                    elif isinstance(raw_value, bool):
+                        bool_value = raw_value
+                    else:
+                        value = str(raw_value).strip().lower()
+                        bool_value = value in ["true", "1", "yes"]
+                    item["bool_value"] = bool_value
+
         request.data["custom_properties"]= data
         serializer = IssueSerializer(
             data=request.data,
