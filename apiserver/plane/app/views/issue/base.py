@@ -816,6 +816,17 @@ class IssueUserDisplayPropertyEndpoint(BaseAPIView):
             user=request.user, project_id=project_id
         )
         serializer = IssueUserPropertySerializer(issue_property)
+        response_data = dict(serializer.data)
+        # Get distinct custom property names
+        custom_properties = IssueTypeCustomProperty.objects.filter(
+            issue_type__workspace__slug=slug,
+            is_active=True
+        ).values_list('name', flat=True).distinct()
+
+        # Create a dictionary with custom property names as keys and True as values
+        custom_props_dict = {prop: True for prop in custom_properties}
+        display_properties = response_data['display_properties']
+        display_properties.update(custom_props_dict)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

@@ -617,8 +617,8 @@ def build_custom_property_q_objects(custom_properties):
 
     string_operator_map = {
         "contains": ("icontains", False),
-         "not_contains": ("icontains", True),
-         "is_equal_to": ("exact", False),
+        "not_contains": ("icontains", True),
+        "is_equal_to": ("exact", False),
         "is_not_equal_to": ("exact", True),
         "isnull": ("isnull", False),
         "isnotnull": ("isnull", True),
@@ -645,74 +645,93 @@ def build_custom_property_q_objects(custom_properties):
             else "value"
         )
 
+        # Define base filters used across all data types
+        base_filters = {
+            "issue_id": OuterRef("id"),
+            "key": actual_key
+        }
+
         # Boolean filters
         if data_type == "boolean":
+            filter_kwargs = base_filters.copy()
+            
             if operator == "is_true":
-                filter_kwargs = {f"{base_field}": True}
+                filter_kwargs[base_field] = True
             elif operator == "is_false":
-                filter_kwargs = {f"{base_field}": False}
-            elif operator == "isnull":
-                filter_kwargs = {f"{base_field}__isnull": True}
-            elif operator == "isnotnull":
-                filter_kwargs = {f"{base_field}__isnull": False}
+                filter_kwargs[base_field] = False
+            elif operator in ["isnull", "isnotnull"]:
+                filter_kwargs[f"{base_field}__isnull"] = (operator == "isnull")
             else:
                 bool_values = [
                     str(v).strip().lower() in ["true", "1", "yes"]
                     for v in values
                 ]
-                filter_kwargs = {f"{base_field}__in": bool_values}
+                filter_kwargs[f"{base_field}__in"] = bool_values
+            
+            q_object = Q(id__in=IssueCustomProperty.objects.filter(**filter_kwargs).values("issue_id"))
 
-            q_object = Q(
-                id__in=IssueCustomProperty.objects.filter(
-                    issue_id=OuterRef("id"),
-                    key=actual_key,
-                    **filter_kwargs
-                ).values("issue_id")
-            )
-
+        # Number filters
         elif data_type in ["number"]:
-            valid_comparisons = ["gte", "lte", "gt", "lt", "exact"]
-            if operator in valid_comparisons:
-                value_field = f"{base_field}__{operator}"
-                value_input = int(values[0])
-                filter_kwargs = {value_field: value_input}
-            elif operator in ["isnull", "isnotnull"]:
-                is_null = operator == "isnull"
-                filter_kwargs = {f"{base_field}__isnull": is_null}
-            else:
-                filter_kwargs = {f"{base_field}__in": list(map(int, values))}
-
-            q_object = Q(
-                id__in=IssueCustomProperty.objects.filter(
-                    issue_id=OuterRef("id"),
-                    key=actual_key,
-                    **filter_kwargs
+            try:
+                value_input = int(values[0]) if values else None
+            except (ValueError, TypeError):
+                continue
+            
+            if operator == "ne":
+                # For not equal, we need (has property AND value != X)
+                exists_filter = IssueCustomProperty.objects.filter(**base_filters).values("issue_id")
+                not_equal_filter = IssueCustomProperty.objects.filter(
+                    **base_filters,
+                    **{f"{base_field}__exact": value_input}
                 ).values("issue_id")
-            )
-        else:
-            if operator in string_operator_map:
-                lookup, negate = string_operator_map[operator]
-                if lookup == "isnull":
-                    filter_kwargs = {f"{base_field}__isnull": operator == "isnull"}
-                else:
-                    filter_kwargs = {f"{base_field}__{lookup}": values[0]}
-                q = Q(
-                    id__in=IssueCustomProperty.objects.filter(
-                        issue_id=OuterRef("id"),
-                        key=actual_key,
-                        **filter_kwargs
-                    ).values("issue_id")
-                )
-                q_object = ~q if negate else q
+                
+                q_object = Q(id__in=exists_filter) & ~Q(id__in=not_equal_filter)
             else:
-                filter_kwargs = {f"{base_field}__in": values}
-                q_object = Q(
-                    id__in=IssueCustomProperty.objects.filter(
-                        issue_id=OuterRef("id"),
-                        key=actual_key,
-                        **filter_kwargs
-                    ).values("issue_id")
-                )
+                filter_kwargs = base_filters.copy()
+                
+                if operator in ["gte", "lte", "gt", "lt", "exact"]:
+                    filter_kwargs[f"{base_field}__{operator}"] = value_input
+                elif operator in ["isnull", "isnotnull"]:
+                    filter_kwargs[f"{base_field}__isnull"] = (operator == "isnull")
+                else:
+                    try:
+                        filter_kwargs[f"{base_field}__in"] = list(map(int, values))
+                    except (ValueError, TypeError):
+                        # Handle case when values can't be converted to int
+                        continue
+                
+                q_object = Q(id__in=IssueCustomProperty.objects.filter(**filter_kwargs).values("issue_id"))
+        
+        # String filters
+        else:
+            if operator == "ne":
+                # For string 'not equal', use same approach as number
+                exists_filter = IssueCustomProperty.objects.filter(**base_filters).values("issue_id")
+                not_equal_filter = IssueCustomProperty.objects.filter(
+                    **base_filters,
+                    **{f"{base_field}__exact": values[0] if values else ""}
+                ).values("issue_id")
+                
+                q_object = Q(id__in=exists_filter) & ~Q(id__in=not_equal_filter)
+            elif operator in string_operator_map:
+                lookup, negate = string_operator_map[operator]
+                filter_kwargs = base_filters.copy()
+                
+                if lookup == "isnull":
+                    filter_kwargs[f"{base_field}__isnull"] = not negate if operator == "isnull" else negate
+                else:
+                    filter_kwargs[f"{base_field}__{lookup}"] = values[0] if values else ""
+                
+                q_object = Q(id__in=IssueCustomProperty.objects.filter(**filter_kwargs).values("issue_id"))
+                
+                if negate:
+                    # For negated operations, ensure property exists but doesn't meet condition
+                    exists_filter = IssueCustomProperty.objects.filter(**base_filters).values("issue_id")
+                    q_object = Q(id__in=exists_filter) & ~q_object
+            else:
+                filter_kwargs = base_filters.copy()
+                filter_kwargs[f"{base_field}__in"] = values
+                q_object = Q(id__in=IssueCustomProperty.objects.filter(**filter_kwargs).values("issue_id"))
 
         custom_filters.append(q_object)
 

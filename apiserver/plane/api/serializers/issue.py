@@ -321,6 +321,9 @@ class IssueSerializer(BaseSerializer):
                     IssueCustomProperty(
                         key=custom_property['key'],
                         value=custom_property['value'],
+                        data_type=custom_property.get('data_type'),
+                        int_value=custom_property.get('int_value'),
+                        bool_value=custom_property.get('bool_value'),
                         issue_type_custom_property=custom_property['issue_type_custom_property'],
                         issue=instance,
                         project_id=project_id,
