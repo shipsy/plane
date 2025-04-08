@@ -822,9 +822,13 @@ class IssueUserDisplayPropertyEndpoint(BaseAPIView):
             issue_type__workspace__slug=slug,
             is_active=True
         ).values_list('name', flat=True).distinct()
-
-        # Create a dictionary with custom property names as keys and True as values
-        custom_props_dict = {prop: True for prop in custom_properties}
+        allowed_properties = ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP.get(slug, [])
+        # Only include properties that are in the allowed list for this workspace
+        filtered_custom_properties = [prop for prop in custom_properties if prop in allowed_properties]
+        
+        # Create a dictionary with filtered custom property names as keys and True as values
+        custom_props_dict = {prop: True for prop in filtered_custom_properties}
+        
         display_properties = response_data['display_properties']
         display_properties.update(custom_props_dict)
         return Response(serializer.data, status=status.HTTP_200_OK)
