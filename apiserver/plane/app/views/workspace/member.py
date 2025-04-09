@@ -44,6 +44,7 @@ from plane.db.models import (
 from plane.utils.cache import cache_response, invalidate_cache
 
 from .. import BaseViewSet
+from plane.utils.constants import ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP
 
 
 class WorkSpaceMemberViewSet(BaseViewSet):
@@ -318,9 +319,10 @@ class WorkspaceMemberUserEndpoint(BaseAPIView):
             issue_type__workspace__slug=slug,
             is_active=True
         ).values_list('name', flat=True).distinct()
-
-        # Create a dictionary with custom property names as keys and True as values
-        custom_props_dict = {prop: True for prop in custom_properties}
+        
+        allowed_properties = ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP.get(slug, [])
+        filtered_custom_properties = [prop for prop in custom_properties if prop in allowed_properties]
+        custom_props_dict = {prop: True for prop in filtered_custom_properties}
         default_props = response_data['default_props']
         display_properties = default_props['display_properties']
         display_properties.update(custom_props_dict)
