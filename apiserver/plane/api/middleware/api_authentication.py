@@ -36,10 +36,7 @@ class APIKeyAuthentication(authentication.BaseAuthentication):
             return (user, token)
         try:
             api_token = APIToken.objects.get(
-                Q(
-                    Q(expired_at__gt=timezone.now())
-                    | Q(expired_at__isnull=True)
-                ),
+                Q(Q(expired_at__gt=timezone.now()) | Q(expired_at__isnull=True)),
                 token=token,
                 is_active=True,
             )

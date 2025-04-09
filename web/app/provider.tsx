@@ -5,9 +5,10 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";//ui
 import { useTheme, ThemeProvider } from "next-themes";
 import { SWRConfig } from "swr";
+// Plane Imports
+import { WEB_SWR_CONFIG } from "@plane/constants";
+import { TranslationProvider } from "@plane/i18n";
 import { Toast } from "@plane/ui";
-// constants
-import { SWR_CONFIG } from "@/constants/swr-config";
 //helpers
 import { resolveGeneralTheme } from "@/helpers/theme.helper";
 // nprogress
@@ -61,15 +62,17 @@ export const AppProvider: FC<IAppProvider> = (props) => {
       <StoreProvider>
         <ThemeProvider themes={["light", "dark", "light-contrast", "dark-contrast", "custom"]} defaultTheme="system">
           <ToastWithTheme />
-          <StoreWrapper>
-            <InstanceWrapper>
-              <IntercomProvider>
-                <PostHogProvider>
-                  <SWRConfig value={SWR_CONFIG}>{children}</SWRConfig>
-                </PostHogProvider>
-              </IntercomProvider>
-            </InstanceWrapper>
-          </StoreWrapper>
+          <TranslationProvider>
+            <StoreWrapper>
+              <InstanceWrapper>
+                <IntercomProvider>
+                  <PostHogProvider>
+                    <SWRConfig value={WEB_SWR_CONFIG}>{children}</SWRConfig>
+                  </PostHogProvider>
+                </IntercomProvider>
+              </InstanceWrapper>
+            </StoreWrapper>
+          </TranslationProvider>
         </ThemeProvider>
       </StoreProvider>
     </>

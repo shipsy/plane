@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
 import { Tooltip2 } from "@blueprintjs/popover2";
+import React, { useEffect, useRef, useState } from "react";
 // helpers
 import { cn } from "../../helpers";
 

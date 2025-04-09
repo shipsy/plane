@@ -20,7 +20,8 @@ export const ProjectStateRoot: FC<TProjectState> = observer((props) => {
 
   useSWR(
     workspaceSlug && projectId ? `PROJECT_STATES_${workspaceSlug}_${projectId}` : null,
-    workspaceSlug && projectId ? () => fetchProjectStates(workspaceSlug.toString(), projectId.toString()) : null
+    workspaceSlug && projectId ? () => fetchProjectStates(workspaceSlug.toString(), projectId.toString()) : null,
+    { revalidateIfStale: false, revalidateOnFocus: false }
   );
 
   // Loader

@@ -13,9 +13,7 @@ from rest_framework import status
 from rest_framework.response import Response
 
 from plane.app.permissions import allow_permission, ROLE
-from plane.app.serializers import (
-    ModuleIssueSerializer,
-)
+from plane.app.serializers import ModuleIssueSerializer
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.db.models import (
     Issue,
@@ -32,14 +30,11 @@ from plane.utils.grouper import (
 )
 from plane.utils.issue_filters import issue_filters
 from plane.utils.order_queryset import order_issue_queryset
-from plane.utils.paginator import (
-    GroupedOffsetPaginator,
-    SubGroupedOffsetPaginator,
-)
+from plane.utils.paginator import GroupedOffsetPaginator, SubGroupedOffsetPaginator
 
 # Module imports
 from .. import BaseViewSet
-
+from plane.utils.host import base_host
 
 class ModuleIssueViewSet(BaseViewSet):
     serializer_class = ModuleIssueSerializer
@@ -47,10 +42,7 @@ class ModuleIssueViewSet(BaseViewSet):
     webhook_event = "module_issue"
     bulk = True
 
-    filterset_fields = [
-        "issue__labels__id",
-        "issue__assignees__id",
-    ]
+    filterset_fields = ["issue__labels__id", "issue__assignees__id"]
 
     def get_queryset(self):
         return (
@@ -85,9 +77,7 @@ class ModuleIssueViewSet(BaseViewSet):
                 .values("count")
             )
             .annotate(
-                sub_issues_count=Issue.issue_objects.filter(
-                    parent=OuterRef("id")
-                )
+                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -95,12 +85,7 @@ class ModuleIssueViewSet(BaseViewSet):
         ).distinct()
 
     @method_decorator(gzip_page)
-    @allow_permission(
-        [
-            ROLE.ADMIN,
-            ROLE.MEMBER,
-        ]
-    )
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def list(self, request, slug, project_id, module_id):
         filters = issue_filters(request.query_params, "GET")
         issue_queryset = self.get_queryset().filter(**filters)
@@ -108,8 +93,7 @@ class ModuleIssueViewSet(BaseViewSet):
 
         # Issue queryset
         issue_queryset, order_by_param = order_issue_queryset(
-            issue_queryset=issue_queryset,
-            order_by_param=order_by_param,
+            issue_queryset=issue_queryset, order_by_param=order_by_param
         )
 
         # Group by
@@ -118,9 +102,7 @@ class ModuleIssueViewSet(BaseViewSet):
 
         # issue queryset
         issue_queryset = issue_queryset_grouper(
-            queryset=issue_queryset,
-            group_by=group_by,
-            sub_group_by=sub_group_by,
+            queryset=issue_queryset, group_by=group_by, sub_group_by=sub_group_by
         )
 
         if group_by:
@@ -140,9 +122,7 @@ class ModuleIssueViewSet(BaseViewSet):
                         order_by=order_by_param,
                         queryset=issue_queryset,
                         on_results=lambda issues: issue_on_results(
-                            group_by=group_by,
-                            issues=issues,
-                            sub_group_by=sub_group_by,
+                            group_by=group_by, issues=issues, sub_group_by=sub_group_by
                         ),
                         paginator_cls=SubGroupedOffsetPaginator,
                         group_by_fields=issue_group_values(
@@ -160,10 +140,10 @@ class ModuleIssueViewSet(BaseViewSet):
                         group_by_field_name=group_by,
                         sub_group_by_field_name=sub_group_by,
                         count_filter=Q(
-                            Q(issue_inbox__status=1)
-                            | Q(issue_inbox__status=-1)
-                            | Q(issue_inbox__status=2)
-                            | Q(issue_inbox__isnull=True),
+                            Q(issue_intake__status=1)
+                            | Q(issue_intake__status=-1)
+                            | Q(issue_intake__status=2)
+                            | Q(issue_intake__isnull=True),
                             archived_at__isnull=True,
                             is_draft=False,
                         ),
@@ -176,9 +156,7 @@ class ModuleIssueViewSet(BaseViewSet):
                     order_by=order_by_param,
                     queryset=issue_queryset,
                     on_results=lambda issues: issue_on_results(
-                        group_by=group_by,
-                        issues=issues,
-                        sub_group_by=sub_group_by,
+                        group_by=group_by, issues=issues, sub_group_by=sub_group_by
                     ),
                     paginator_cls=GroupedOffsetPaginator,
                     group_by_fields=issue_group_values(
@@ -189,10 +167,10 @@ class ModuleIssueViewSet(BaseViewSet):
                     ),
                     group_by_field_name=group_by,
                     count_filter=Q(
-                        Q(issue_inbox__status=1)
-                        | Q(issue_inbox__status=-1)
-                        | Q(issue_inbox__status=2)
-                        | Q(issue_inbox__isnull=True),
+                        Q(issue_intake__status=1)
+                        | Q(issue_intake__status=-1)
+                        | Q(issue_intake__status=2)
+                        | Q(issue_intake__isnull=True),
                         archived_at__isnull=True,
                         is_draft=False,
                     ),
@@ -214,8 +192,7 @@ class ModuleIssueViewSet(BaseViewSet):
         issues = request.data.get("issues", [])
         if not issues:
             return Response(
-                {"error": "Issues are required"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Issues are required"}, status=status.HTTP_400_BAD_REQUEST
             )
         project = Project.objects.get(pk=project_id)
         _ = ModuleIssue.objects.bulk_create(
@@ -244,7 +221,7 @@ class ModuleIssueViewSet(BaseViewSet):
                 current_instance=None,
                 epoch=int(timezone.now().timestamp()),
                 notification=True,
-                origin=request.META.get("HTTP_ORIGIN"),
+                origin=base_host(request=request, is_app=True),
             )
             for issue in issues
         ]
@@ -284,7 +261,7 @@ class ModuleIssueViewSet(BaseViewSet):
                     current_instance=None,
                     epoch=int(timezone.now().timestamp()),
                     notification=True,
-                    origin=request.META.get("HTTP_ORIGIN"),
+                    origin=base_host(request=request, is_app=True),
                 )
                 for module in modules
             ]
@@ -303,11 +280,11 @@ class ModuleIssueViewSet(BaseViewSet):
                 issue_id=str(issue_id),
                 project_id=str(project_id),
                 current_instance=json.dumps(
-                    {"module_name": module_issue.first().module.name}
+                    {"module_name": module_issue.first().module.name if (module_issue.first() and module_issue.first().module) else None}
                 ),
                 epoch=int(timezone.now().timestamp()),
                 notification=True,
-                origin=request.META.get("HTTP_ORIGIN"),
+                origin=base_host(request=request, is_app=True),
             )
             module_issue.delete()
 
@@ -332,7 +309,7 @@ class ModuleIssueViewSet(BaseViewSet):
             ),
             epoch=int(timezone.now().timestamp()),
             notification=True,
-            origin=request.META.get("HTTP_ORIGIN"),
+            origin=base_host(request=request, is_app=True),
         )
         module_issue.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

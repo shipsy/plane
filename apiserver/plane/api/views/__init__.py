@@ -31,8 +31,7 @@ from .module import (
 
 from .member import ProjectMemberAPIEndpoint
 
-from .inbox import InboxIssueAPIEndpoint
-
+from .intake import IntakeIssueAPIEndpoint
 from .search import GlobalSearchEndpoint
 
 from .webhook import (

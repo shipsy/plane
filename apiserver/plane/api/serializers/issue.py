@@ -2,6 +2,7 @@
 from django.utils import timezone
 from lxml import html
 import uuid
+from django.db import IntegrityError
 
 #  Third party imports
 from rest_framework import serializers
@@ -76,10 +77,7 @@ class IssueSerializer(BaseSerializer):
         required=False,
     )
     type_id = serializers.PrimaryKeyRelatedField(
-        source="type",
-        queryset=IssueType.objects.all(),
-        required=False,
-        allow_null=True,
+        source="type", queryset=IssueType.objects.all(), required=False, allow_null=True
     )
     custom_properties = IssueCustomPropertySerializer(many=True, required=False)
 
@@ -105,9 +103,7 @@ class IssueSerializer(BaseSerializer):
             and data.get("target_date", None) is not None
             and data.get("start_date", None) > data.get("target_date", None)
         ):
-            raise serializers.ValidationError(
-                "Start date cannot exceed target date"
-            )
+            raise serializers.ValidationError("Start date cannot exceed target date")
 
         try:
             if data.get("description_html", None) is not None:
@@ -123,22 +119,21 @@ class IssueSerializer(BaseSerializer):
             data["assignees"] = ProjectMember.objects.filter(
                 project_id=self.context.get("project_id"),
                 is_active=True,
+                role__gte=15,
                 member_id__in=data["assignees"],
             ).values_list("member_id", flat=True)
 
         # Validate labels are from project
         if data.get("labels", []):
             data["labels"] = Label.objects.filter(
-                project_id=self.context.get("project_id"),
-                id__in=data["labels"],
+                project_id=self.context.get("project_id"), id__in=data["labels"]
             ).values_list("id", flat=True)
 
         # Check state is from the project only else raise validation error
         if (
             data.get("state")
             and not State.objects.filter(
-                project_id=self.context.get("project_id"),
-                pk=data.get("state").id,
+                project_id=self.context.get("project_id"), pk=data.get("state").id
             ).exists()
         ):
             raise serializers.ValidationError(
@@ -149,8 +144,7 @@ class IssueSerializer(BaseSerializer):
         if (
             data.get("parent")
             and not Issue.objects.filter(
-                workspace_id=self.context.get("workspace_id"),
-                pk=data.get("parent").id,
+                workspace_id=self.context.get("workspace_id"), pk=data.get("parent").id
             ).exists()
         ):
             raise serializers.ValidationError(
@@ -196,9 +190,7 @@ class IssueSerializer(BaseSerializer):
             issue_type = issue_type
 
         issue = Issue.objects.create(
-            **validated_data,
-            project_id=project_id,
-            type=issue_type,
+            **validated_data, project_id=project_id, type=issue_type
         )
 
         # Issue Audit Users
@@ -206,47 +198,61 @@ class IssueSerializer(BaseSerializer):
         updated_by_id = issue.updated_by_id
 
         if assignees is not None and len(assignees):
-            IssueAssignee.objects.bulk_create(
-                [
-                    IssueAssignee(
-                        assignee_id=assignee_id,
+            try:
+                IssueAssignee.objects.bulk_create(
+                    [
+                        IssueAssignee(
+                            assignee_id=assignee_id,
+                            issue=issue,
+                            project_id=project_id,
+                            workspace_id=workspace_id,
+                            created_by_id=created_by_id,
+                            updated_by_id=updated_by_id,
+                        )
+                        for assignee_id in assignees
+                    ],
+                    batch_size=10,
+                )
+            except IntegrityError:
+                pass
+        else:
+            try:
+                # Then assign it to default assignee, if it is a valid assignee
+                if default_assignee_id is not None and ProjectMember.objects.filter(
+                    member_id=default_assignee_id,
+                    project_id=project_id,
+                    role__gte=15,
+                    is_active=True
+                ).exists():
+                    IssueAssignee.objects.create(
+                        assignee_id=default_assignee_id,
                         issue=issue,
                         project_id=project_id,
                         workspace_id=workspace_id,
                         created_by_id=created_by_id,
                         updated_by_id=updated_by_id,
                     )
-                    for assignee_id in assignees
-                ],
-                batch_size=10,
-            )
-        else:
-            # Then assign it to default assignee
-            if default_assignee_id is not None:
-                IssueAssignee.objects.create(
-                    assignee_id=default_assignee_id,
-                    issue=issue,
-                    project_id=project_id,
-                    workspace_id=workspace_id,
-                    created_by_id=created_by_id,
-                    updated_by_id=updated_by_id,
-                )
+            except IntegrityError:
+                pass
 
         if labels is not None and len(labels):
-            IssueLabel.objects.bulk_create(
-                [
-                    IssueLabel(
-                        label_id=label_id,
-                        issue=issue,
-                        project_id=project_id,
-                        workspace_id=workspace_id,
-                        created_by_id=created_by_id,
-                        updated_by_id=updated_by_id,
-                    )
-                    for label_id in labels
-                ],
-                batch_size=10,
-            )
+            try:
+                IssueLabel.objects.bulk_create(
+                    [
+                        IssueLabel(
+                            label_id=label_id,
+                            issue=issue,
+                            project_id=project_id,
+                            workspace_id=workspace_id,
+                            created_by_id=created_by_id,
+                            updated_by_id=updated_by_id,
+                        )
+                        for label_id in labels
+                    ],
+                    batch_size=10,
+                )
+            except IntegrityError:
+                pass
         if custom_properties is not None and len(custom_properties):
             IssueCustomProperty.objects.bulk_create(
                 [
@@ -280,37 +286,46 @@ class IssueSerializer(BaseSerializer):
 
         if assignees is not None:
             IssueAssignee.objects.filter(issue=instance).delete()
-            IssueAssignee.objects.bulk_create(
-                [
-                    IssueAssignee(
-                        assignee_id=assignee_id,
-                        issue=instance,
-                        project_id=project_id,
-                        workspace_id=workspace_id,
-                        created_by_id=created_by_id,
-                        updated_by_id=updated_by_id,
-                    )
-                    for assignee_id in assignees
-                ],
-                batch_size=10,
-            )
+            try:
+                IssueAssignee.objects.bulk_create(
+                    [
+                        IssueAssignee(
+                            assignee_id=assignee_id,
+                            issue=instance,
+                            project_id=project_id,
+                            workspace_id=workspace_id,
+                            created_by_id=created_by_id,
+                            updated_by_id=updated_by_id,
+                        )
+                        for assignee_id in assignees
+                    ],
+                    batch_size=10,
+                    ignore_conflicts=True,
+                )
+            except IntegrityError:
+                pass
 
         if labels is not None:
             IssueLabel.objects.filter(issue=instance).delete()
-            IssueLabel.objects.bulk_create(
-                [
-                    IssueLabel(
-                        label_id=label_id,
-                        issue=instance,
-                        project_id=project_id,
-                        workspace_id=workspace_id,
-                        created_by_id=created_by_id,
-                        updated_by_id=updated_by_id,
-                    )
-                    for label_id in labels
-                ],
-                batch_size=10,
-            )
+            try:
+                IssueLabel.objects.bulk_create(
+                    [
+                        IssueLabel(
+                            label_id=label_id,
+                            issue=instance,
+                            project_id=project_id,
+                            workspace_id=workspace_id,
+                            created_by_id=created_by_id,
+                            updated_by_id=updated_by_id,
+                        )
+                        for label_id in labels
+                    ],
+                    batch_size=10,
+                    ignore_conflicts=True,
+                )
+            except IntegrityError:
+                pass
+
         if custom_properties is not None:
             IssueCustomProperty.objects.filter(issue=instance).delete()
             IssueCustomProperty.objects.bulk_create(
@@ -340,20 +355,36 @@ class IssueSerializer(BaseSerializer):
                 from .user import UserLiteSerializer
 
                 data["assignees"] = UserLiteSerializer(
-                    instance.assignees.all(), many=True
+                    User.objects.filter(
+                        pk__in=IssueAssignee.objects.filter(issue=instance).values_list(
+                            "assignee_id", flat=True
+                        )
+                    ),
+                    many=True,
                 ).data
             else:
                 data["assignees"] = [
-                    str(assignee.id) for assignee in instance.assignees.all()
+                    str(assignee)
+                    for assignee in IssueAssignee.objects.filter(
+                        issue=instance
+                    ).values_list("assignee_id", flat=True)
                 ]
         if "labels" in self.fields:
             if "labels" in self.expand:
                 data["labels"] = LabelSerializer(
-                    instance.labels.all(), many=True
+                    Label.objects.filter(
+                        pk__in=IssueLabel.objects.filter(issue=instance).values_list(
+                            "label_id", flat=True
+                        )
+                    ),
+                    many=True,
                 ).data
             else:
                 data["labels"] = [
-                    str(label.id) for label in instance.labels.all()
+                    str(label)
+                    for label in IssueLabel.objects.filter(issue=instance).values_list(
+                        "label_id", flat=True
+                    )
                 ]
 
         return data
@@ -362,11 +393,7 @@ class IssueSerializer(BaseSerializer):
 class IssueLiteSerializer(BaseSerializer):
     class Meta:
         model = Issue
-        fields = [
-            "id",
-            "sequence_id",
-            "project_id",
-        ]
+        fields = ["id", "sequence_id", "project_id"]
         read_only_fields = fields
 
 
@@ -418,8 +445,7 @@ class IssueLinkSerializer(BaseSerializer):
     # Validation if url already exists
     def create(self, validated_data):
         if IssueLink.objects.filter(
-            url=validated_data.get("url"),
-            issue_id=validated_data.get("issue_id"),
+            url=validated_data.get("url"), issue_id=validated_data.get("issue_id")
         ).exists():
             raise serializers.ValidationError(
                 {"error": "URL already exists for this Issue"}
@@ -429,8 +455,7 @@ class IssueLinkSerializer(BaseSerializer):
     def update(self, instance, validated_data):
         if (
             IssueLink.objects.filter(
-                url=validated_data.get("url"),
-                issue_id=instance.issue_id,
+                url=validated_data.get("url"), issue_id=instance.issue_id
             )
             .exclude(pk=instance.id)
             .exists()
@@ -472,10 +497,7 @@ class IssueCommentSerializer(BaseSerializer):
             "created_at",
             "updated_at"
         ]
-        exclude = [
-            "comment_stripped",
-            "comment_json",
-        ]
+        exclude = ["comment_stripped", "comment_json"]
 
     def validate(self, data):
         try:
@@ -500,38 +522,27 @@ class IssueActivitySerializer(BaseSerializer):
     # project_detail = ProjectLiteSerializer(read_only=True, source="project")
     class Meta:
         model = IssueActivity
-        exclude = [
-            "created_by",
-            "updated_by",
-        ]
+        exclude = ["created_by", "updated_by"]
 
 
 class CycleIssueSerializer(BaseSerializer):
     cycle = CycleSerializer(read_only=True)
 
     class Meta:
-        fields = [
-            "cycle",
-        ]
+        fields = ["cycle"]
 
 
 class ModuleIssueSerializer(BaseSerializer):
     module = ModuleSerializer(read_only=True)
 
     class Meta:
-        fields = [
-            "module",
-        ]
+        fields = ["module"]
 
 
 class LabelLiteSerializer(BaseSerializer):
     class Meta:
         model = Label
-        fields = [
-            "id",
-            "name",
-            "color",
-        ]
+        fields = ["id", "name", "color"]
 
 
 class IssueExpandSerializer(BaseSerializer):

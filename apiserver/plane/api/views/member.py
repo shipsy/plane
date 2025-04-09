@@ -22,16 +22,12 @@ from plane.db.models import (
     Profile
 )
 
-from plane.app.permissions import (
-    ProjectMemberPermission,
-)
+from plane.app.permissions import ProjectMemberPermission
 
 
 # API endpoint to get and insert users inside the workspace
 class ProjectMemberAPIEndpoint(BaseAPIView):
-    permission_classes = [
-        ProjectMemberPermission,
-    ]
+    permission_classes = [ProjectMemberPermission]
 
     # Get all the users that are present inside the workspace
     def get(self, request, slug, project_id, member_id=None):
@@ -100,8 +96,7 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
             validate_email(email)
         except ValidationError:
             return Response(
-                {"error": "Invalid email provided"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Invalid email provided"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         workspace = Workspace.objects.filter(slug=slug).first()
@@ -130,9 +125,7 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
                 ).first()
                 if project_member:
                     return Response(
-                        {
-                            "error": "User is already part of the workspace and project"
-                        },
+                        {"error": "User is already part of the workspace and project"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 

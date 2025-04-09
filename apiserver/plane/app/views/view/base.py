@@ -2,16 +2,7 @@
 from django.contrib.postgres.aggregates import ArrayAgg
 from django.db.models import Count
 from django.contrib.postgres.fields import ArrayField
-from django.db.models import (
-    Exists,
-    F,
-    Func,
-    OuterRef,
-    Q,
-    UUIDField,
-    Value,
-    Subquery,
-)
+from django.db.models import Exists, F, Func, OuterRef, Q, UUIDField, Value, Subquery
 from django.db.models.functions import Coalesce
 from django.utils.decorators import method_decorator
 from django.views.decorators.gzip import gzip_page
@@ -41,6 +32,7 @@ from plane.db.models import (
     Project,
     CycleIssue,
     IssueCustomProperty
+    UserRecentVisit,
 )
 from plane.utils.grouper import (
     issue_group_values,
@@ -50,10 +42,7 @@ from plane.utils.grouper import (
 from plane.utils.issue_filters import issue_filters
 from plane.utils.constants import ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP
 from plane.utils.order_queryset import order_issue_queryset
-from plane.utils.paginator import (
-    GroupedOffsetPaginator,
-    SubGroupedOffsetPaginator,
-)
+from plane.utils.paginator import GroupedOffsetPaginator, SubGroupedOffsetPaginator
 from plane.bgtasks.recent_visited_task import recent_visited_task
 from .. import BaseViewSet
 from plane.db.models import (
@@ -94,21 +83,13 @@ class WorkspaceViewViewSet(BaseViewSet):
         )
 
     @allow_permission(
-        allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST],
-        level="WORKSPACE",
+        allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE"
     )
     def list(self, request, slug):
         queryset = self.get_queryset()
-        fields = [
-            field
-            for field in request.GET.get("fields", "").split(",")
-            if field
-        ]
+        fields = [field for field in request.GET.get("fields", "").split(",") if field]
         if WorkspaceMember.objects.filter(
-            workspace__slug=slug,
-            member=request.user,
-            role=5,
-            is_active=True,
+            workspace__slug=slug, member=request.user, role=5, is_active=True
         ).exists():
             queryset = queryset.filter(owned_by=request.user)
         views = IssueViewSerializer(
@@ -122,22 +103,18 @@ class WorkspaceViewViewSet(BaseViewSet):
     def partial_update(self, request, slug, pk):
         with transaction.atomic():
             workspace_view = IssueView.objects.select_for_update().get(
-                pk=pk,
-                workspace__slug=slug,
+                pk=pk, workspace__slug=slug
             )
 
             if workspace_view.is_locked:
                 return Response(
-                    {"error": "view is locked"},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    {"error": "view is locked"}, status=status.HTTP_400_BAD_REQUEST
                 )
 
             # Only update the view if owner is updating
             if workspace_view.owned_by_id != request.user.id:
                 return Response(
-                    {
-                        "error": "Only the owner of the view can update the view"
-                    },
+                    {"error": "Only the owner of the view can update the view"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -148,9 +125,7 @@ class WorkspaceViewViewSet(BaseViewSet):
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            return Response(
-                serializer.errors, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def retrieve(self, request, slug, pk):
         issue_view = self.get_queryset().filter(pk=pk).first()
@@ -162,33 +137,18 @@ class WorkspaceViewViewSet(BaseViewSet):
             entity_identifier=pk,
             user_id=request.user.id,
         )
-        return Response(
-            serializer.data,
-            status=status.HTTP_200_OK,
-        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @allow_permission(
-        allowed_roles=[],
-        level="WORKSPACE",
-        creator=True,
-        model=IssueView,
+        allowed_roles=[ROLE.ADMIN], level="WORKSPACE", creator=True, model=IssueView
     )
     def destroy(self, request, slug, pk):
-        workspace_view = IssueView.objects.get(
-            pk=pk,
-            workspace__slug=slug,
-        )
+        workspace_view = IssueView.objects.get(pk=pk, workspace__slug=slug)
 
         workspace_member = WorkspaceMember.objects.filter(
-            workspace__slug=slug,
-            member=request.user,
-            role=20,
-            is_active=True,
+            workspace__slug=slug, member=request.user, role=20, is_active=True
         )
-        if (
-            workspace_member.exists()
-            or workspace_view.owned_by == request.user
-        ):
+        if workspace_member.exists() or workspace_view.owned_by == request.user:
             workspace_view.delete()
             # Delete the user favorite view
             UserFavorite.objects.filter(
@@ -210,9 +170,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
         custom_properties = filters.get("custom_properties", {})
         return (
             Issue.issue_objects.annotate(
-                sub_issues_count=Issue.issue_objects.filter(
-                    parent=OuterRef("id")
-                )
+                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -247,9 +205,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                 .values("count")
             )
             .annotate(
-                sub_issues_count=Issue.issue_objects.filter(
-                    parent=OuterRef("id")
-                )
+                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -261,7 +217,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                         distinct=True,
                         filter=Q(
                             ~Q(labels__id__isnull=True)
-                            & Q(label_issue__deleted_at__isnull=True),
+                            & Q(label_issue__deleted_at__isnull=True)
                         ),
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
@@ -366,8 +322,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
 
         # Issue queryset
         issue_queryset, order_by_param = order_issue_queryset(
-            issue_queryset=issue_queryset,
-            order_by_param=order_by_param,
+            issue_queryset=issue_queryset, order_by_param=order_by_param
         )
 
         # Group by
@@ -376,9 +331,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
 
         # issue queryset
         issue_queryset = issue_queryset_grouper(
-            queryset=issue_queryset,
-            group_by=group_by,
-            sub_group_by=sub_group_by,
+            queryset=issue_queryset, group_by=group_by, sub_group_by=sub_group_by
         )
 
         if group_by:
@@ -398,16 +351,11 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                         order_by=order_by_param,
                         queryset=issue_queryset,
                         on_results=lambda issues: issue_on_results(
-                            group_by=group_by,
-                            issues=issues,
-                            sub_group_by=sub_group_by,
+                            group_by=group_by, issues=issues, sub_group_by=sub_group_by
                         ),
                         paginator_cls=SubGroupedOffsetPaginator,
                         group_by_fields=issue_group_values(
-                            field=group_by,
-                            slug=slug,
-                            project_id=None,
-                            filters=filters,
+                            field=group_by, slug=slug, project_id=None, filters=filters
                         ),
                         sub_group_by_fields=issue_group_values(
                             field=sub_group_by,
@@ -418,10 +366,10 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                         group_by_field_name=group_by,
                         sub_group_by_field_name=sub_group_by,
                         count_filter=Q(
-                            Q(issue_inbox__status=1)
-                            | Q(issue_inbox__status=-1)
-                            | Q(issue_inbox__status=2)
-                            | Q(issue_inbox__isnull=True),
+                            Q(issue_intake__status=1)
+                            | Q(issue_intake__status=-1)
+                            | Q(issue_intake__status=2)
+                            | Q(issue_intake__isnull=True),
                             archived_at__isnull=True,
                             is_draft=False,
                         ),
@@ -434,23 +382,18 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                     order_by=order_by_param,
                     queryset=issue_queryset,
                     on_results=lambda issues: issue_on_results(
-                        group_by=group_by,
-                        issues=issues,
-                        sub_group_by=sub_group_by,
+                        group_by=group_by, issues=issues, sub_group_by=sub_group_by
                     ),
                     paginator_cls=GroupedOffsetPaginator,
                     group_by_fields=issue_group_values(
-                        field=group_by,
-                        slug=slug,
-                        project_id=None,
-                        filters=filters,
+                        field=group_by, slug=slug, project_id=None, filters=filters
                     ),
                     group_by_field_name=group_by,
                     count_filter=Q(
-                        Q(issue_inbox__status=1)
-                        | Q(issue_inbox__status=-1)
-                        | Q(issue_inbox__status=2)
-                        | Q(issue_inbox__isnull=True),
+                        Q(issue_intake__status=1)
+                        | Q(issue_intake__status=-1)
+                        | Q(issue_intake__status=2)
+                        | Q(issue_intake__isnull=True),
                         archived_at__isnull=True,
                         is_draft=False,
                     ),
@@ -473,8 +416,7 @@ class IssueViewViewSet(BaseViewSet):
 
     def perform_create(self, serializer):
         serializer.save(
-            project_id=self.kwargs.get("project_id"),
-            owned_by=self.request.user,
+            project_id=self.kwargs.get("project_id"), owned_by=self.request.user
         )
 
     def get_queryset(self):
@@ -518,11 +460,7 @@ class IssueViewViewSet(BaseViewSet):
             and not project.guest_view_all_features
         ):
             queryset = queryset.filter(owned_by=request.user)
-        fields = [
-            field
-            for field in request.GET.get("fields", "").split(",")
-            if field
-        ]
+        fields = [field for field in request.GET.get("fields", "").split(",") if field]
         views = IssueViewSerializer(
             queryset, many=True, fields=fields if fields else None
         ).data
@@ -530,9 +468,7 @@ class IssueViewViewSet(BaseViewSet):
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def retrieve(self, request, slug, project_id, pk):
-        issue_view = (
-            self.get_queryset().filter(pk=pk, project_id=project_id).first()
-        )
+        issue_view = self.get_queryset().filter(pk=pk, project_id=project_id).first()
         project = Project.objects.get(id=project_id)
         """
         if the role is guest and guest_view_all_features is false and owned by is not 
@@ -552,7 +488,7 @@ class IssueViewViewSet(BaseViewSet):
         ):
             return Response(
                 {"error": "You are not allowed to view this issue"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         serializer = IssueViewSerializer(issue_view)
@@ -563,10 +499,7 @@ class IssueViewViewSet(BaseViewSet):
             entity_identifier=pk,
             user_id=request.user.id,
         )
-        return Response(
-            serializer.data,
-            status=status.HTTP_200_OK,
-        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     @allow_permission(allowed_roles=[], creator=True, model=IssueView)
     def partial_update(self, request, slug, project_id, pk):
@@ -577,16 +510,13 @@ class IssueViewViewSet(BaseViewSet):
 
             if issue_view.is_locked:
                 return Response(
-                    {"error": "view is locked"},
-                    status=status.HTTP_400_BAD_REQUEST,
+                    {"error": "view is locked"}, status=status.HTTP_400_BAD_REQUEST
                 )
 
             # Only update the view if owner is updating
             if issue_view.owned_by_id != request.user.id:
                 return Response(
-                    {
-                        "error": "Only the owner of the view can update the view"
-                    },
+                    {"error": "Only the owner of the view can update the view"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
@@ -597,18 +527,12 @@ class IssueViewViewSet(BaseViewSet):
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            return Response(
-                serializer.errors, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @allow_permission(
-        allowed_roles=[ROLE.ADMIN], creator=True, model=IssueView
-    )
+    @allow_permission(allowed_roles=[ROLE.ADMIN], creator=True, model=IssueView)
     def destroy(self, request, slug, project_id, pk):
         project_view = IssueView.objects.get(
-            pk=pk,
-            project_id=project_id,
-            workspace__slug=slug,
+            pk=pk, project_id=project_id, workspace__slug=slug
         )
         if (
             ProjectMember.objects.filter(
@@ -628,6 +552,13 @@ class IssueViewViewSet(BaseViewSet):
                 entity_identifier=pk,
                 entity_type="view",
             ).delete()
+            # Delete the page from recent visit
+            UserRecentVisit.objects.filter(
+                project_id=project_id,
+                workspace__slug=slug,
+                entity_identifier=pk,
+                entity_name="view",
+            ).delete(soft=False)
         else:
             return Response(
                 {"error": "Only admin or owner can delete the view"},

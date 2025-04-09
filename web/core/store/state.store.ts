@@ -1,15 +1,16 @@
 import groupBy from "lodash/groupBy";
 import set from "lodash/set";
-import { makeObservable, observable, computed, action, runInAction } from "mobx";
+import { action, computed, makeObservable, observable, runInAction } from "mobx";
 import { computedFn } from "mobx-utils";
-// types
+// plane imports
+import { STATE_GROUPS } from "@plane/constants";
 import { IState } from "@plane/types";
 // helpers
 import { sortStates } from "@/helpers/state.helper";
-// services
-import { ProjectStateService } from "@/services/project";
-// plane web store
-import { CoreRootStore } from "./root.store";
+// plane web
+import { syncIssuesWithDeletedStates } from "@/local-db/utils/load-workspace";
+import { ProjectStateService } from "@/plane-web/services/project/project-state.service";
+import { RootStore } from "@/plane-web/store/root.store";
 
 export interface IStateStore {
   //Loaders
@@ -23,6 +24,8 @@ export interface IStateStore {
   // computed actions
   getStateById: (stateId: string | null | undefined) => IState | undefined;
   getProjectStates: (projectId: string | null | undefined) => IState[] | undefined;
+  getProjectStateIds: (projectId: string | null | undefined) => string[] | undefined;
+  getProjectDefaultStateId: (projectId: string | null | undefined) => string | undefined;
   // fetch actions
   fetchProjectStates: (workspaceSlug: string, projectId: string) => Promise<IState[]>;
   fetchWorkspaceStates: (workspaceSlug: string) => Promise<IState[]>;
@@ -48,10 +51,11 @@ export class StateStore implements IStateStore {
   stateMap: Record<string, IState> = {};
   //loaders
   fetchedMap: Record<string, boolean> = {};
+  rootStore: RootStore;
   router;
-  stateService;
+  stateService: ProjectStateService;
 
-  constructor(_rootStore: CoreRootStore) {
+  constructor(_rootStore: RootStore) {
     makeObservable(this, {
       // observables
       stateMap: observable,
@@ -71,6 +75,7 @@ export class StateStore implements IStateStore {
     });
     this.stateService = new ProjectStateService();
     this.router = _rootStore.router;
+    this.rootStore = _rootStore;
   }
 
   /**
@@ -97,7 +102,20 @@ export class StateStore implements IStateStore {
    */
   get groupedProjectStates() {
     if (!this.router.projectId) return;
-    return groupBy(this.projectStates, "group") as Record<string, IState[]>;
+
+    // First group the existing states
+    const groupedStates = groupBy(this.projectStates, "group") as Record<string, IState[]>;
+
+    // Ensure all STATE_GROUPS are present
+    const allGroups = Object.keys(STATE_GROUPS).reduce(
+      (acc, group) => ({
+        ...acc,
+        [group]: groupedStates[group] || [],
+      }),
+      {} as Record<string, IState[]>
+    );
+
+    return allGroups;
   }
 
   /**
@@ -118,6 +136,29 @@ export class StateStore implements IStateStore {
     const workspaceSlug = this.router.workspaceSlug || "";
     if (!projectId || !(this.fetchedMap[projectId] || this.fetchedMap[workspaceSlug])) return;
     return sortStates(Object.values(this.stateMap).filter((state) => state.project_id === projectId));
+  });
+
+  /**
+   * Returns the state ids for a project by projectId
+   * @param projectId
+   * @returns string[]
+   */
+  getProjectStateIds = computedFn((projectId: string | null | undefined) => {
+    const workspaceSlug = this.router.workspaceSlug;
+    if (!workspaceSlug || !projectId || !(this.fetchedMap[projectId] || this.fetchedMap[workspaceSlug]))
+      return undefined;
+    const projectStates = this.getProjectStates(projectId);
+    return projectStates?.map((state) => state.id) ?? [];
+  });
+
+  /**
+   * Returns the default state id for a project
+   * @param projectId
+   * @returns string | undefined
+   */
+  getProjectDefaultStateId = computedFn((projectId: string | null | undefined) => {
+    const projectStates = this.getProjectStates(projectId);
+    return projectStates?.find((state) => state.default)?.id;
   });
 
   /**
@@ -206,6 +247,7 @@ export class StateStore implements IStateStore {
     await this.stateService.deleteState(workspaceSlug, projectId, stateId).then(() => {
       runInAction(() => {
         delete this.stateMap[stateId];
+        syncIssuesWithDeletedStates([stateId]);
       });
     });
   };
@@ -254,7 +296,7 @@ export class StateStore implements IStateStore {
       });
       // updating using api
       await this.stateService.patchState(workspaceSlug, projectId, stateId, payload);
-    } catch (err) {
+    } catch {
       // reverting back to old state group if api fails
       runInAction(() => {
         this.stateMap = originalStates;

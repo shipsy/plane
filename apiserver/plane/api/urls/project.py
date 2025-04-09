@@ -7,9 +7,7 @@ from plane.api.views import (
 
 urlpatterns = [
     path(
-        "workspaces/<str:slug>/projects/",
-        ProjectAPIEndpoint.as_view(),
-        name="project",
+        "workspaces/<str:slug>/projects/", ProjectAPIEndpoint.as_view(), name="project"
     ),
     path(
         "workspaces/<str:slug>/projects/<str:pk>/",

@@ -1,6 +1,8 @@
 import { Dispatch, FC, SetStateAction } from "react";
 import { Editor } from "@tiptap/react";
 import { Check, ChevronDown } from "lucide-react";
+// plane utils
+import { cn } from "@plane/utils";
 // components
 import {
   BulletListItem,
@@ -17,8 +19,8 @@ import {
   HeadingSixItem,
   EditorMenuItem,
 } from "@/components/menus";
-// helpers
-import { cn } from "@/helpers/common";
+// types
+import { TEditorCommands } from "@/types";
 
 type Props = {
   editor: Editor;
@@ -29,7 +31,7 @@ type Props = {
 export const BubbleMenuNodeSelector: FC<Props> = (props) => {
   const { editor, isOpen, setIsOpen } = props;
 
-  const items: EditorMenuItem[] = [
+  const items: EditorMenuItem<TEditorCommands>[] = [
     TextItem(editor),
     HeadingOneItem(editor),
     HeadingTwoItem(editor),
@@ -44,7 +46,7 @@ export const BubbleMenuNodeSelector: FC<Props> = (props) => {
     CodeItem(editor),
   ];
 
-  const activeItem = items.filter((item) => item.isActive("")).pop() ?? {
+  const activeItem = items.filter((item) => item.isActive()).pop() ?? {
     name: "Multiple",
   };
 

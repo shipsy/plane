@@ -3,16 +3,7 @@ import json
 
 # Django imports
 from django.utils import timezone
-from django.db.models import (
-    Q,
-    OuterRef,
-    F,
-    Func,
-    UUIDField,
-    Value,
-    CharField,
-    Subquery,
-)
+from django.db.models import Q, OuterRef, F, Func, UUIDField, Value, CharField, Subquery
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db.models.functions import Coalesce
 from django.contrib.postgres.aggregates import ArrayAgg
@@ -24,10 +15,7 @@ from rest_framework import status
 
 # Module imports
 from .. import BaseViewSet
-from plane.app.serializers import (
-    IssueRelationSerializer,
-    RelatedIssueSerializer,
-)
+from plane.app.serializers import IssueRelationSerializer, RelatedIssueSerializer
 from plane.app.permissions import ProjectEntityPermission
 from plane.db.models import (
     Project,
@@ -39,14 +27,12 @@ from plane.db.models import (
 )
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.utils.issue_relation_mapper import get_actual_relation
-
+from plane.utils.host import base_host
 
 class IssueRelationViewSet(BaseViewSet):
     serializer_class = IssueRelationSerializer
     model = IssueRelation
-    permission_classes = [
-        ProjectEntityPermission,
-    ]
+    permission_classes = [ProjectEntityPermission]
 
     def list(self, request, slug, project_id, issue_id):
         issue_relations = (
@@ -137,9 +123,7 @@ class IssueRelationViewSet(BaseViewSet):
                 .values("count")
             )
             .annotate(
-                sub_issues_count=Issue.issue_objects.filter(
-                    parent=OuterRef("id")
-                )
+                sub_issues_count=Issue.issue_objects.filter(parent=OuterRef("id"))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
@@ -191,78 +175,34 @@ class IssueRelationViewSet(BaseViewSet):
 
         response_data = {
             "blocking": queryset.filter(pk__in=blocking_issues)
-            .annotate(
-                relation_type=Value("blocking", output_field=CharField())
-            )
+            .annotate(relation_type=Value("blocking", output_field=CharField()))
             .values(*fields),
             "blocked_by": queryset.filter(pk__in=blocked_by_issues)
-            .annotate(
-                relation_type=Value("blocked_by", output_field=CharField())
-            )
+            .annotate(relation_type=Value("blocked_by", output_field=CharField()))
             .values(*fields),
             "duplicate": queryset.filter(pk__in=duplicate_issues)
-            .annotate(
-                relation_type=Value(
-                    "duplicate",
-                    output_field=CharField(),
-                )
-            )
+            .annotate(relation_type=Value("duplicate", output_field=CharField()))
             .values(*fields)
             | queryset.filter(pk__in=duplicate_issues_related)
-            .annotate(
-                relation_type=Value(
-                    "duplicate",
-                    output_field=CharField(),
-                )
-            )
+            .annotate(relation_type=Value("duplicate", output_field=CharField()))
             .values(*fields),
             "relates_to": queryset.filter(pk__in=relates_to_issues)
-            .annotate(
-                relation_type=Value(
-                    "relates_to",
-                    output_field=CharField(),
-                )
-            )
+            .annotate(relation_type=Value("relates_to", output_field=CharField()))
             .values(*fields)
             | queryset.filter(pk__in=relates_to_issues_related)
-            .annotate(
-                relation_type=Value(
-                    "relates_to",
-                    output_field=CharField(),
-                )
-            )
+            .annotate(relation_type=Value("relates_to", output_field=CharField()))
             .values(*fields),
             "start_after": queryset.filter(pk__in=start_after_issues)
-            .annotate(
-                relation_type=Value(
-                    "start_after",
-                    output_field=CharField(),
-                )
-            )
+            .annotate(relation_type=Value("start_after", output_field=CharField()))
             .values(*fields),
             "start_before": queryset.filter(pk__in=start_before_issues)
-            .annotate(
-                relation_type=Value(
-                    "start_before",
-                    output_field=CharField(),
-                )
-            )
+            .annotate(relation_type=Value("start_before", output_field=CharField()))
             .values(*fields),
             "finish_after": queryset.filter(pk__in=finish_after_issues)
-            .annotate(
-                relation_type=Value(
-                    "finish_after",
-                    output_field=CharField(),
-                )
-            )
+            .annotate(relation_type=Value("finish_after", output_field=CharField()))
             .values(*fields),
             "finish_before": queryset.filter(pk__in=finish_before_issues)
-            .annotate(
-                relation_type=Value(
-                    "finish_before",
-                    output_field=CharField(),
-                )
-            )
+            .annotate(relation_type=Value("finish_before", output_field=CharField()))
             .values(*fields),
         }
 
@@ -284,14 +224,12 @@ class IssueRelationViewSet(BaseViewSet):
                 IssueRelation(
                     issue_id=(
                         issue
-                        if relation_type
-                        in ["blocking", "start_after", "finish_after"]
+                        if relation_type in ["blocking", "start_after", "finish_after"]
                         else issue_id
                     ),
                     related_issue_id=(
                         issue_id
-                        if relation_type
-                        in ["blocking", "start_after", "finish_after"]
+                        if relation_type in ["blocking", "start_after", "finish_after"]
                         else issue
                     ),
                     relation_type=(get_actual_relation(relation_type)),
@@ -315,10 +253,10 @@ class IssueRelationViewSet(BaseViewSet):
             current_instance=None,
             epoch=int(timezone.now().timestamp()),
             notification=True,
-            origin=request.META.get("HTTP_ORIGIN"),
+            origin=base_host(request=request, is_app=True),
         )
 
-        if relation_type == "blocking":
+        if relation_type in ["blocking", "start_after", "finish_after"]:
             return Response(
                 RelatedIssueSerializer(issue_relation, many=True).data,
                 status=status.HTTP_201_CREATED,
@@ -330,28 +268,19 @@ class IssueRelationViewSet(BaseViewSet):
             )
 
     def remove_relation(self, request, slug, project_id, issue_id):
-        relation_type = request.data.get("relation_type", None)
         related_issue = request.data.get("related_issue", None)
 
-        if relation_type == "blocking":
-            issue_relation = IssueRelation.objects.get(
-                workspace__slug=slug,
-                project_id=project_id,
-                issue_id=related_issue,
-                related_issue_id=issue_id,
-            )
-        else:
-            issue_relation = IssueRelation.objects.get(
-                workspace__slug=slug,
-                project_id=project_id,
-                issue_id=issue_id,
-                related_issue_id=related_issue,
-            )
-        current_instance = json.dumps(
-            IssueRelationSerializer(issue_relation).data,
-            cls=DjangoJSONEncoder,
+        issue_relations = IssueRelation.objects.filter(
+            workspace__slug=slug,
+        ).filter(
+            Q(issue_id=related_issue, related_issue_id=issue_id)
+            | Q(issue_id=issue_id, related_issue_id=related_issue)
         )
-        issue_relation.delete()
+        issue_relations = issue_relations.first()
+        current_instance = json.dumps(
+            IssueRelationSerializer(issue_relations).data, cls=DjangoJSONEncoder
+        )
+        issue_relations.delete()
         issue_activity.delay(
             type="issue_relation.activity.deleted",
             requested_data=json.dumps(request.data, cls=DjangoJSONEncoder),
@@ -361,6 +290,6 @@ class IssueRelationViewSet(BaseViewSet):
             current_instance=current_instance,
             epoch=int(timezone.now().timestamp()),
             notification=True,
-            origin=request.META.get("HTTP_ORIGIN"),
+            origin=base_host(request=request, is_app=True),
         )
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -39,17 +39,22 @@ import {
   setText,
 } from "@/helpers/editor-commands";
 // types
-import { CommandProps, ISlashCommandItem } from "@/types";
+import { CommandProps, ISlashCommandItem, TSlashCommandSectionKeys } from "@/types";
+// plane editor extensions
+import { coreEditorAdditionalSlashCommandOptions } from "@/plane-editor/extensions";
+// local types
+import { TExtensionProps, TSlashCommandAdditionalOption } from "./root";
 
 export type TSlashCommandSection = {
-  key: string;
+  key: TSlashCommandSectionKeys;
   title?: string;
   items: ISlashCommandItem[];
 };
 
 export const getSlashCommandFilteredSections =
-  (additionalOptions?: ISlashCommandItem[]) =>
+  (args: TExtensionProps) =>
   ({ query }: { query: string }): TSlashCommandSection[] => {
+    const { additionalOptions: externalAdditionalOptions, disabledExtensions } = args;
     const SLASH_COMMAND_SECTIONS: TSlashCommandSection[] = [
       {
         key: "general",
@@ -172,15 +177,6 @@ export const getSlashCommandFilteredSections =
             command: ({ editor, range }) => editor.chain().focus().deleteRange(range).toggleCodeBlock().run(),
           },
           {
-            commandKey: "image",
-            key: "image",
-            title: "Image",
-            icon: <ImageIcon className="size-3.5" />,
-            description: "Insert an image",
-            searchTerms: ["img", "photo", "picture", "media", "upload"],
-            command: ({ editor, range }: CommandProps) => insertImage({ editor, event: "insert", range }),
-          },
-          {
             commandKey: "callout",
             key: "callout",
             title: "Callout",
@@ -201,7 +197,7 @@ export const getSlashCommandFilteredSections =
         ],
       },
       {
-        key: "text-color",
+        key: "text-colors",
         title: "Colors",
         items: [
           {
@@ -242,7 +238,7 @@ export const getSlashCommandFilteredSections =
         ],
       },
       {
-        key: "background-color",
+        key: "background-colors",
         title: "Background colors",
         items: [
           {
@@ -279,8 +275,35 @@ export const getSlashCommandFilteredSections =
       },
     ];
 
-    additionalOptions?.map((item) => {
-      SLASH_COMMAND_SECTIONS?.[0]?.items.push(item);
+    const internalAdditionalOptions: TSlashCommandAdditionalOption[] = [];
+    if (!disabledExtensions?.includes("image")) {
+      internalAdditionalOptions.push({
+        commandKey: "image",
+        key: "image",
+        title: "Image",
+        icon: <ImageIcon className="size-3.5" />,
+        description: "Insert an image",
+        searchTerms: ["img", "photo", "picture", "media", "upload"],
+        command: ({ editor, range }: CommandProps) => insertImage({ editor, event: "insert", range }),
+        section: "general",
+        pushAfter: "code",
+      });
+    }
+
+    [
+      ...internalAdditionalOptions,
+      ...(externalAdditionalOptions ?? []),
+      ...coreEditorAdditionalSlashCommandOptions({
+        disabledExtensions,
+      }),
+    ]?.forEach((item) => {
+      const sectionToPushTo = SLASH_COMMAND_SECTIONS.find((s) => s.key === item.section) ?? SLASH_COMMAND_SECTIONS[0];
+      const itemIndexToPushAfter = sectionToPushTo.items.findIndex((i) => i.commandKey === item.pushAfter);
+      if (itemIndexToPushAfter !== -1) {
+        sectionToPushTo.items.splice(itemIndexToPushAfter + 1, 0, item);
+      } else {
+        sectionToPushTo.items.push(item);
+      }
     });
 
     const filteredSlashSections = SLASH_COMMAND_SECTIONS.map((section) => ({

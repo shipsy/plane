@@ -2,13 +2,12 @@
 
 import React from "react";
 import { observer } from "mobx-react";
-// types
+// plane imports
+import { EIssuesStoreType } from "@plane/constants";
 import type { TIssue } from "@plane/types";
 // components
 import { CreateUpdateIssueModalBase } from "@/components/issues";
-// constants
-import { EIssuesStoreType } from "@/constants/issue";
-// plane web providers
+// plane web imports
 import { IssueModalProvider } from "@/plane-web/components/issues";
 
 export interface IssuesModalProps {
@@ -27,12 +26,14 @@ export interface IssuesModalProps {
     default: string;
     loading: string;
   };
+  isProjectSelectionDisabled?: boolean;
+  templateId?: string;
 }
 
 export const CreateUpdateIssueModal: React.FC<IssuesModalProps> = observer(
   (props) =>
     props.isOpen && (
-      <IssueModalProvider>
+      <IssueModalProvider templateId={props.templateId}>
         <CreateUpdateIssueModalBase {...props} />
       </IssueModalProvider>
     )

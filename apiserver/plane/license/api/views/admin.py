@@ -33,12 +33,11 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
     AuthenticationException,
 )
+from plane.utils.ip_address import get_client_ip
 
 
 class InstanceAdminEndpoint(BaseAPIView):
-    permission_classes = [
-        InstanceAdminPermission,
-    ]
+    permission_classes = [InstanceAdminPermission]
 
     @invalidate_cache(path="/api/instances/", user=False)
     # Create an instance admin
@@ -48,8 +47,7 @@ class InstanceAdminEndpoint(BaseAPIView):
 
         if not email:
             return Response(
-                {"error": "Email is required"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         instance = Instance.objects.first()
@@ -63,9 +61,7 @@ class InstanceAdminEndpoint(BaseAPIView):
         user = User.objects.get(email=email)
 
         instance_admin = InstanceAdmin.objects.create(
-            instance=instance,
-            user=user,
-            role=role,
+            instance=instance, user=user, role=role
         )
         serializer = InstanceAdminSerializer(instance_admin)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -90,9 +86,7 @@ class InstanceAdminEndpoint(BaseAPIView):
 
 
 class InstanceAdminSignUpEndpoint(View):
-    permission_classes = [
-        AllowAny,
-    ]
+    permission_classes = [AllowAny]
 
     @invalidate_cache(path="/api/instances/", user=False)
     def post(self, request):
@@ -100,9 +94,7 @@ class InstanceAdminSignUpEndpoint(View):
         instance = Instance.objects.first()
         if instance is None:
             exc = AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES[
-                    "INSTANCE_NOT_CONFIGURED"
-                ],
+                error_code=AUTHENTICATION_ERROR_CODES["INSTANCE_NOT_CONFIGURED"],
                 error_message="INSTANCE_NOT_CONFIGURED",
             )
             url = urljoin(
@@ -178,9 +170,7 @@ class InstanceAdminSignUpEndpoint(View):
         # Existing user
         if User.objects.filter(email=email).exists():
             exc = AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES[
-                    "ADMIN_USER_ALREADY_EXIST"
-                ],
+                error_code=AUTHENTICATION_ERROR_CODES["ADMIN_USER_ALREADY_EXIST"],
                 error_message="ADMIN_USER_ALREADY_EXIST",
                 payload={
                     "email": email,
@@ -196,13 +186,10 @@ class InstanceAdminSignUpEndpoint(View):
             )
             return HttpResponseRedirect(url)
         else:
-
             results = zxcvbn(password)
             if results["score"] < 3:
                 exc = AuthenticationException(
-                    error_code=AUTHENTICATION_ERROR_CODES[
-                        "INVALID_ADMIN_PASSWORD"
-                    ],
+                    error_code=AUTHENTICATION_ERROR_CODES["INVALID_ADMIN_PASSWORD"],
                     error_message="INVALID_ADMIN_PASSWORD",
                     payload={
                         "email": email,
@@ -231,16 +218,13 @@ class InstanceAdminSignUpEndpoint(View):
             user.is_active = True
             user.last_active = timezone.now()
             user.last_login_time = timezone.now()
-            user.last_login_ip = request.META.get("REMOTE_ADDR")
+            user.last_login_ip = get_client_ip(request=request)
             user.last_login_uagent = request.META.get("HTTP_USER_AGENT")
             user.token_updated_at = timezone.now()
             user.save()
 
             # Register the user as an instance admin
-            _ = InstanceAdmin.objects.create(
-                user=user,
-                instance=instance,
-            )
+            _ = InstanceAdmin.objects.create(user=user, instance=instance)
             # Make the setup flag True
             instance.is_setup_done = True
             instance.instance_name = company_name
@@ -254,9 +238,7 @@ class InstanceAdminSignUpEndpoint(View):
 
 
 class InstanceAdminSignInEndpoint(View):
-    permission_classes = [
-        AllowAny,
-    ]
+    permission_classes = [AllowAny]
 
     @invalidate_cache(path="/api/instances/", user=False)
     def post(self, request):
@@ -264,9 +246,7 @@ class InstanceAdminSignInEndpoint(View):
         instance = Instance.objects.first()
         if instance is None:
             exc = AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES[
-                    "INSTANCE_NOT_CONFIGURED"
-                ],
+                error_code=AUTHENTICATION_ERROR_CODES["INSTANCE_NOT_CONFIGURED"],
                 error_message="INSTANCE_NOT_CONFIGURED",
             )
             url = urljoin(
@@ -282,13 +262,9 @@ class InstanceAdminSignInEndpoint(View):
         # return error if the email and password is not present
         if not email or not password:
             exc = AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES[
-                    "REQUIRED_ADMIN_EMAIL_PASSWORD"
-                ],
+                error_code=AUTHENTICATION_ERROR_CODES["REQUIRED_ADMIN_EMAIL_PASSWORD"],
                 error_message="REQUIRED_ADMIN_EMAIL_PASSWORD",
-                payload={
-                    "email": email,
-                },
+                payload={"email": email},
             )
             url = urljoin(
                 base_host(request=request, is_admin=True),
@@ -304,9 +280,7 @@ class InstanceAdminSignInEndpoint(View):
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["INVALID_ADMIN_EMAIL"],
                 error_message="INVALID_ADMIN_EMAIL",
-                payload={
-                    "email": email,
-                },
+                payload={"email": email},
             )
             url = urljoin(
                 base_host(request=request, is_admin=True),
@@ -317,13 +291,12 @@ class InstanceAdminSignInEndpoint(View):
         # Fetch the user
         user = User.objects.filter(email=email).first()
 
-        # is_active
-        if not user.is_active:
+        # Error out if the user is not present
+        if not user:
             exc = AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES[
-                    "ADMIN_USER_DEACTIVATED"
-                ],
-                error_message="ADMIN_USER_DEACTIVATED",
+                error_code=AUTHENTICATION_ERROR_CODES["ADMIN_USER_DOES_NOT_EXIST"],
+                error_message="ADMIN_USER_DOES_NOT_EXIST",
+                payload={"email": email},
             )
             url = urljoin(
                 base_host(request=request, is_admin=True),
@@ -331,16 +304,11 @@ class InstanceAdminSignInEndpoint(View):
             )
             return HttpResponseRedirect(url)
 
-        # Error out if the user is not present
-        if not user:
+        # is_active
+        if not user.is_active:
             exc = AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES[
-                    "ADMIN_USER_DOES_NOT_EXIST"
-                ],
-                error_message="ADMIN_USER_DOES_NOT_EXIST",
-                payload={
-                    "email": email,
-                },
+                error_code=AUTHENTICATION_ERROR_CODES["ADMIN_USER_DEACTIVATED"],
+                error_message="ADMIN_USER_DEACTIVATED",
             )
             url = urljoin(
                 base_host(request=request, is_admin=True),
@@ -351,13 +319,9 @@ class InstanceAdminSignInEndpoint(View):
         # Check password of the user
         if not user.check_password(password):
             exc = AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES[
-                    "ADMIN_AUTHENTICATION_FAILED"
-                ],
+                error_code=AUTHENTICATION_ERROR_CODES["ADMIN_AUTHENTICATION_FAILED"],
                 error_message="ADMIN_AUTHENTICATION_FAILED",
-                payload={
-                    "email": email,
-                },
+                payload={"email": email},
             )
             url = urljoin(
                 base_host(request=request, is_admin=True),
@@ -368,13 +332,9 @@ class InstanceAdminSignInEndpoint(View):
         # Check if the user is an instance admin
         if not InstanceAdmin.objects.filter(instance=instance, user=user):
             exc = AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES[
-                    "ADMIN_AUTHENTICATION_FAILED"
-                ],
+                error_code=AUTHENTICATION_ERROR_CODES["ADMIN_AUTHENTICATION_FAILED"],
                 error_message="ADMIN_AUTHENTICATION_FAILED",
-                payload={
-                    "email": email,
-                },
+                payload={"email": email},
             )
             url = urljoin(
                 base_host(request=request, is_admin=True),
@@ -385,7 +345,7 @@ class InstanceAdminSignInEndpoint(View):
         user.is_active = True
         user.last_active = timezone.now()
         user.last_login_time = timezone.now()
-        user.last_login_ip = request.META.get("REMOTE_ADDR")
+        user.last_login_ip = get_client_ip(request=request)
         user.last_login_uagent = request.META.get("HTTP_USER_AGENT")
         user.token_updated_at = timezone.now()
         user.save()
@@ -397,24 +357,15 @@ class InstanceAdminSignInEndpoint(View):
 
 
 class InstanceAdminUserMeEndpoint(BaseAPIView):
-
-    permission_classes = [
-        InstanceAdminPermission,
-    ]
+    permission_classes = [InstanceAdminPermission]
 
     def get(self, request):
         serializer = InstanceAdminMeSerializer(request.user)
-        return Response(
-            serializer.data,
-            status=status.HTTP_200_OK,
-        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class InstanceAdminUserSessionEndpoint(BaseAPIView):
-
-    permission_classes = [
-        AllowAny,
-    ]
+    permission_classes = [AllowAny]
 
     def get(self, request):
         if (
@@ -424,21 +375,13 @@ class InstanceAdminUserSessionEndpoint(BaseAPIView):
             serializer = InstanceAdminMeSerializer(request.user)
             data = {"is_authenticated": True}
             data["user"] = serializer.data
-            return Response(
-                data,
-                status=status.HTTP_200_OK,
-            )
+            return Response(data, status=status.HTTP_200_OK)
         else:
-            return Response(
-                {"is_authenticated": False}, status=status.HTTP_200_OK
-            )
+            return Response({"is_authenticated": False}, status=status.HTTP_200_OK)
 
 
 class InstanceAdminSignOutEndpoint(View):
-
-    permission_classes = [
-        InstanceAdminPermission,
-    ]
+    permission_classes = [InstanceAdminPermission]
 
     def post(self, request):
         # Get user
@@ -452,6 +395,4 @@ class InstanceAdminSignOutEndpoint(View):
             url = urljoin(base_host(request=request, is_admin=True))
             return HttpResponseRedirect(url)
         except Exception:
-            return HttpResponseRedirect(
-                base_host(request=request, is_admin=True)
-            )
+            return HttpResponseRedirect(base_host(request=request, is_admin=True))

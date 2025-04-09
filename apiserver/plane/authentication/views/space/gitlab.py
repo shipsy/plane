@@ -15,10 +15,10 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
     AuthenticationException,
 )
+from plane.utils.path_validator import validate_next_path
 
 
 class GitLabOauthInitiateSpaceEndpoint(View):
-
     def get(self, request):
         # Get host and next path
         request.session["host"] = base_host(request=request, is_space=True)
@@ -30,14 +30,12 @@ class GitLabOauthInitiateSpaceEndpoint(View):
         instance = Instance.objects.first()
         if instance is None or not instance.is_setup_done:
             exc = AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES[
-                    "INSTANCE_NOT_CONFIGURED"
-                ],
+                error_code=AUTHENTICATION_ERROR_CODES["INSTANCE_NOT_CONFIGURED"],
                 error_message="INSTANCE_NOT_CONFIGURED",
             )
             params = exc.get_error_dict()
             if next_path:
-                params["next_path"] = str(next_path)
+                params["next_path"] = str(validate_next_path(next_path))
             url = f"{base_host(request=request, is_space=True)}?{urlencode(params)}"
             return HttpResponseRedirect(url)
 
@@ -56,7 +54,6 @@ class GitLabOauthInitiateSpaceEndpoint(View):
 
 
 class GitLabCallbackSpaceEndpoint(View):
-
     def get(self, request):
         code = request.GET.get("code")
         state = request.GET.get("state")
@@ -65,35 +62,28 @@ class GitLabCallbackSpaceEndpoint(View):
 
         if state != request.session.get("state", ""):
             exc = AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES[
-                    "GITLAB_OAUTH_PROVIDER_ERROR"
-                ],
+                error_code=AUTHENTICATION_ERROR_CODES["GITLAB_OAUTH_PROVIDER_ERROR"],
                 error_message="GITLAB_OAUTH_PROVIDER_ERROR",
             )
             params = exc.get_error_dict()
             if next_path:
-                params["next_path"] = str(next_path)
+                params["next_path"] = str(validate_next_path(next_path))
             url = f"{base_host(request=request, is_space=True)}?{urlencode(params)}"
             return HttpResponseRedirect(url)
 
         if not code:
             exc = AuthenticationException(
-                error_code=AUTHENTICATION_ERROR_CODES[
-                    "GITLAB_OAUTH_PROVIDER_ERROR"
-                ],
+                error_code=AUTHENTICATION_ERROR_CODES["GITLAB_OAUTH_PROVIDER_ERROR"],
                 error_message="GITLAB_OAUTH_PROVIDER_ERROR",
             )
             params = exc.get_error_dict()
             if next_path:
-                params["next_path"] = str(next_path)
+                params["next_path"] = str(validate_next_path(next_path))
             url = f"{base_host(request=request, is_space=True)}?{urlencode(params)}"
             return HttpResponseRedirect(url)
 
         try:
-            provider = GitLabOAuthProvider(
-                request=request,
-                code=code,
-            )
+            provider = GitLabOAuthProvider(request=request, code=code)
             user = provider.authenticate()
             # Login the user and record his device info
             user_login(request=request, user=user, is_space=True)
@@ -104,6 +94,6 @@ class GitLabCallbackSpaceEndpoint(View):
         except AuthenticationException as e:
             params = e.get_error_dict()
             if next_path:
-                params["next_path"] = str(next_path)
+                params["next_path"] = str(validate_next_path(next_path))
             url = f"{base_host(request=request, is_space=True)}?{urlencode(params)}"
             return HttpResponseRedirect(url)

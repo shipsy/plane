@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
 import { Editor, NodeViewProps, NodeViewWrapper } from "@tiptap/react";
+import { useEffect, useRef, useState } from "react";
 // extensions
 import { CustomImageBlock, CustomImageUploader, ImageAttributes } from "@/extensions/custom-image";
+import { getExtensionStorage } from "@/helpers/get-extension-storage";
 
 export type CustoBaseImageNodeViewProps = {
   getPos: () => number;
@@ -29,12 +30,9 @@ export const CustomImageNode = (props: CustomImageNodeProps) => {
 
   useEffect(() => {
     const closestEditorContainer = imageComponentRef.current?.closest(".editor-container");
-    if (!closestEditorContainer) {
-      console.error("Editor container not found");
-      return;
+    if (closestEditorContainer) {
+      setEditorContainer(closestEditorContainer as HTMLDivElement);
     }
-
-    setEditorContainer(closestEditorContainer as HTMLDivElement);
   }, []);
 
   // the image is already uploaded if the image-component node has src attribute
@@ -55,7 +53,7 @@ export const CustomImageNode = (props: CustomImageNodeProps) => {
       setResolvedSrc(url as string);
     };
     getImageSource();
-  }, [imageFromFileSystem, node.attrs.src]);
+  }, [imgNodeSrc]);
 
   return (
     <NodeViewWrapper>
@@ -79,7 +77,7 @@ export const CustomImageNode = (props: CustomImageNodeProps) => {
             failedToLoadImage={failedToLoadImage}
             getPos={getPos}
             loadImageFromFileSystem={setImageFromFileSystem}
-            maxFileSize={editor.storage.imageComponent.maxFileSize}
+            maxFileSize={getExtensionStorage(editor, "imageComponent").maxFileSize}
             node={node}
             setIsUploaded={setIsUploaded}
             selected={selected}

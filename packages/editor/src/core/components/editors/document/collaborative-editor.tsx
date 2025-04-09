@@ -1,4 +1,7 @@
+import { Extensions } from "@tiptap/core";
 import React from "react";
+// plane imports
+import { cn } from "@plane/utils";
 // components
 import { DocumentContentLoader, PageRenderer } from "@/components/editors";
 // constants
@@ -16,9 +19,11 @@ const CollaborativeDocumentEditor = (props: ICollaborativeDocumentEditor) => {
   const {
     onTransaction,
     aiHandler,
+    bubbleMenuEnabled = true,
     containerClassName,
     disabledExtensions,
     displayConfig = DEFAULT_DISPLAY_CONFIG,
+    editable,
     editorClassName = "",
     embedHandler,
     fileHandler,
@@ -33,7 +38,7 @@ const CollaborativeDocumentEditor = (props: ICollaborativeDocumentEditor) => {
     user,
   } = props;
 
-  const extensions = [];
+  const extensions: Extensions = [];
   if (embedHandler?.issue) {
     extensions.push(
       IssueWidget({
@@ -44,8 +49,8 @@ const CollaborativeDocumentEditor = (props: ICollaborativeDocumentEditor) => {
 
   // use document editor
   const { editor, hasServerConnectionFailed, hasServerSynced } = useCollaborativeEditor({
-    onTransaction,
     disabledExtensions,
+    editable,
     editorClassName,
     embedHandler,
     extensions,
@@ -54,6 +59,7 @@ const CollaborativeDocumentEditor = (props: ICollaborativeDocumentEditor) => {
     handleEditorReady,
     id,
     mentionHandler,
+    onTransaction,
     placeholder,
     realtimeConfig,
     serverHandler,
@@ -69,14 +75,19 @@ const CollaborativeDocumentEditor = (props: ICollaborativeDocumentEditor) => {
 
   if (!editor) return null;
 
-  if (!hasServerSynced && !hasServerConnectionFailed) return <DocumentContentLoader />;
+  const blockWidthClassName = cn("w-full max-w-[720px] mx-auto transition-all duration-200 ease-in-out", {
+    "max-w-[1152px]": displayConfig.wideLayout,
+  });
+
+  if (!hasServerSynced && !hasServerConnectionFailed) return <DocumentContentLoader className={blockWidthClassName} />;
 
   return (
     <PageRenderer
-      displayConfig={displayConfig}
       aiHandler={aiHandler}
+      bubbleMenuEnabled={bubbleMenuEnabled}
+      displayConfig={displayConfig}
       editor={editor}
-      editorContainerClassName={editorContainerClassNames}
+      editorContainerClassName={cn(editorContainerClassNames, "document-editor")}
       id={id}
       tabIndex={tabIndex}
     />

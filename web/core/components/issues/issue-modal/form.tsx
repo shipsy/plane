@@ -3,14 +3,18 @@
 import React, { FC, useState, useRef, useEffect } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { FormProvider, useForm } from "react-hook-form";
 // editor
+import { ETabIndices, EIssuesStoreType, DEFAULT_WORK_ITEM_FORM_VALUES } from "@plane/constants";
 import { EditorRefApi } from "@plane/editor";
+// i18n
+import { useTranslation } from "@plane/i18n";
 // types
-import type { TIssue, ISearchIssueResponse, TWorkspaceDraftIssue } from "@plane/types";
+import type { TIssue, TWorkspaceDraftIssue } from "@plane/types";
 // hooks
 import { Button, ToggleSwitch, TOAST_TYPE, setToast } from "@plane/ui";
 // components
+import { convertWorkItemDataToSearchResponse, getUpdateFormDataForReset } from "@plane/utils";
 import {
   IssueDefaultProperties,
   IssueDescriptionEditor,
@@ -19,38 +23,24 @@ import {
   IssueTitleInput,
 } from "@/components/issues/issue-modal/components";
 import { CreateLabelModal } from "@/components/labels";
-import { ETabIndices } from "@/constants/tab-indices";
 // helpers
 import { cn } from "@/helpers/common.helper";
 import { getTextContent } from "@/helpers/editor.helper";
-import { getChangedIssuefields } from "@/helpers/issue.helper";
+import { getChangedIssuefields } from "@/helpers/issue-modal.helper";
 import { getTabIndex } from "@/helpers/tab-indices.helper";
 // hooks
 import { useIssueModal } from "@/hooks/context/use-issue-modal";
 import { useIssueDetail, useProject, useProjectState, useWorkspaceDraftIssues } from "@/hooks/store";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import { useProjectIssueProperties } from "@/hooks/use-project-issue-properties";
-// plane web components
-import { DeDupeIssueButtonLabel, DuplicateModalRoot } from "@/plane-web/components/de-dupe";
-import { IssueAdditionalProperties, IssueTypeSelect } from "@/plane-web/components/issues/issue-modal";
+// plane web imports
+import { DeDupeButtonRoot, DuplicateModalRoot } from "@/plane-web/components/de-dupe";
+import {
+  IssueAdditionalProperties,
+  IssueTypeSelect,
+  WorkItemTemplateSelect,
+} from "@/plane-web/components/issues/issue-modal";
 import { useDebouncedDuplicateIssues } from "@/plane-web/hooks/use-debounced-duplicate-issues";
-
-const defaultValues: Partial<TIssue> = {
-  project_id: "",
-  type_id: null,
-  name: "",
-  description_html: "",
-  estimate_point: null,
-  state_id: "",
-  parent_id: null,
-  priority: "none",
-  assignee_ids: [],
-  label_ids: [],
-  cycle_id: null,
-  module_ids: null,
-  start_date: null,
-  target_date: null,
-};
 
 export interface IssueFormProps {
   data?: Partial<TIssue>;
@@ -71,9 +61,13 @@ export interface IssueFormProps {
   };
   isDuplicateModalOpen: boolean;
   handleDuplicateIssueModal: (isOpen: boolean) => void;
+  handleDraftAndClose?: () => void;
+  isProjectSelectionDisabled?: boolean;
+  storeType: EIssuesStoreType;
 }
 
 export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
+  const { t } = useTranslation();
   const {
     data,
     issueTitleRef,
@@ -85,20 +79,23 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
     isCreateMoreToggleEnabled,
     onCreateMoreToggleChange,
     isDraft,
-    moveToIssue,
-    modalTitle = `${data?.id ? "Update" : isDraft ? "Create a draft" : "Create new issue"}`,
+    moveToIssue = false,
+    modalTitle = `${data?.id ? t("update") : isDraft ? t("create_a_draft") : t("create_new_issue")}`,
     primaryButtonText = {
-      default: `${data?.id ? "Update" : isDraft ? "Save to Drafts" : "Save"}`,
-      loading: `${data?.id ? "Updating" : "Saving"}`,
+      default: `${data?.id ? t("update") : isDraft ? t("save_to_drafts") : t("save")}`,
+      loading: `${data?.id ? t("updating") : t("saving")}`,
     },
     isDuplicateModalOpen,
     handleDuplicateIssueModal,
+    handleDraftAndClose,
+    isProjectSelectionDisabled = false,
+    storeType,
   } = props;
 
   // states
   const [labelModal, setLabelModal] = useState(false);
-  const [selectedParentIssue, setSelectedParentIssue] = useState<ISearchIssueResponse | null>(null);
   const [gptAssistantModal, setGptAssistantModal] = useState(false);
+  const [isMoving, setIsMoving] = useState<boolean>(false);
 
   // refs
   const editorRef = useRef<EditorRefApi>(null);
@@ -111,8 +108,18 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
 
   // store hooks
   const { getProjectById } = useProject();
-  const { getIssueTypeIdOnProjectChange, getActiveAdditionalPropertiesLength, handlePropertyValuesValidation } =
-    useIssueModal();
+  const {
+    workItemTemplateId,
+    isApplyingTemplate,
+    selectedParentIssue,
+    setWorkItemTemplateId,
+    setSelectedParentIssue,
+    getIssueTypeIdOnProjectChange,
+    getActiveAdditionalPropertiesLength,
+    handlePropertyValuesValidation,
+    handleCreateUpdatePropertyValues,
+    handleTemplateChange,
+  } = useIssueModal();
   const { isMobile } = usePlatformOS();
   const { moveIssue } = useWorkspaceDraftIssues();
 
@@ -123,18 +130,20 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
   const { getStateById } = useProjectState();
 
   // form info
+  const methods = useForm<TIssue>({
+    defaultValues: { ...DEFAULT_WORK_ITEM_FORM_VALUES, project_id: defaultProjectId, ...data },
+    reValidateMode: "onChange",
+  });
   const {
-    formState: { errors, isDirty, isSubmitting, dirtyFields },
+    formState,
+    formState: { isDirty, isSubmitting, dirtyFields },
     handleSubmit,
     reset,
     watch,
     control,
     getValues,
     setValue,
-  } = useForm<TIssue>({
-    defaultValues: { ...defaultValues, project_id: defaultProjectId, ...data },
-    reValidateMode: "onChange",
-  });
+  } = methods;
 
   const projectId = watch("project_id");
   const activeAdditionalPropertiesLength = getActiveAdditionalPropertiesLength({
@@ -145,24 +154,21 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
 
   // derived values
   const projectDetails = projectId ? getProjectById(projectId) : undefined;
+  const isDisabled = isSubmitting || isApplyingTemplate;
 
   const { getIndex } = getTabIndex(ETabIndices.ISSUE_FORM, isMobile);
 
   //reset few fields on projectId change
   useEffect(() => {
     if (isDirty) {
-      const formData = getValues();
-
-      reset({
-        ...defaultValues,
-        project_id: projectId,
-        name: formData.name,
-        description_html: formData.description_html,
-        priority: formData.priority,
-        start_date: formData.start_date,
-        target_date: formData.target_date,
-        parent_id: formData.parent_id,
-      });
+      if (workItemTemplateId) {
+        // reset work item template id
+        setWorkItemTemplateId(null);
+        reset({ ...DEFAULT_WORK_ITEM_FORM_VALUES, project_id: projectId });
+        editorRef.current?.clearEditor();
+      } else {
+        reset(getUpdateFormDataForReset(projectId, getValues()));
+      }
     }
     if (projectId && routeProjectId !== projectId) fetchCycles(workspaceSlug?.toString(), projectId);
 
@@ -183,13 +189,24 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, projectId]);
 
+  useEffect(() => {
+    if (workItemTemplateId && editorRef.current) {
+      handleTemplateChange({
+        workspaceSlug: workspaceSlug?.toString(),
+        reset,
+        editorRef,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workItemTemplateId]);
+
   const handleFormSubmit = async (formData: Partial<TIssue>, is_draft_issue = false) => {
     // Check if the editor is ready to discard
     if (!editorRef.current?.isEditorReadyToDiscard()) {
       setToast({
         type: TOAST_TYPE.ERROR,
-        title: "Error!",
-        message: "Editor is not ready to discard changes.",
+        title: t("error"),
+        message: t("editor_is_not_ready_to_discard_changes"),
       });
       return;
     }
@@ -220,18 +237,53 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
     await onSubmit(submitData, is_draft_issue)
       .then(() => {
         setGptAssistantModal(false);
-        reset({
-          ...defaultValues,
-          ...(isCreateMoreToggleEnabled ? { ...data } : {}),
-          project_id: getValues<"project_id">("project_id"),
-          type_id: getValues<"type_id">("type_id"),
-          description_html: data?.description_html ?? "<p></p>",
-        });
-        editorRef?.current?.clearEditor();
+        if (isCreateMoreToggleEnabled && workItemTemplateId) {
+          handleTemplateChange({
+            workspaceSlug: workspaceSlug?.toString(),
+            reset,
+            editorRef,
+          });
+        } else {
+          reset({
+            ...DEFAULT_WORK_ITEM_FORM_VALUES,
+            ...(isCreateMoreToggleEnabled ? { ...data } : {}),
+            project_id: getValues<"project_id">("project_id"),
+            type_id: getValues<"type_id">("type_id"),
+            description_html: data?.description_html ?? "<p></p>",
+          });
+          editorRef?.current?.clearEditor();
+        }
       })
       .catch((error) => {
         console.error(error);
       });
+  };
+
+  const handleMoveToProjects = async () => {
+    if (!data?.id || !data?.project_id || !data) return;
+    setIsMoving(true);
+    try {
+      await handleCreateUpdatePropertyValues({
+        issueId: data.id,
+        issueTypeId: data.type_id,
+        projectId: data.project_id,
+        workspaceSlug: workspaceSlug?.toString(),
+        isDraft: true,
+      });
+
+      await moveIssue(workspaceSlug.toString(), data.id, {
+        ...data,
+        ...getValues(),
+      } as TWorkspaceDraftIssue);
+    } catch {
+      setToast({
+        type: TOAST_TYPE.ERROR,
+        title: "Error!",
+        message: "Failed to move work item to project. Please try again.",
+      });
+    } finally {
+      setIsMoving(false);
+    }
   };
 
   const condition =
@@ -246,6 +298,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
 
   // debounced duplicate issues swr
   const { duplicateIssues } = useDebouncedDuplicateIssues(
+    workspaceSlug?.toString(),
     projectDetails?.workspace.toString(),
     projectId ?? undefined,
     {
@@ -268,16 +321,9 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
 
     const stateDetails = getStateById(issue.state_id);
 
-    setSelectedParentIssue({
-      id: issue.id,
-      name: issue.name,
-      project_id: issue.project_id,
-      project__identifier: projectDetails.identifier,
-      project__name: projectDetails.name,
-      sequence_id: issue.sequence_id,
-      type_id: issue.type_id,
-      state__color: stateDetails?.color,
-    } as ISearchIssueResponse);
+    setSelectedParentIssue(
+      convertWorkItemDataToSearchResponse(workspaceSlug?.toString(), issue, projectDetails, stateDetails)
+    );
   }, [watch, getIssueById, getProjectById, selectedParentIssue, getStateById]);
 
   // executing this useEffect when isDirty changes
@@ -311,7 +357,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
   const shouldRenderDuplicateModal = isDuplicateModalOpen && duplicateIssues?.length > 0;
 
   return (
-    <>
+    <FormProvider {...methods}>
       {projectId && (
         <CreateLabelModal
           isOpen={labelModal}
@@ -336,32 +382,46 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
                 <div className="flex items-center gap-x-1">
                   <IssueProjectSelect
                     control={control}
-                    disabled={!!data?.id || !!data?.sourceIssueId}
+                    disabled={!!data?.id || !!data?.sourceIssueId || isProjectSelectionDisabled}
                     handleFormChange={handleFormChange}
                   />
-                  {projectId && (
+                  {projectId && storeType !== EIssuesStoreType.EPIC && (
                     <IssueTypeSelect
                       control={control}
                       projectId={projectId}
+                      editorRef={editorRef}
                       disabled={!!data?.sourceIssueId}
+                      handleFormChange={handleFormChange}
+                      renderChevron
+                    />
+                  )}
+                  {projectId && !data?.id && !data?.sourceIssueId && (
+                    <WorkItemTemplateSelect
+                      projectId={projectId}
+                      typeId={watch("type_id")}
+                      handleModalClose={() => {
+                        if (handleDraftAndClose) {
+                          handleDraftAndClose();
+                        } else {
+                          onClose();
+                        }
+                      }}
                       handleFormChange={handleFormChange}
                       renderChevron
                     />
                   )}
                 </div>
                 {duplicateIssues.length > 0 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                      handleDuplicateIssueModal(!isDuplicateModalOpen);
-                    }}
-                  >
-                    <DeDupeIssueButtonLabel
-                      isOpen={isDuplicateModalOpen}
-                      buttonLabel={`${duplicateIssues.length} duplicate issue${duplicateIssues.length > 1 ? "s" : ""} found!`}
-                    />
-                  </button>
+                  <DeDupeButtonRoot
+                    workspaceSlug={workspaceSlug?.toString()}
+                    isDuplicateModalOpen={isDuplicateModalOpen}
+                    label={
+                      duplicateIssues.length === 1
+                        ? `${duplicateIssues.length} ${t("duplicate_issue_found")}`
+                        : `${duplicateIssues.length} ${t("duplicate_issues_found")}`
+                    }
+                    handleOnClick={() => handleDuplicateIssueModal(!isDuplicateModalOpen)}
+                  />
                 )}
               </div>
               {watch("parent_id") && selectedParentIssue && (
@@ -378,7 +438,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
                 <IssueTitleInput
                   control={control}
                   issueTitleRef={issueTitleRef}
-                  errors={errors}
+                  formState={formState}
                   handleFormChange={handleFormChange}
                 />
               </div>
@@ -447,7 +507,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
                   setSelectedParentIssue={setSelectedParentIssue}
                 />
               </div>
-              <div className="flex items-center justify-end gap-4 py-3">
+              <div className="flex items-center justify-end gap-4 py-3" tabIndex={getIndex("create_more")}>
                 {!data?.id && (
                   <div
                     className="inline-flex items-center gap-1.5 cursor-pointer"
@@ -455,58 +515,55 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") onCreateMoreToggleChange(!isCreateMoreToggleEnabled);
                     }}
-                    tabIndex={getIndex("create_more")}
                     role="button"
                   >
                     <ToggleSwitch value={isCreateMoreToggleEnabled} onChange={() => {}} size="sm" />
-                    <span className="text-xs">Create more</span>
+                    <span className="text-xs">{t("create_more")}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="neutral-primary"
-                    size="sm"
-                    onClick={() => {
-                      if (editorRef.current?.isEditorReadyToDiscard()) {
-                        onClose();
-                      } else {
-                        setToast({
-                          type: TOAST_TYPE.ERROR,
-                          title: "Error!",
-                          message: "Editor is still processing changes. Please wait before proceeding.",
-                        });
-                      }
-                    }}
-                    tabIndex={getIndex("discard_button")}
-                  >
-                    Discard
-                  </Button>
-                  <Button
-                    variant={moveToIssue ? "neutral-primary" : "primary"}
-                    type="submit"
-                    size="sm"
-                    ref={submitBtnRef}
-                    loading={isSubmitting}
-                    tabIndex={isDraft ? getIndex("submit_button") : getIndex("draft_button")}
-                  >
-                    {isSubmitting ? primaryButtonText.loading : primaryButtonText.default}
-                  </Button>
+                  <div tabIndex={getIndex("discard_button")}>
+                    <Button
+                      variant="neutral-primary"
+                      size="sm"
+                      onClick={() => {
+                        if (editorRef.current?.isEditorReadyToDiscard()) {
+                          onClose();
+                        } else {
+                          setToast({
+                            type: TOAST_TYPE.ERROR,
+                            title: "Error!",
+                            message: "Editor is still processing changes. Please wait before proceeding.",
+                          });
+                        }
+                      }}
+                    >
+                      {t("discard")}
+                    </Button>
+                  </div>
+                  <div tabIndex={isDraft ? getIndex("submit_button") : getIndex("draft_button")}>
+                    <Button
+                      variant={moveToIssue ? "neutral-primary" : "primary"}
+                      type="submit"
+                      size="sm"
+                      ref={submitBtnRef}
+                      loading={isSubmitting}
+                      disabled={isDisabled}
+                    >
+                      {isSubmitting ? primaryButtonText.loading : primaryButtonText.default}
+                    </Button>
+                  </div>
+
                   {moveToIssue && (
                     <Button
                       variant="primary"
                       type="button"
                       size="sm"
-                      loading={isSubmitting}
-                      onClick={() => {
-                        if (data?.id && data) {
-                          moveIssue(workspaceSlug.toString(), data?.id, {
-                            ...data,
-                            ...getValues(),
-                          } as TWorkspaceDraftIssue);
-                        }
-                      }}
+                      loading={isMoving}
+                      onClick={handleMoveToProjects}
+                      disabled={isMoving}
                     >
-                      Add to project
+                      {t("add_to_project")}
                     </Button>
                   )}
                 </div>
@@ -517,7 +574,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
         {shouldRenderDuplicateModal && (
           <div
             ref={modalContainerRef}
-            className="relative flex flex-col gap-2.5 h-full px-3 py-4 rounded-lg shadow-xl bg-pi-50"
+            className="relative flex flex-col gap-2.5 px-3 py-4 rounded-lg shadow-xl bg-pi-50"
             style={{ maxHeight: formRef?.current?.offsetHeight ? `${formRef.current.offsetHeight}px` : "436px" }}
           >
             <DuplicateModalRoot
@@ -528,6 +585,6 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
           </div>
         )}
       </div>
-    </>
+    </FormProvider>
   );
 });

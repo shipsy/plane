@@ -10,6 +10,7 @@ import { IModule, ILinkDetails, TModulePlotType } from "@plane/types";
 import { DistributionUpdates, updateDistribution } from "@/helpers/distribution-update.helper";
 import { orderModules, shouldFilterModule } from "@/helpers/module.helper";
 // services
+import { syncIssuesWithDeletedModules } from "@/local-db/utils/load-workspace";
 import { ModuleService } from "@/services/module.service";
 import { ModuleArchiveService } from "@/services/module_archive.service";
 import { ProjectService } from "@/services/project";
@@ -27,10 +28,12 @@ export interface IModuleStore {
   projectModuleIds: string[] | null;
   projectArchivedModuleIds: string[] | null;
   // computed actions
+  getModulesFetchStatusByProjectId: (projectId: string) => boolean;
   getFilteredModuleIds: (projectId: string) => string[] | null;
   getFilteredArchivedModuleIds: (projectId: string) => string[] | null;
   getModuleById: (moduleId: string) => IModule | null;
   getModuleNameById: (moduleId: string) => string;
+  getProjectModuleDetails: (projectId: string) => IModule[] | null;
   getProjectModuleIds: (projectId: string) => string[] | null;
   getPlotTypeByModuleId: (moduleId: string) => TModulePlotType;
   // actions
@@ -39,7 +42,7 @@ export interface IModuleStore {
   updateModuleDistribution: (distributionUpdates: DistributionUpdates, moduleId: string) => void;
   fetchWorkspaceModules: (workspaceSlug: string) => Promise<IModule[]>;
   fetchModules: (workspaceSlug: string, projectId: string) => Promise<undefined | IModule[]>;
-  fetchModulesSlim: (workspaceSlug: string, projectId: string) => Promise<undefined  | IModule[]>
+  fetchModulesSlim: (workspaceSlug: string, projectId: string) => Promise<undefined | IModule[]>;
   fetchArchivedModules: (workspaceSlug: string, projectId: string) => Promise<undefined | IModule[]>;
   fetchArchivedModuleDetails: (workspaceSlug: string, projectId: string, moduleId: string) => Promise<IModule>;
   fetchModuleDetails: (workspaceSlug: string, projectId: string, moduleId: string) => Promise<IModule>;
@@ -151,6 +154,13 @@ export class ModulesStore implements IModuleStore {
   }
 
   /**
+   * Returns the fetch status for a specific project
+   * @param projectId
+   * @returns boolean
+   */
+  getModulesFetchStatusByProjectId = computedFn((projectId: string) => this.fetchedMap[projectId] ?? false);
+
+  /**
    * @description returns filtered module ids based on display filters and filters
    * @param {TModuleDisplayFilters} displayFilters
    * @param {TModuleFilters} filters
@@ -210,14 +220,23 @@ export class ModulesStore implements IModuleStore {
   getModuleNameById = computedFn((moduleId: string) => this.moduleMap?.[moduleId]?.name);
 
   /**
+   * @description returns list of module details of the project id passed as argument
+   * @param projectId
+   */
+  getProjectModuleDetails = computedFn((projectId: string) => {
+    if (!this.fetchedMap[projectId]) return null;
+    let projectModules = Object.values(this.moduleMap).filter((m) => m.project_id === projectId && !m.archived_at);
+    projectModules = sortBy(projectModules, [(m) => m.sort_order]);
+    return projectModules;
+  });
+
+  /**
    * @description returns list of module ids of the project id passed as argument
    * @param projectId
    */
   getProjectModuleIds = computedFn((projectId: string) => {
-    if (!this.fetchedMap[projectId]) return null;
-
-    let projectModules = Object.values(this.moduleMap).filter((m) => m.project_id === projectId && !m.archived_at);
-    projectModules = sortBy(projectModules, [(m) => m.sort_order]);
+    const projectModules = this.getProjectModuleDetails(projectId);
+    if (!projectModules) return null;
     const projectModuleIds = projectModules.map((m) => m.id);
     return projectModuleIds;
   });
@@ -253,6 +272,11 @@ export class ModulesStore implements IModuleStore {
         response.forEach((module) => {
           set(this.moduleMap, [module.id], { ...this.moduleMap[module.id], ...module });
         });
+        // check for all unique project ids and update the fetchedMap
+        const uniqueProjectIds = new Set(response.map((module) => module.project_id));
+        uniqueProjectIds.forEach((projectId) => {
+          set(this.fetchedMap, projectId, true);
+        });
       });
       return response;
     });
@@ -276,7 +300,7 @@ export class ModulesStore implements IModuleStore {
         });
         return response;
       });
-    } catch (error) {
+    } catch {
       this.loader = false;
       return undefined;
     }
@@ -302,7 +326,7 @@ export class ModulesStore implements IModuleStore {
         });
         return projectModules;
       });
-    } catch (error) {
+    } catch {
       this.loader = false;
       return undefined;
     }
@@ -409,7 +433,6 @@ export class ModulesStore implements IModuleStore {
         set(this.moduleMap, [moduleId], { ...originalModuleDetails, ...data });
       });
       const response = await this.moduleService.patchModule(workspaceSlug, projectId, moduleId, data);
-      this.fetchModuleDetails(workspaceSlug, projectId, moduleId);
       return response;
     } catch (error) {
       console.error("Failed to update module in module store", error);
@@ -433,6 +456,7 @@ export class ModulesStore implements IModuleStore {
       runInAction(() => {
         delete this.moduleMap[moduleId];
         if (this.rootStore.favorite.entityMap[moduleId]) this.rootStore.favorite.removeFavoriteFromStore(moduleId);
+        syncIssuesWithDeletedModules([moduleId]);
       });
     });
   };

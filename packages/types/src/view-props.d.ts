@@ -1,11 +1,6 @@
-import { EIssueLayoutTypes } from "constants/issue";
+import { TIssue } from "./issues/issue";
 
-export type TIssueLayouts =
-  | "list"
-  | "kanban"
-  | "calendar"
-  | "spreadsheet"
-  | "gantt_chart";
+export type TIssueLayouts = "list" | "kanban" | "calendar" | "spreadsheet" | "gantt_chart";
 
 export type TIssueGroupByOptions =
   | "state"
@@ -18,6 +13,7 @@ export type TIssueGroupByOptions =
   | "cycle"
   | "module"
   | "target_date"
+  | "team_project"
   | null;
 
 export type TIssueOrderByOptions =
@@ -40,8 +36,8 @@ export type TIssueOrderByOptions =
   | "-issue_cycle__cycle__name"
   | "target_date"
   | "-target_date"
-  | "estimate_point"
-  | "-estimate_point"
+  | "estimate_point__key"
+  | "-estimate_point__key"
   | "start_date"
   | "-start_date"
   | "link_count"
@@ -89,6 +85,7 @@ export type TIssueParams =
   | "start_date"
   | "target_date"
   | "project"
+  | "team_project"
   | "group_by"
   | "sub_group_by"
   | "order_by"
@@ -120,6 +117,7 @@ export interface IIssueFilterOptions {
   cycle?: string[] | null;
   module?: string[] | null;
   project?: string[] | null;
+  team_project?: string[] | null;
   start_date?: string[] | null;
   state?: string[] | null;
   state_group?: string[] | null;
@@ -142,7 +140,7 @@ export interface IIssueDisplayFilterOptions {
   };
   group_by?: TIssueGroupByOptions;
   sub_group_by?: TIssueGroupByOptions;
-  layout?: EIssueLayoutTypes;
+  layout?: any; // TODO: Need to fix this and set it to enum EIssueLayoutTypes
   order_by?: TIssueOrderByOptions;
   show_empty_groups?: boolean;
   sub_issue?: boolean;
@@ -255,3 +253,10 @@ export interface IssuePaginationOptions {
   subGroupedBy?: TIssueGroupByOptions;
   orderBy?: TIssueOrderByOptions;
 }
+
+export type TSpreadsheetColumn = React.FC<{
+  issue: TIssue;
+  onClose: () => void;
+  onChange: (issue: TIssue, data: Partial<TIssue>, updates: any) => void;
+  disabled: boolean;
+}>;

@@ -1,6 +1,8 @@
 import { FC, useState } from "react";
 import { observer } from "mobx-react";
 import { LayoutPanelTop } from "lucide-react";
+// plane imports
+import { ETabIndices } from "@plane/constants";
 import { ISearchIssueResponse, TIssue } from "@plane/types";
 import { CustomMenu } from "@plane/ui";
 // components
@@ -15,8 +17,6 @@ import {
 } from "@/components/dropdowns";
 import { ParentIssuesListModal } from "@/components/issues";
 import { IssueLabelSelect } from "@/components/issues/select";
-// constants
-import { ETabIndices } from "@/constants/tab-indices";
 // helpers
 import { renderFormattedPayloadDate, getDate } from "@/helpers/date-time.helper";
 import { getTabIndex } from "@/helpers/tab-indices.helper";
@@ -61,6 +61,7 @@ export const InboxIssueProperties: FC<TInboxIssueProperties> = observer((props) 
           projectId={projectId}
           buttonVariant="border-with-text"
           tabIndex={getIndex("state_id")}
+          isForWorkItemCreation={!data?.id}
         />
       </div>
 
@@ -91,7 +92,7 @@ export const InboxIssueProperties: FC<TInboxIssueProperties> = observer((props) 
       {/* labels */}
       <div className="h-7">
         <IssueLabelSelect
-          setIsOpen={() => { }}
+          setIsOpen={() => {}}
           value={data?.label_ids || []}
           onChange={(labelIds) => handleData("label_ids", labelIds)}
           projectId={projectId}
@@ -171,13 +172,13 @@ export const InboxIssueProperties: FC<TInboxIssueProperties> = observer((props) 
 
       {/* add parent */}
       {isVisible && (
-        <>
+        <div className="h-7">
           {selectedParentIssue ? (
             <CustomMenu
               customButton={
                 <button
                   type="button"
-                  className="flex cursor-pointer items-center justify-between gap-1 rounded border-[0.5px] border-custom-border-300 px-2 py-1.5 text-xs hover:bg-custom-background-80"
+                  className="flex cursor-pointer items-center justify-between gap-1 h-full rounded border-[0.5px] border-custom-border-300 px-2 py-0.5 text-xs hover:bg-custom-background-80"
                 >
                   <LayoutPanelTop className="h-3 w-3 flex-shrink-0" />
                   <span className="whitespace-nowrap">
@@ -188,11 +189,13 @@ export const InboxIssueProperties: FC<TInboxIssueProperties> = observer((props) 
                 </button>
               }
               placement="bottom-start"
+              className="h-full w-full"
+              customButtonClassName="h-full"
               tabIndex={getIndex("parent_id")}
             >
               <>
                 <CustomMenu.MenuItem className="!p-1" onClick={() => setParentIssueModalOpen(true)}>
-                  Change parent issue
+                  Change parent work item
                 </CustomMenu.MenuItem>
                 <CustomMenu.MenuItem
                   className="!p-1"
@@ -201,14 +204,14 @@ export const InboxIssueProperties: FC<TInboxIssueProperties> = observer((props) 
                     setSelectedParentIssue(undefined);
                   }}
                 >
-                  Remove parent issue
+                  Remove parent work item
                 </CustomMenu.MenuItem>
               </>
             </CustomMenu>
           ) : (
             <button
               type="button"
-              className="flex cursor-pointer items-center justify-between gap-1 rounded border-[0.5px] border-custom-border-300 px-2 py-1.5 text-xs hover:bg-custom-background-80"
+              className="flex cursor-pointer items-center justify-between gap-1 h-full rounded border-[0.5px] border-custom-border-300 px-2 py-0.5 text-xs hover:bg-custom-background-80"
               onClick={() => setParentIssueModalOpen(true)}
             >
               <LayoutPanelTop className="h-3 w-3 flex-shrink-0" />
@@ -226,7 +229,7 @@ export const InboxIssueProperties: FC<TInboxIssueProperties> = observer((props) 
             projectId={projectId}
             issueId={undefined}
           />
-        </>
+        </div>
       )}
     </div>
   );

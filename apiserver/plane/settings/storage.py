@@ -39,6 +39,12 @@ class S3Storage(S3Boto3Storage):
             "AWS_S3_ENDPOINT_URL"
         ) or os.environ.get("MINIO_ENDPOINT_URL")
         if os.environ.get("USE_MINIO") == "1":
+
+            # Determine protocol based on environment variable
+            if os.environ.get("MINIO_ENDPOINT_SSL") == "1":
+                endpoint_protocol = "https"
+            else:
+                endpoint_protocol = request.scheme if request else "http"
             # Create an S3 client for MinIO
             self.s3_client = boto3.client(
                 "s3",
@@ -67,9 +73,7 @@ class S3Storage(S3Boto3Storage):
         self, object_name, file_type, file_size, expiration=3600
     ):
         """Generate a presigned URL to upload an S3 object"""
-        fields = {
-            "Content-Type": file_type,
-        }
+        fields = {"Content-Type": file_type}
 
         conditions = [
             {"bucket": self.aws_storage_bucket_name},
@@ -121,9 +125,7 @@ class S3Storage(S3Boto3Storage):
         disposition="inline",
         filename=None,
     ):
-        content_disposition = self._get_content_disposition(
-            disposition, filename
-        )
+        content_disposition = self._get_content_disposition(disposition, filename)
         """Generate a presigned URL to share an S3 object"""
         try:
             response = self.s3_client.generate_presigned_url(
@@ -164,3 +166,17 @@ class S3Storage(S3Boto3Storage):
             "ETag": response.get("ETag"),
             "Metadata": response.get("Metadata", {}),
         }
+
+    def copy_object(self, object_name, new_object_name):
+        """Copy an S3 object to a new location"""
+        try:
+            response = self.s3_client.copy_object(
+                Bucket=self.aws_storage_bucket_name,
+                CopySource={"Bucket": self.aws_storage_bucket_name, "Key": object_name},
+                Key=new_object_name,
+            )
+        except ClientError as e:
+            log_exception(e)
+            return None
+
+        return response

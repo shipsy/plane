@@ -7,7 +7,6 @@ import jwt
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
-from django.db.models import Count
 from django.utils import timezone
 
 # Third party modules
@@ -24,14 +23,10 @@ from plane.app.serializers import (
 from plane.app.views.base import BaseAPIView
 from plane.bgtasks.event_tracking_task import workspace_invite_event
 from plane.bgtasks.workspace_invitation_task import workspace_invitation
-from plane.db.models import (
-    User,
-    Workspace,
-    WorkspaceMember,
-    WorkspaceMemberInvite,
-)
+from plane.db.models import User, Workspace, WorkspaceMember, WorkspaceMemberInvite
 from plane.utils.cache import invalidate_cache, invalidate_cache_directly
-
+from plane.utils.host import base_host
+from plane.utils.ip_address import get_client_ip
 from .. import BaseViewSet
 
 
@@ -41,9 +36,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
     serializer_class = WorkSpaceMemberInviteSerializer
     model = WorkspaceMemberInvite
 
-    permission_classes = [
-        WorkSpaceAdminPermission,
-    ]
+    permission_classes = [WorkSpaceAdminPermission]
 
     def get_queryset(self):
         return self.filter_queryset(
@@ -58,15 +51,12 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         # Check if email is provided
         if not emails:
             return Response(
-                {"error": "Emails are required"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"error": "Emails are required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         # check for role level of the requesting user
         requesting_user = WorkspaceMember.objects.get(
-            workspace__slug=slug,
-            member=request.user,
-            is_active=True,
+            workspace__slug=slug, member=request.user, is_active=True
         )
 
         # Check if any invited user has an higher role
@@ -112,10 +102,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
                         email=email.get("email").strip().lower(),
                         workspace_id=workspace.id,
                         token=jwt.encode(
-                            {
-                                "email": email,
-                                "timestamp": datetime.now().timestamp(),
-                            },
+                            {"email": email, "timestamp": datetime.now().timestamp()},
                             settings.SECRET_KEY,
                             algorithm="HS256",
                         ),
@@ -135,7 +122,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
             workspace_invitations, batch_size=10, ignore_conflicts=True
         )
 
-        current_site = request.META.get("HTTP_ORIGIN")
+        current_site = base_host(request=request, is_app=True)
 
         # Send invitations
         for invitation in workspace_invitations:
@@ -148,10 +135,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
             )
 
         return Response(
-            {
-                "message": "Emails sent successfully",
-            },
-            status=status.HTTP_200_OK,
+            {"message": "Emails sent successfully"}, status=status.HTTP_200_OK
         )
 
     def destroy(self, request, slug, pk):
@@ -163,9 +147,7 @@ class WorkspaceInvitationsViewset(BaseViewSet):
 
 
 class WorkspaceJoinEndpoint(BaseAPIView):
-    permission_classes = [
-        AllowAny,
-    ]
+    permission_classes = [AllowAny]
     """Invitation response endpoint the user can respond to the invitation"""
 
     @invalidate_cache(path="/api/workspaces/", user=False)
@@ -231,7 +213,7 @@ class WorkspaceJoinEndpoint(BaseAPIView):
                     user=user.id if user is not None else None,
                     email=email,
                     user_agent=request.META.get("HTTP_USER_AGENT"),
-                    ip=request.META.get("REMOTE_ADDR"),
+                    ip=get_client_ip(request=request),
                     event_name="MEMBER_ACCEPTED",
                     accepted_from="EMAIL",
                 )
@@ -269,8 +251,7 @@ class UserWorkspaceInvitationsViewSet(BaseViewSet):
             super()
             .get_queryset()
             .filter(email=self.request.user.email)
-            .select_related("workspace", "workspace__owner", "created_by")
-            .annotate(total_members=Count("workspace__workspace_member"))
+            .select_related("workspace")
         )
 
     @invalidate_cache(path="/api/workspaces/", user=False)

@@ -1,8 +1,6 @@
 from django.urls import path
 
-from plane.api.views import (
-    ProjectMemberAPIEndpoint,
-)
+from plane.api.views import ProjectMemberAPIEndpoint
 
 urlpatterns = [
     path(

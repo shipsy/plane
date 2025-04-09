@@ -11,12 +11,15 @@ import { RelatedIcon, Tooltip, TOAST_TYPE, setToast } from "@plane/ui";
 import { ExistingIssuesListModal } from "@/components/core";
 // helpers
 import { cn } from "@/helpers/common.helper";
+import { generateWorkItemLink } from "@/helpers/issue.helper";
 // hooks
 import { useIssueDetail, useIssues, useProject } from "@/hooks/store";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // Plane-web
-import { ISSUE_RELATION_OPTIONS } from "@/plane-web/components/relations";
+import { useTimeLineRelationOptions } from "@/plane-web/components/relations";
 import { TIssueRelationTypes } from "@/plane-web/types";
+//
+import { TRelationObject } from "../issue-detail-widgets";
 
 type TIssueRelationSelect = {
   className?: string;
@@ -41,13 +44,14 @@ export const IssueRelationSelect: React.FC<TIssueRelationSelect> = observer((pro
   const { issueMap } = useIssues();
   const { isMobile } = usePlatformOS();
   const relationIssueIds = getRelationByIssueIdRelationType(issueId, relationKey);
+  const ISSUE_RELATION_OPTIONS = useTimeLineRelationOptions();
 
   const onSubmit = async (data: ISearchIssueResponse[]) => {
     if (data.length === 0) {
       setToast({
         type: TOAST_TYPE.ERROR,
         title: "Error!",
-        message: "Please select at least one issue.",
+        message: "Please select at least one work item.",
       });
       return;
     }
@@ -67,6 +71,8 @@ export const IssueRelationSelect: React.FC<TIssueRelationSelect> = observer((pro
 
   const isRelationKeyModalActive =
     isRelationModalOpen?.relationType === relationKey && isRelationModalOpen?.issueId === issueId;
+
+  const currRelationOption: TRelationObject | undefined = ISSUE_RELATION_OPTIONS[relationKey];
 
   return (
     <>
@@ -106,11 +112,17 @@ export const IssueRelationSelect: React.FC<TIssueRelationSelect> = observer((pro
                 return (
                   <div
                     key={relationIssueId}
-                    className={`group flex items-center gap-1 rounded px-1.5 pb-1 pt-1 leading-3 hover:bg-custom-background-90 ${ISSUE_RELATION_OPTIONS[relationKey].className}`}
+                    className={`group flex items-center gap-1 rounded px-1.5 pb-1 pt-1 leading-3 hover:bg-custom-background-90 ${currRelationOption?.className}`}
                   >
                     <Tooltip tooltipHeading="Title" tooltipContent={currentIssue.name} isMobile={isMobile}>
                       <Link
-                        href={`/${workspaceSlug}/projects/${projectDetails?.id}/issues/${currentIssue.id}`}
+                        href={generateWorkItemLink({
+                          workspaceSlug,
+                          projectId: projectDetails?.id,
+                          issueId: currentIssue.id,
+                          projectIdentifier: projectDetails?.identifier,
+                          sequenceId: currentIssue?.sequence_id,
+                        })}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs font-medium"
@@ -137,7 +149,7 @@ export const IssueRelationSelect: React.FC<TIssueRelationSelect> = observer((pro
               })}
             </div>
           ) : (
-            <span className="text-sm text-custom-text-400">{ISSUE_RELATION_OPTIONS[relationKey].placeholder}</span>
+            <span className="text-sm text-custom-text-400">{currRelationOption?.placeholder}</span>
           )}
           {!disabled && (
             <span

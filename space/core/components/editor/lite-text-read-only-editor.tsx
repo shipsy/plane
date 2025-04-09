@@ -1,28 +1,40 @@
 import React from "react";
-// editor
+// plane imports
 import { EditorReadOnlyRefApi, ILiteTextReadOnlyEditor, LiteTextReadOnlyEditorWithRef } from "@plane/editor";
+import { MakeOptional } from "@plane/types";
+// components
+import { EditorMentionsRoot } from "@/components/editor";
 // helpers
 import { cn } from "@/helpers/common.helper";
 import { getReadOnlyEditorFileHandlers } from "@/helpers/editor.helper";
-// hooks
-import { useMention } from "@/hooks/use-mention";
+// store hooks
+import { useMember } from "@/hooks/store";
 
-type LiteTextReadOnlyEditorWrapperProps = Omit<ILiteTextReadOnlyEditor, "fileHandler" | "mentionHandler"> & {
+type LiteTextReadOnlyEditorWrapperProps = MakeOptional<
+  Omit<ILiteTextReadOnlyEditor, "fileHandler" | "mentionHandler">,
+  "disabledExtensions"
+> & {
   anchor: string;
+  workspaceId: string;
 };
 
 export const LiteTextReadOnlyEditor = React.forwardRef<EditorReadOnlyRefApi, LiteTextReadOnlyEditorWrapperProps>(
-  ({ anchor, ...props }, ref) => {
-    const { mentionHighlights } = useMention();
+  ({ anchor, workspaceId, disabledExtensions, ...props }, ref) => {
+    const { getMemberById } = useMember();
 
     return (
       <LiteTextReadOnlyEditorWithRef
         ref={ref}
+        disabledExtensions={disabledExtensions ?? []}
         fileHandler={getReadOnlyEditorFileHandlers({
           anchor,
+          workspaceId,
         })}
         mentionHandler={{
-          highlights: mentionHighlights,
+          renderComponent: (props) => <EditorMentionsRoot {...props} />,
+          getMentionedEntityDetails: (id: string) => ({
+            display_name: getMemberById(id)?.member__display_name ?? "",
+          }),
         }}
         {...props}
         // overriding the customClassName to add relative class passed

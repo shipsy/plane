@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Check, ChevronDown } from "lucide-react";
 // editor
-import { EditorRefApi, TNonColorEditorCommands } from "@plane/editor";
+import { EditorRefApi } from "@plane/editor";
 // ui
 import { CustomMenu, Tooltip } from "@plane/ui";
 // components
@@ -36,11 +36,13 @@ const ToolbarButton: React.FC<ToolbarButtonProps> = React.memo((props) => {
       }
     >
       <button
-        key={item.key}
         type="button"
         onClick={() =>
+          // TODO: update this while toolbar homogenization
+          // @ts-expect-error type mismatch here
           executeCommand({
-            itemKey: item.key as TNonColorEditorCommands,
+            itemKey: item.itemKey,
+            ...item.extraProps,
           })
         }
         className={cn("grid size-7 place-items-center rounded text-custom-text-300 hover:bg-custom-background-80", {
@@ -70,8 +72,11 @@ export const PageToolbar: React.FC<Props> = ({ editorRef }) => {
     Object.values(toolbarItems)
       .flat()
       .forEach((item) => {
-        newActiveStates[item.key] = editorRef.isMenuItemActive({
-          itemKey: item.key as TNonColorEditorCommands,
+        // TODO: update this while toolbar homogenization
+        // @ts-expect-error type mismatch here
+        newActiveStates[item.renderKey] = editorRef.isMenuItemActive({
+          itemKey: item.itemKey,
+          ...item.extraProps,
         });
       });
     setActiveStates(newActiveStates);
@@ -85,7 +90,8 @@ export const PageToolbar: React.FC<Props> = ({ editorRef }) => {
 
   const activeTypography = TYPOGRAPHY_ITEMS.find((item) =>
     editorRef.isMenuItemActive({
-      itemKey: item.key as TNonColorEditorCommands,
+      itemKey: item.itemKey,
+      ...item.extraProps,
     })
   );
 
@@ -105,11 +111,12 @@ export const PageToolbar: React.FC<Props> = ({ editorRef }) => {
       >
         {TYPOGRAPHY_ITEMS.map((item) => (
           <CustomMenu.MenuItem
-            key={item.key}
+            key={item.renderKey}
             className="flex items-center justify-between gap-2"
             onClick={() =>
               editorRef.executeMenuItemCommand({
-                itemKey: item.key as TNonColorEditorCommands,
+                itemKey: item.itemKey,
+                ...item.extraProps,
               })
             }
           >
@@ -117,7 +124,9 @@ export const PageToolbar: React.FC<Props> = ({ editorRef }) => {
               <item.icon className="size-3" />
               {item.name}
             </span>
-            {activeTypography?.key === item.key && <Check className="size-3 text-custom-text-300 flex-shrink-0" />}
+            {activeTypography?.itemKey === item.itemKey && (
+              <Check className="size-3 text-custom-text-300 flex-shrink-0" />
+            )}
           </CustomMenu.MenuItem>
         ))}
       </CustomMenu>
@@ -139,9 +148,9 @@ export const PageToolbar: React.FC<Props> = ({ editorRef }) => {
         <div key={key} className="flex items-center gap-0.5 px-2 first:pl-0 last:pr-0">
           {toolbarItems[key].map((item) => (
             <ToolbarButton
-              key={item.key}
+              key={item.renderKey}
               item={item}
-              isActive={activeStates[item.key]}
+              isActive={activeStates[item.renderKey]}
               executeCommand={editorRef.executeMenuItemCommand}
             />
           ))}

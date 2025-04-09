@@ -1,17 +1,15 @@
 import { Editor, mergeAttributes } from "@tiptap/core";
 import { Image } from "@tiptap/extension-image";
-import { MarkdownSerializerState } from "@tiptap/pm/markdown";
-import { Node } from "@tiptap/pm/model";
 import { ReactNodeViewRenderer } from "@tiptap/react";
 import { v4 as uuidv4 } from "uuid";
 // extensions
-import { CustomImageNode, ImageAttributes } from "@/extensions/custom-image";
+import { CustomImageNode } from "@/extensions/custom-image";
+// helpers
+import { insertEmptyParagraphAtNodeBoundaries } from "@/helpers/insert-empty-paragraph-at-node-boundary";
 // plugins
 import { TrackImageDeletionPlugin, TrackImageRestorationPlugin, isFileValid } from "@/plugins/image";
 // types
 import { TFileHandler } from "@/types";
-// helpers
-import { insertEmptyParagraphAtNodeBoundaries } from "@/helpers/insert-empty-paragraph-at-node-boundary";
 
 export type InsertImageComponentProps = {
   file?: File;
@@ -23,7 +21,8 @@ declare module "@tiptap/core" {
   interface Commands<ReturnType> {
     imageComponent: {
       insertImageComponent: ({ file, pos, event }: InsertImageComponentProps) => ReturnType;
-      uploadImage: (file: File) => () => Promise<string> | undefined;
+      uploadImage: (blockId: string, file: File) => () => Promise<string> | undefined;
+      updateAssetsUploadStatus?: (updatedStatus: TFileHandler["assetsUploadStatus"]) => () => void;
       getImageSource?: (path: string) => () => Promise<string>;
       restoreImage: (src: string) => () => Promise<void>;
     };
@@ -34,13 +33,18 @@ export const getImageComponentImageFileMap = (editor: Editor) =>
   (editor.storage.imageComponent as UploadImageExtensionStorage | undefined)?.fileMap;
 
 export interface UploadImageExtensionStorage {
+  assetsUploadStatus: TFileHandler["assetsUploadStatus"];
   fileMap: Map<string, UploadEntity>;
+  deletedImageSet: Map<string, boolean>;
+  uploadInProgress: boolean;
+  maxFileSize: number;
 }
 
 export type UploadEntity = ({ event: "insert" } | { event: "drop"; file: File }) & { hasOpenedFileInputOnce?: boolean };
 
 export const CustomImageExtension = (props: TFileHandler) => {
   const {
+    assetsUploadStatus,
     getAssetSrc,
     upload,
     delete: deleteImageFn,
@@ -107,7 +111,6 @@ export const CustomImageExtension = (props: TFileHandler) => {
       this.editor.state.doc.descendants((node) => {
         if (node.type.name === this.name) {
           if (!node.attrs.src?.startsWith("http")) return;
-
           imageSources.add(node.attrs.src);
         }
       });
@@ -126,22 +129,18 @@ export const CustomImageExtension = (props: TFileHandler) => {
         deletedImageSet: new Map<string, boolean>(),
         uploadInProgress: false,
         maxFileSize,
+        // escape markdown for images
         markdown: {
-          serialize(state: MarkdownSerializerState, node: Node) {
-            const attrs = node.attrs as ImageAttributes;
-            const imageSource = state.esc(this?.editor?.commands?.getImageSource?.(attrs.src) || attrs.src);
-            const imageWidth = state.esc(attrs.width?.toString());
-            state.write(`<img src="${state.esc(imageSource)}" width="${imageWidth}" />`);
-            state.closeBlock(node);
-          },
+          serialize() {},
         },
+        assetsUploadStatus,
       };
     },
 
     addCommands() {
       return {
         insertImageComponent:
-          (props: { file?: File; pos?: number; event: "insert" | "drop" }) =>
+          (props) =>
           ({ commands }) => {
             // Early return if there's an invalid file being dropped
             if (
@@ -189,12 +188,15 @@ export const CustomImageExtension = (props: TFileHandler) => {
               attrs: attributes,
             });
           },
-        uploadImage: (file: File) => async () => {
-          const fileUrl = await upload(file);
+        uploadImage: (blockId, file) => async () => {
+          const fileUrl = await upload(blockId, file);
           return fileUrl;
         },
-        getImageSource: (path: string) => async () => await getAssetSrc(path),
-        restoreImage: (src: string) => async () => {
+        updateAssetsUploadStatus: (updatedStatus) => () => {
+          this.storage.assetsUploadStatus = updatedStatus;
+        },
+        getImageSource: (path) => async () => await getAssetSrc(path),
+        restoreImage: (src) => async () => {
           await restoreImageFn(src);
         },
       };

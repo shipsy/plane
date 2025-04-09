@@ -3,7 +3,7 @@ from django.db.models import Count, F, Sum, Q
 from django.db.models.functions import ExtractMonth
 from django.utils import timezone
 from django.db.models.functions import Concat
-from django.db.models import Case, When, Value
+from django.db.models import Case, When, Value, OuterRef, Func
 from django.db import models
 
 # Third party imports
@@ -15,21 +15,23 @@ from plane.app.permissions import WorkSpaceAdminPermission
 from plane.app.serializers import AnalyticViewSerializer
 from plane.app.views.base import BaseAPIView, BaseViewSet
 from plane.bgtasks.analytic_plot_export import analytic_export_task
-from plane.db.models import AnalyticView, Issue, Workspace
+from plane.db.models import (
+    AnalyticView,
+    Issue,
+    Workspace,
+    Project,
+    ProjectMember,
+    Cycle,
+    Module,
+)
+
 from plane.utils.analytics_plot import build_graph_plot
 from plane.utils.issue_filters import issue_filters
 from plane.app.permissions import allow_permission, ROLE
 
 
 class AnalyticsEndpoint(BaseAPIView):
-
-    @allow_permission(
-        [
-            ROLE.ADMIN,
-            ROLE.MEMBER,
-        ],
-        level="WORKSPACE",
-    )
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug):
         x_axis = request.GET.get("x_axis", False)
         y_axis = request.GET.get("y_axis", False)
@@ -50,10 +52,7 @@ class AnalyticsEndpoint(BaseAPIView):
             "completed_at",
         ]
 
-        valid_yaxis = [
-            "issue_count",
-            "estimate",
-        ]
+        valid_yaxis = ["issue_count", "estimate"]
 
         # Check for x-axis and y-axis as thery are required parameters
         if (
@@ -70,9 +69,7 @@ class AnalyticsEndpoint(BaseAPIView):
             )
 
         # If segment is present it cannot be same as x-axis
-        if segment and (
-            segment not in valid_xaxis_segment or x_axis == segment
-        ):
+        if segment and (segment not in valid_xaxis_segment or x_axis == segment):
             return Response(
                 {
                     "error": "Both segment and x axis cannot be same and segment should be valid"
@@ -97,10 +94,7 @@ class AnalyticsEndpoint(BaseAPIView):
         state_details = {}
         if x_axis in ["state_id"] or segment in ["state_id"]:
             state_details = (
-                Issue.issue_objects.filter(
-                    workspace__slug=slug,
-                    **filters,
-                )
+                Issue.issue_objects.filter(workspace__slug=slug, **filters)
                 .distinct("state_id")
                 .order_by("state_id")
                 .values("state_id", "state__name", "state__color")
@@ -163,9 +157,7 @@ class AnalyticsEndpoint(BaseAPIView):
             )
 
         cycle_details = {}
-        if x_axis in ["issue_cycle__cycle_id"] or segment in [
-            "issue_cycle__cycle_id"
-        ]:
+        if x_axis in ["issue_cycle__cycle_id"] or segment in ["issue_cycle__cycle_id"]:
             cycle_details = (
                 Issue.issue_objects.filter(
                     workspace__slug=slug,
@@ -175,10 +167,7 @@ class AnalyticsEndpoint(BaseAPIView):
                 )
                 .distinct("issue_cycle__cycle_id")
                 .order_by("issue_cycle__cycle_id")
-                .values(
-                    "issue_cycle__cycle_id",
-                    "issue_cycle__cycle__name",
-                )
+                .values("issue_cycle__cycle_id", "issue_cycle__cycle__name")
             )
 
         module_details = {}
@@ -194,10 +183,7 @@ class AnalyticsEndpoint(BaseAPIView):
                 )
                 .distinct("issue_module__module_id")
                 .order_by("issue_module__module_id")
-                .values(
-                    "issue_module__module_id",
-                    "issue_module__module__name",
-                )
+                .values("issue_module__module_id", "issue_module__module__name")
             )
 
         return Response(
@@ -217,9 +203,7 @@ class AnalyticsEndpoint(BaseAPIView):
 
 
 class AnalyticViewViewset(BaseViewSet):
-    permission_classes = [
-        WorkSpaceAdminPermission,
-    ]
+    permission_classes = [WorkSpaceAdminPermission]
     model = AnalyticView
     serializer_class = AnalyticViewSerializer
 
@@ -229,25 +213,14 @@ class AnalyticViewViewset(BaseViewSet):
 
     def get_queryset(self):
         return self.filter_queryset(
-            super()
-            .get_queryset()
-            .filter(workspace__slug=self.kwargs.get("slug"))
+            super().get_queryset().filter(workspace__slug=self.kwargs.get("slug"))
         )
 
 
 class SavedAnalyticEndpoint(BaseAPIView):
-
-    @allow_permission(
-        [
-            ROLE.ADMIN,
-            ROLE.MEMBER,
-        ],
-        level="WORKSPACE",
-    )
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug, analytic_id):
-        analytic_view = AnalyticView.objects.get(
-            pk=analytic_id, workspace__slug=slug
-        )
+        analytic_view = AnalyticView.objects.get(pk=analytic_id, workspace__slug=slug)
 
         filter = analytic_view.query
         queryset = Issue.issue_objects.filter(**filter)
@@ -273,14 +246,7 @@ class SavedAnalyticEndpoint(BaseAPIView):
 
 
 class ExportAnalyticsEndpoint(BaseAPIView):
-
-    @allow_permission(
-        [
-            ROLE.ADMIN,
-            ROLE.MEMBER,
-        ],
-        level="WORKSPACE",
-    )
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def post(self, request, slug):
         x_axis = request.data.get("x_axis", False)
         y_axis = request.data.get("y_axis", False)
@@ -301,10 +267,7 @@ class ExportAnalyticsEndpoint(BaseAPIView):
             "completed_at",
         ]
 
-        valid_yaxis = [
-            "issue_count",
-            "estimate",
-        ]
+        valid_yaxis = ["issue_count", "estimate"]
 
         # Check for x-axis and y-axis as thery are required parameters
         if (
@@ -321,9 +284,7 @@ class ExportAnalyticsEndpoint(BaseAPIView):
             )
 
         # If segment is present it cannot be same as x-axis
-        if segment and (
-            segment not in valid_xaxis_segment or x_axis == segment
-        ):
+        if segment and (segment not in valid_xaxis_segment or x_axis == segment):
             return Response(
                 {
                     "error": "Both segment and x axis cannot be same and segment should be valid"
@@ -344,13 +305,10 @@ class ExportAnalyticsEndpoint(BaseAPIView):
 
 
 class DefaultAnalyticsEndpoint(BaseAPIView):
-
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug):
         filters = issue_filters(request.GET, "GET")
-        base_issues = Issue.issue_objects.filter(
-            workspace__slug=slug, **filters
-        )
+        base_issues = Issue.issue_objects.filter(workspace__slug=slug, **filters)
 
         total_issues = base_issues.count()
 
@@ -363,9 +321,7 @@ class DefaultAnalyticsEndpoint(BaseAPIView):
         )
 
         open_issues_groups = ["backlog", "unstarted", "started"]
-        open_issues_queryset = state_groups.filter(
-            state__group__in=open_issues_groups
-        )
+        open_issues_queryset = state_groups.filter(state__group__in=open_issues_groups)
 
         open_issues = open_issues_queryset.count()
         open_issues_classified = (
@@ -407,8 +363,7 @@ class DefaultAnalyticsEndpoint(BaseAPIView):
                     ),
                     # If `avatar_asset` is None, fall back to using `avatar` field directly
                     When(
-                        created_by__avatar_asset__isnull=True,
-                        then="created_by__avatar",
+                        created_by__avatar_asset__isnull=True, then="created_by__avatar"
                     ),
                     default=Value(None),
                     output_field=models.CharField(),
@@ -441,8 +396,7 @@ class DefaultAnalyticsEndpoint(BaseAPIView):
                     ),
                     # If `avatar_asset` is None, fall back to using `avatar` field directly
                     When(
-                        assignees__avatar_asset__isnull=True,
-                        then="assignees__avatar",
+                        assignees__avatar_asset__isnull=True, then="assignees__avatar"
                     ),
                     default=Value(None),
                     output_field=models.CharField(),
@@ -469,8 +423,7 @@ class DefaultAnalyticsEndpoint(BaseAPIView):
                     ),
                     # If `avatar_asset` is None, fall back to using `avatar` field directly
                     When(
-                        assignees__avatar_asset__isnull=True,
-                        then="assignees__avatar",
+                        assignees__avatar_asset__isnull=True, then="assignees__avatar"
                     ),
                     default=Value(None),
                     output_field=models.CharField(),
@@ -479,9 +432,7 @@ class DefaultAnalyticsEndpoint(BaseAPIView):
             .order_by("-count")
         )
 
-        open_estimate_sum = open_issues_queryset.aggregate(sum=Sum("point"))[
-            "sum"
-        ]
+        open_estimate_sum = open_issues_queryset.aggregate(sum=Sum("point"))["sum"]
         total_estimate_sum = base_issues.aggregate(sum=Sum("point"))["sum"]
 
         return Response(
@@ -499,3 +450,74 @@ class DefaultAnalyticsEndpoint(BaseAPIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class ProjectStatsEndpoint(BaseAPIView):
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    def get(self, request, slug):
+        fields = request.GET.get("fields", "").split(",")
+        project_ids = request.GET.get("project_ids", "")
+
+        valid_fields = {
+            "total_issues",
+            "completed_issues",
+            "total_members",
+            "total_cycles",
+            "total_modules",
+        }
+        requested_fields = set(filter(None, fields)) & valid_fields
+
+        if not requested_fields:
+            requested_fields = valid_fields
+
+        projects = Project.objects.filter(workspace__slug=slug)
+        if project_ids:
+            projects = projects.filter(id__in=project_ids.split(","))
+
+        annotations = {}
+        if "total_issues" in requested_fields:
+            annotations["total_issues"] = (
+                Issue.issue_objects.filter(project_id=OuterRef("pk"))
+                .order_by()
+                .annotate(count=Func(F("id"), function="Count"))
+                .values("count")
+            )
+
+        if "completed_issues" in requested_fields:
+            annotations["completed_issues"] = (
+                Issue.issue_objects.filter(
+                    project_id=OuterRef("pk"), state__group="completed"
+                )
+                .order_by()
+                .annotate(count=Func(F("id"), function="Count"))
+                .values("count")
+            )
+
+        if "total_cycles" in requested_fields:
+            annotations["total_cycles"] = (
+                Cycle.objects.filter(project_id=OuterRef("id"))
+                .order_by()
+                .annotate(count=Func(F("id"), function="Count"))
+                .values("count")
+            )
+
+        if "total_modules" in requested_fields:
+            annotations["total_modules"] = (
+                Module.objects.filter(project_id=OuterRef("id"))
+                .order_by()
+                .annotate(count=Func(F("id"), function="Count"))
+                .values("count")
+            )
+
+        if "total_members" in requested_fields:
+            annotations["total_members"] = (
+                ProjectMember.objects.filter(
+                    project_id=OuterRef("id"), member__is_bot=False, is_active=True
+                )
+                .order_by()
+                .annotate(count=Func(F("id"), function="Count"))
+                .values("count")
+            )
+
+        projects = projects.annotate(**annotations).values("id", *requested_fields)
+        return Response(projects, status=status.HTTP_200_OK)

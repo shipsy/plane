@@ -1,3 +1,4 @@
+import { Extensions } from "@tiptap/core";
 import CharacterCount from "@tiptap/extension-character-count";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
@@ -18,37 +19,39 @@ import {
   TableCell,
   TableRow,
   Table,
-  CustomMention,
-  HeadingListExtension,
+  CustomMentionExtension,
   CustomReadOnlyImageExtension,
+  CustomTextAlignExtension,
   CustomCalloutReadOnlyExtension,
   CustomColorExtension,
+  MarkdownClipboard,
 } from "@/extensions";
 // helpers
 import { isValidHttpUrl } from "@/helpers/common";
+// plane editor extensions
+import { CoreReadOnlyEditorAdditionalExtensions } from "@/plane-editor/extensions";
 // types
-import { IMentionHighlight, TFileHandler } from "@/types";
+import { TExtensions, TReadOnlyFileHandler, TReadOnlyMentionHandler } from "@/types";
 
 type Props = {
-  fileHandler: Pick<TFileHandler, "getAssetSrc">;
-  mentionConfig: {
-    mentionHighlights?: () => Promise<IMentionHighlight[]>;
-  };
+  disabledExtensions: TExtensions[];
+  fileHandler: TReadOnlyFileHandler;
+  mentionHandler: TReadOnlyMentionHandler;
 };
 
-export const CoreReadOnlyEditorExtensions = (props: Props) => {
-  const { fileHandler, mentionConfig } = props;
+export const CoreReadOnlyEditorExtensions = (props: Props): Extensions => {
+  const { disabledExtensions, fileHandler, mentionHandler } = props;
 
-  return [
+  const extensions = [
     StarterKit.configure({
       bulletList: {
         HTMLAttributes: {
-          class: "list-disc pl-7 space-y-2",
+          class: "list-disc pl-7 space-y-[--list-spacing-y]",
         },
       },
       orderedList: {
         HTMLAttributes: {
-          class: "list-decimal pl-7 space-y-2",
+          class: "list-decimal pl-7 space-y-[--list-spacing-y]",
         },
       },
       listItem: {
@@ -60,13 +63,23 @@ export const CoreReadOnlyEditorExtensions = (props: Props) => {
       codeBlock: false,
       horizontalRule: false,
       blockquote: false,
+      paragraph: {
+        HTMLAttributes: {
+          class: "editor-paragraph-block",
+        },
+      },
+      heading: {
+        HTMLAttributes: {
+          class: "editor-heading-block",
+        },
+      },
       dropcursor: false,
       gapcursor: false,
     }),
     CustomQuoteExtension,
     CustomHorizontalRule.configure({
       HTMLAttributes: {
-        class: "my-4 border-custom-border-400",
+        class: "py-4 border-custom-border-400",
       },
     }),
     CustomLinkExtension.configure({
@@ -74,23 +87,13 @@ export const CoreReadOnlyEditorExtensions = (props: Props) => {
       autolink: true,
       linkOnPaste: true,
       protocols: ["http", "https"],
-      validate: (url: string) => isValidHttpUrl(url),
+      validate: (url: string) => isValidHttpUrl(url).isValid,
       HTMLAttributes: {
         class:
           "text-custom-primary-300 underline underline-offset-[3px] hover:text-custom-primary-500 transition-colors cursor-pointer",
       },
     }),
     CustomTypographyExtension,
-    ReadOnlyImageExtension({
-      getAssetSrc: fileHandler.getAssetSrc,
-    }).configure({
-      HTMLAttributes: {
-        class: "rounded-md",
-      },
-    }),
-    CustomReadOnlyImageExtension({
-      getAssetSrc: fileHandler.getAssetSrc,
-    }),
     TiptapUnderline,
     TextStyle,
     TaskList.configure({
@@ -112,19 +115,34 @@ export const CoreReadOnlyEditorExtensions = (props: Props) => {
     CustomCodeInlineExtension,
     Markdown.configure({
       html: true,
-      transformCopiedText: true,
+      transformCopiedText: false,
     }),
+    MarkdownClipboard,
     Table,
     TableHeader,
     TableCell,
     TableRow,
-    CustomMention({
-      mentionHighlights: mentionConfig.mentionHighlights,
-      readonly: true,
-    }),
+    CustomMentionExtension(mentionHandler),
     CharacterCount,
     CustomColorExtension,
-    HeadingListExtension,
+    CustomTextAlignExtension,
     CustomCalloutReadOnlyExtension,
+    ...CoreReadOnlyEditorAdditionalExtensions({
+      disabledExtensions,
+    }),
   ];
+
+  if (!disabledExtensions.includes("image")) {
+    extensions.push(
+      ReadOnlyImageExtension(fileHandler).configure({
+        HTMLAttributes: {
+          class: "rounded-md",
+        },
+      }),
+      CustomReadOnlyImageExtension(fileHandler)
+    );
+  }
+
+  // @ts-expect-error tiptap types are incorrect
+  return extensions;
 };

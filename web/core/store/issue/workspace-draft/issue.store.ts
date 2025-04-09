@@ -5,6 +5,8 @@ import unset from "lodash/unset";
 import update from "lodash/update";
 import { action, computed, makeObservable, observable, runInAction } from "mobx";
 import { computedFn } from "mobx-utils";
+// plane imports
+import { EDraftIssuePaginationType } from "@plane/constants";
 import {
   TWorkspaceDraftIssue,
   TWorkspaceDraftPaginationInfo,
@@ -19,9 +21,10 @@ import {
   TBulkOperationsPayload,
 } from "@plane/types";
 // constants
-import { EDraftIssuePaginationType } from "@/constants/workspace-drafts";
 // helpers
 import { getCurrentDateTimeInISO, convertToISODateString } from "@/helpers/date-time.helper";
+// local-db
+import { addIssueToPersistanceLayer } from "@/local-db/utils/utils";
 // services
 import workspaceDraftService from "@/services/issue/workspace_draft.service";
 // types
@@ -59,7 +62,7 @@ export interface IWorkspaceDraftIssues {
     payload: Partial<TWorkspaceDraftIssue | TIssue>
   ) => Promise<TWorkspaceDraftIssue | undefined>;
   deleteIssue: (workspaceSlug: string, issueId: string) => Promise<void>;
-  moveIssue: (workspaceSlug: string, issueId: string, payload: Partial<TWorkspaceDraftIssue>) => Promise<void>;
+  moveIssue: (workspaceSlug: string, issueId: string, payload: Partial<TWorkspaceDraftIssue>) => Promise<TIssue>;
   addCycleToIssue: (
     workspaceSlug: string,
     issueId: string,
@@ -231,8 +234,12 @@ export class WorkspaceDraftIssues implements IWorkspaceDraftIssues {
         if (results && results.length > 0) {
           // adding issueIds
           const issueIds = results.map((issue) => issue.id);
+          const existingIssueIds = this.issueMapIds[workspaceSlug] ?? [];
+          // new issueIds
+          const newIssueIds = issueIds.filter((issueId) => !existingIssueIds.includes(issueId));
           this.addIssue(results);
-          update(this.issueMapIds, [workspaceSlug], (existingIssueIds = []) => [...issueIds, ...existingIssueIds]);
+          // issue map update
+          update(this.issueMapIds, [workspaceSlug], (existingIssueIds = []) => [...newIssueIds, ...existingIssueIds]);
           this.loader = undefined;
         } else {
           this.loader = "empty-state";
@@ -348,6 +355,10 @@ export class WorkspaceDraftIssues implements IWorkspaceDraftIssues {
             total_count: this.paginationInfo.total_count - 1,
           });
         }
+
+        // sync issue to local db
+        addIssueToPersistanceLayer({ ...payload, ...response });
+
         // Update draft issue count in workspaceUserInfo
         this.updateWorkspaceUserDraftIssueCount(workspaceSlug, -1);
       });

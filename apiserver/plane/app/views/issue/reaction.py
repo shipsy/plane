@@ -15,7 +15,7 @@ from plane.app.serializers import IssueReactionSerializer
 from plane.app.permissions import allow_permission, ROLE
 from plane.db.models import IssueReaction
 from plane.bgtasks.issue_activities_task import issue_activity
-
+from plane.utils.host import base_host
 
 class IssueReactionViewSet(BaseViewSet):
     serializer_class = IssueReactionSerializer
@@ -42,9 +42,7 @@ class IssueReactionViewSet(BaseViewSet):
         serializer = IssueReactionSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(
-                issue_id=issue_id,
-                project_id=project_id,
-                actor=request.user,
+                issue_id=issue_id, project_id=project_id, actor=request.user
             )
             issue_activity.delay(
                 type="issue_reaction.activity.created",
@@ -55,7 +53,7 @@ class IssueReactionViewSet(BaseViewSet):
                 current_instance=None,
                 epoch=int(timezone.now().timestamp()),
                 notification=True,
-                origin=request.META.get("HTTP_ORIGIN"),
+                origin=base_host(request=request, is_app=True),
             )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -76,14 +74,11 @@ class IssueReactionViewSet(BaseViewSet):
             issue_id=str(self.kwargs.get("issue_id", None)),
             project_id=str(self.kwargs.get("project_id", None)),
             current_instance=json.dumps(
-                {
-                    "reaction": str(reaction_code),
-                    "identifier": str(issue_reaction.id),
-                }
+                {"reaction": str(reaction_code), "identifier": str(issue_reaction.id)}
             ),
             epoch=int(timezone.now().timestamp()),
             notification=True,
-            origin=request.META.get("HTTP_ORIGIN"),
+            origin=base_host(request=request, is_app=True),
         )
         issue_reaction.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)

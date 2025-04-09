@@ -1,5 +1,6 @@
 # Python imports
 from django.utils import timezone
+from django.db import DatabaseError
 
 # Third party imports
 from celery import shared_task
@@ -10,9 +11,7 @@ from plane.utils.exception_logger import log_exception
 
 
 @shared_task
-def recent_visited_task(
-    entity_name, entity_identifier, user_id, project_id, slug
-):
+def recent_visited_task(entity_name, entity_identifier, user_id, project_id, slug):
     try:
         workspace = Workspace.objects.get(slug=slug)
         recent_visited = UserRecentVisit.objects.filter(
@@ -24,10 +23,13 @@ def recent_visited_task(
         ).first()
 
         if recent_visited:
-            recent_visited.visited_at = timezone.now()
-            recent_visited.save(update_fields=["visited_at"])
+            # Check if the database is available
+            try:
+                recent_visited.visited_at = timezone.now()
+                recent_visited.save(update_fields=["visited_at"])
+            except DatabaseError:
+                pass
         else:
-
             recent_visited_count = UserRecentVisit.objects.filter(
                 user_id=user_id, workspace_id=workspace.id
             ).count()
@@ -51,9 +53,7 @@ def recent_visited_task(
             )
             recent_activity.created_by_id = user_id
             recent_activity.updated_by_id = user_id
-            recent_activity.save(
-                update_fields=["created_by_id", "updated_by_id"]
-            )
+            recent_activity.save(update_fields=["created_by_id", "updated_by_id"])
 
         return
     except Exception as e:

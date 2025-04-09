@@ -41,6 +41,7 @@ type ChartViewRootProps = {
   canLoadMoreBlocks?: boolean;
   quickAdd?: React.JSX.Element | undefined;
   showToday: boolean;
+  isEpic?: boolean;
 };
 
 const timelineViewHelpers = {
@@ -71,6 +72,7 @@ export const ChartViewRoot: FC<ChartViewRootProps> = observer((props) => {
     quickAdd,
     showToday,
     updateBlockDates,
+    isEpic = false,
   } = props;
   // states
   const [itemsContainerWidth, setItemsContainerWidth] = useState(0);
@@ -86,7 +88,7 @@ export const ChartViewRoot: FC<ChartViewRootProps> = observer((props) => {
     updateAllBlocksOnChartChangeWhileDragging,
   } = useTimeLineChartStore();
 
-  const updateCurrentViewRenderPayload = (side: null | "left" | "right", view: TGanttViews) => {
+  const updateCurrentViewRenderPayload = (side: null | "left" | "right", view: TGanttViews, targetDate?: Date) => {
     const selectedCurrentView: TGanttViews = view;
     const selectedCurrentViewData: ChartDataType | undefined =
       selectedCurrentView && selectedCurrentView === currentViewData?.key
@@ -96,7 +98,7 @@ export const ChartViewRoot: FC<ChartViewRootProps> = observer((props) => {
     if (selectedCurrentViewData === undefined) return;
 
     const currentViewHelpers = timelineViewHelpers[selectedCurrentView];
-    const currentRender = currentViewHelpers.generateChart(selectedCurrentViewData, side);
+    const currentRender = currentViewHelpers.generateChart(selectedCurrentViewData, side, targetDate);
     const mergeRenderPayloads = currentViewHelpers.mergeRenderPayloads as (
       a: IWeekBlock[] | IMonthView | IMonthBlock[],
       b: IWeekBlock[] | IMonthView | IMonthBlock[]
@@ -109,7 +111,8 @@ export const ChartViewRoot: FC<ChartViewRootProps> = observer((props) => {
       if (side === "left") {
         updateCurrentView(selectedCurrentView);
         updateRenderView(mergeRenderPayloads(currentRender.payload, renderView));
-        updatingCurrentLeftScrollPosition(currentRender.scrollWidth);
+        updateItemsContainerWidth(currentRender.scrollWidth);
+        if (!targetDate) updateCurrentLeftScrollPosition(currentRender.scrollWidth);
         updateAllBlocksOnChartChangeWhileDragging(currentRender.scrollWidth);
         setItemsContainerWidth(itemsContainerWidth + currentRender.scrollWidth);
       } else if (side === "right") {
@@ -125,6 +128,8 @@ export const ChartViewRoot: FC<ChartViewRootProps> = observer((props) => {
         }, 50);
       }
     }
+
+    return currentRender.state;
   };
 
   const handleToday = () => updateCurrentViewRenderPayload(null, currentView);
@@ -135,12 +140,17 @@ export const ChartViewRoot: FC<ChartViewRootProps> = observer((props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const updatingCurrentLeftScrollPosition = (width: number) => {
+  const updateItemsContainerWidth = (width: number) => {
+    const scrollContainer = document.querySelector("#gantt-container") as HTMLDivElement;
+    if (!scrollContainer) return;
+    setItemsContainerWidth(width + scrollContainer?.scrollLeft);
+  };
+
+  const updateCurrentLeftScrollPosition = (width: number) => {
     const scrollContainer = document.querySelector("#gantt-container") as HTMLDivElement;
     if (!scrollContainer) return;
 
     scrollContainer.scrollLeft = width + scrollContainer?.scrollLeft;
-    setItemsContainerWidth(width + scrollContainer?.scrollLeft);
   };
 
   const handleScrollToCurrentSelectedDate = (currentState: ChartDataType, date: Date) => {
@@ -196,6 +206,7 @@ export const ChartViewRoot: FC<ChartViewRootProps> = observer((props) => {
         updateCurrentViewRenderPayload={updateCurrentViewRenderPayload}
         quickAdd={quickAdd}
         updateBlockDates={updateBlockDates}
+        isEpic={isEpic}
       />
     </div>
   );
