@@ -33,6 +33,7 @@ from plane.db.models import (
     CommentReaction,
     IssueVote,
     IssueRelation,
+    IssueCustomProperty,
     State,
     IssueVersion,
     IssueDescriptionVersion,
@@ -656,6 +657,18 @@ class IssueIntakeSerializer(DynamicBaseSerializer):
         ]
         read_only_fields = fields
 
+class IssueCustomPropertySerializer(BaseSerializer):
+    class Meta:
+        model = IssueCustomProperty
+        fields = ["key", "value", "issue_type_custom_property"]
+        read_only_fields = [
+            "id",
+            "issue",
+            "created_by",
+            "updated_by",
+            "created_at",
+            "updated_at",
+        ]
 
 class IssueSerializer(DynamicBaseSerializer):
     # ids
@@ -663,9 +676,14 @@ class IssueSerializer(DynamicBaseSerializer):
     module_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
 
     # Many to many
-    label_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
-    assignee_ids = serializers.ListField(child=serializers.UUIDField(), required=False)
-
+    label_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+    )
+    assignee_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+    )
     # Count items
     sub_issues_count = serializers.IntegerField(read_only=True)
     attachment_count = serializers.IntegerField(read_only=True)
@@ -680,6 +698,18 @@ class IssueSerializer(DynamicBaseSerializer):
             "sort_order",
             "completed_at",
             "estimate_point",
+            "trip_reference_number",
+            "vendor_code",
+            "worker_code",
+            "reference_number",
+            "hub_code",
+            "hub_name",
+            "customer_code",
+            "customer_name",
+            "vendor_name",
+            "vendor_code",
+            "worker_code",
+            "worker_name",
             "priority",
             "start_date",
             "target_date",
@@ -713,9 +743,14 @@ class IssueLiteSerializer(DynamicBaseSerializer):
 class IssueDetailSerializer(IssueSerializer):
     description_html = serializers.CharField()
     is_subscribed = serializers.BooleanField(read_only=True)
+    custom_properties = IssueCustomPropertySerializer(many=True, required=False)
 
     class Meta(IssueSerializer.Meta):
-        fields = IssueSerializer.Meta.fields + ["description_html", "is_subscribed"]
+        fields = IssueSerializer.Meta.fields + [
+            "description_html",
+            "is_subscribed",
+            "custom_properties"
+        ]
         read_only_fields = fields
 
 

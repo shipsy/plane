@@ -65,3 +65,16 @@ RESTRICTED_WORKSPACE_SLUGS = [
     "instances",
     "instance",
 ]
+
+ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP = {
+    "heineken": [
+        "Hub Code",
+        "Customer Name",
+        "Vendor Code",
+        "Vendor Name",
+        "Customer Code",
+        "Consignment Number",
+        "Trip Number",
+        "Hub Name"
+    ]
+}

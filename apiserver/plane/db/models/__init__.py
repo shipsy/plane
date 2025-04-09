@@ -42,6 +42,7 @@ from .issue import (
     IssueVote,
     IssueVersion,
     IssueDescriptionVersion,
+    IssueCustomProperty
 )
 from .module import Module, ModuleIssue, ModuleLink, ModuleMember, ModuleUserProperties
 from .notification import EmailNotificationLog, Notification, UserNotificationPreference
@@ -52,7 +53,7 @@ from .project import (
     ProjectIdentifier,
     ProjectMember,
     ProjectMemberInvite,
-    ProjectPublicMember,
+    ProjectPublicMember
 )
 from .session import Session
 from .social_connection import SocialLoginConnection
@@ -74,7 +75,7 @@ from .workspace import (
 
 from .favorite import UserFavorite
 
-from .issue_type import IssueType
+from .issue_type import IssueType, IssueTypeCustomProperty
 
 from .recent_visit import UserRecentVisit
 

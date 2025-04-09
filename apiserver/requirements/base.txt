@@ -10,6 +10,7 @@ psycopg-binary==3.1.18
 psycopg-c==3.1.18
 dj-database-url==2.1.0
 # redis
+python-dotenv==1.0.0
 redis==5.0.4
 django-redis==5.4.0
 # cors
@@ -27,7 +28,7 @@ django-filter==24.2
 # json model
 jsonmodels==2.7.0
 # storage
-django-storages==1.14.2
+django-storages==1.14.4
 # user management
 django-crum==0.7.9
 # web server

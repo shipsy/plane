@@ -28,6 +28,8 @@ from plane.app.views import (
     WorkItemDescriptionVersionEndpoint,
     IssueMetaEndpoint,
     IssueDetailIdentifierEndpoint,
+    SearchAPIEndpoint,
+    SearchSingleValueAPI
 )
 
 urlpatterns = [
@@ -290,4 +292,14 @@ urlpatterns = [
         IssueDetailIdentifierEndpoint.as_view(),
         name="issue-detail-identifier",
     ),
+    path(
+        "workspaces/<str:slug>/search",
+        SearchAPIEndpoint.as_view(),
+        name="key-codes",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<str:project_id>/filed_search",
+        SearchSingleValueAPI.as_view(),
+        name="key-codes"
+    )
 ]

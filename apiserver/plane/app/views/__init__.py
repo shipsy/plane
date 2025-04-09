@@ -118,6 +118,8 @@ from .issue.base import (
     IssueBulkUpdateDateEndpoint,
     IssueMetaEndpoint,
     IssueDetailIdentifierEndpoint,
+    SearchAPIEndpoint,
+    SearchSingleValueAPI
 )
 
 from .issue.activity import IssueActivityEndpoint

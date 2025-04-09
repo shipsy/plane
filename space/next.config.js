@@ -10,7 +10,7 @@ const nextConfig = {
     return [
       {
         source: "/",
-        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }], // clickjacking protection
+        headers: [{ key: "X-Frame-Options", value: "ALLOWALL" }], // clickjacking protection
       },
     ];
   },

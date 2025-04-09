@@ -3,6 +3,7 @@
 import { Fragment, Ref, useState } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { usePopper } from "react-popper";
 // icons
 import { ChevronDown, CirclePlus, LogOut, Mails, Settings } from "lucide-react";
@@ -17,15 +18,35 @@ import { orderWorkspacesList } from "@plane/utils";
 import { GOD_MODE_URL, cn } from "@/helpers/common.helper";
 import { getFileURL } from "@/helpers/file.helper";
 // hooks
-import { useAppTheme, useUser, useUserProfile, useWorkspace } from "@/hooks/store";
+import { useAppTheme, useUser, useUserProfile, useWorkspace, useUserPermissions } from "@/hooks/store";
 // plane web helpers
 import { getIsWorkspaceCreationDisabled } from "@/plane-web/helpers/instance.helper";
 // components
+import { EUserPermissions, EUserPermissionsLevel } from "@/plane-web/constants/user-permissions";
 import { WorkspaceLogo } from "../logo";
 import SidebarDropdownItem from "./dropdown-item";
 
+// Static Data
+const userLinks = (workspaceSlug: string) => [
+  {
+    key: "workspace_invites",
+    name: "Workspace invites",
+    href: "/invitations",
+    icon: Mails,
+    access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
+  },
+  {
+    key: "settings",
+    name: "Workspace settings",
+    href: `/${workspaceSlug}/settings`,
+    icon: Settings,
+    access: [EUserPermissions.ADMIN],
+  },
+];
+
 export const SidebarDropdown = observer(() => {
   const { t } = useTranslation();
+  const {workspaceSlug} = useParams();
 
   // store hooks
   const { sidebarCollapsed, toggleSidebar } = useAppTheme();
@@ -36,6 +57,7 @@ export const SidebarDropdown = observer(() => {
     signOut,
   } = useUser();
   const { updateUserProfile } = useUserProfile();
+  const { allowPermissions } = useUserPermissions();
   const isWorkspaceCreationEnabled = getIsWorkspaceCreationDisabled() === false;
 
   const isUserInstanceAdmin = false;
@@ -182,6 +204,38 @@ export const SidebarDropdown = observer(() => {
                         {t("sign_out")}
                       </Menu.Item>
                     </div>
+                    {userLinks(workspaceSlug?.toString() ?? "").map(
+                      (link, index) =>
+                        allowPermissions(link.access, EUserPermissionsLevel.WORKSPACE) && (
+                          <Link
+                            key={link.key}
+                            href={link.href}
+                            className="w-full"
+                            onClick={() => {
+                              if (index > 0) handleItemClick();
+                            }}
+                          >
+                            <Menu.Item
+                              as="div"
+                              className="flex items-center gap-2 rounded px-2 py-1 text-sm font-medium text-custom-sidebar-text-200 hover:bg-custom-sidebar-background-80"
+                            >
+                              <link.icon className="h-4 w-4 flex-shrink-0" />
+                              {link.name}
+                            </Menu.Item>
+                          </Link>
+                        )
+                    )}
+                  </div>
+                  <div className="w-full px-4 py-2">
+                    <Menu.Item
+                      as="button"
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded px-2 py-1 text-sm font-medium text-red-600 hover:bg-custom-sidebar-background-80"
+                      onClick={handleSignOut}
+                    >
+                      <LogOut className="size-4 flex-shrink-0" />
+                      Sign out
+                    </Menu.Item>
                   </div>
                 </div>
               </Menu.Items>

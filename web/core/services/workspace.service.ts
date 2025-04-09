@@ -284,6 +284,27 @@ export class WorkspaceService extends APIService {
       });
   }
 
+  async getIssuesCustomProperties(workspaceSlug: string, config = {}): Promise<Record<string, any>[]> {
+    return this.get(
+      `/api/workspaces/${workspaceSlug}/custom-properties/`,
+      config
+    )
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async getIssueAdditionalProperties(workspaceSlug: string, field: any): Promise<any> {
+    return this.get(
+      `/api/workspaces/${workspaceSlug}/search?field=${field}`,
+    )
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
   // quicklinks
   async fetchWorkspaceLinks(workspaceSlug: string): Promise<TLink[]> {
     return this.get(`/api/workspaces/${workspaceSlug}/quick-links/`)
