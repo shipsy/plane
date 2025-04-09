@@ -53,14 +53,14 @@ from plane.db.models import (
     Project,
     ProjectMember,
     CycleIssue,
-    IssueType
     Workspace,
+    IssueType
 )
-from plane.utils.issue_filters import issue_filtersfrom plane.settings.storage import S3Storage
+from plane.settings.storage import S3Storage
 from plane.bgtasks.storage_metadata_task import get_asset_object_metadata
+from plane.utils.issue_filters import issue_filters
 from .base import BaseAPIView
 from plane.utils.host import base_host
-
 
 class WorkspaceIssueAPIEndpoint(BaseAPIView):
     """

@@ -201,7 +201,7 @@ export class IssueStore implements IIssueStore {
       reference_number: issue?.reference_number, 
       trip_reference_number: issue?.trip_reference_number, 
       vendor_code: issue?.vendor_code, 
-      worker_code: issue?.worker_code
+      worker_code: issue?.worker_code,
       is_epic: issue?.is_epic,
     };
 

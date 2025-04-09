@@ -24,12 +24,12 @@ from plane.app.views import (
     IssueDetailEndpoint,
     IssueAttachmentV2Endpoint,
     IssueBulkUpdateDateEndpoint,
-    SearchAPIEndpoint,
-    SearchSingleValueAPI
     IssueVersionEndpoint,
     WorkItemDescriptionVersionEndpoint,
     IssueMetaEndpoint,
     IssueDetailIdentifierEndpoint,
+    SearchAPIEndpoint,
+    SearchSingleValueAPI
 )
 
 urlpatterns = [
@@ -263,16 +263,6 @@ urlpatterns = [
         name="project-issue-dates",
     ),
     path(
-        "workspaces/<str:slug>/search",
-        SearchAPIEndpoint.as_view(),
-        name="key-codes",
-    ),
-    path(
-        "workspaces/<str:slug>/projects/<str:project_id>/filed_search",
-        SearchSingleValueAPI.as_view(),
-        name="key-codes"
-    )
-    path(
         "workspaces/<str:slug>/projects/<uuid:project_id>/issues/<uuid:issue_id>/versions/",
         IssueVersionEndpoint.as_view(),
         name="issue-versions",
@@ -302,4 +292,14 @@ urlpatterns = [
         IssueDetailIdentifierEndpoint.as_view(),
         name="issue-detail-identifier",
     ),
+    path(
+        "workspaces/<str:slug>/search",
+        SearchAPIEndpoint.as_view(),
+        name="key-codes",
+    ),
+    path(
+        "workspaces/<str:slug>/projects/<str:project_id>/filed_search",
+        SearchSingleValueAPI.as_view(),
+        name="key-codes"
+    )
 ]

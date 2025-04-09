@@ -31,8 +31,8 @@ from plane.db.models import (
     ProjectMember,
     Project,
     CycleIssue,
-    IssueCustomProperty
     UserRecentVisit,
+    IssueCustomProperty
 )
 from plane.utils.grouper import (
     issue_group_values,

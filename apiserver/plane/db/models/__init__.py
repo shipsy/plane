@@ -40,7 +40,7 @@ from .issue import (
     IssueSequence,
     IssueSubscriber,
     IssueVote,
-    IssueCustomProperty
+    IssueCustomProperty,
     IssueVersion,
     IssueDescriptionVersion,
 )

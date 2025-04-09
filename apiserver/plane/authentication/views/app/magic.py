@@ -32,7 +32,8 @@ from plane.authentication.adapter.error import (
 )
 from plane.authentication.rate_limit import AuthenticationThrottle
 from plane.api.views.base import BaseAPIView
-from plane.api.views.project import create_projectfrom plane.utils.path_validator import validate_next_path
+from plane.api.views.project import create_project
+from plane.utils.path_validator import validate_next_path
 
 
 class MagicGenerateEndpoint(BaseAPIView):
@@ -64,7 +65,7 @@ class MagicGenerateEndpoint(BaseAPIView):
             adapter = MagicCodeProvider(request=request, key=email)
             key, token = adapter.initiate()
             # If the smtp is configured send through here
-            magic_link.delay(email, key, token, origin)
+            magic_link.delay(email, key, token)
             return Response({"key": str(key), "token": token}, status=status.HTTP_200_OK)
         except AuthenticationException as e:
             params = e.get_error_dict()
