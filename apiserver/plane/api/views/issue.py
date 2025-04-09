@@ -57,7 +57,9 @@ from plane.db.models import (
     IssueType
 )
 from plane.settings.storage import S3Storage
-from plane.bgtasks.storage_metadata_task import get_asset_object_metadatafrom plane.utils.issue_filters import issue_filters
+from plane.bgtasks.storage_metadata_task import get_asset_object_metadata
+from plane.utils.issue_filters import issue_filters
+
 from .base import BaseAPIView
 from plane.utils.host import base_host
 

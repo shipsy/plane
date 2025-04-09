@@ -7,7 +7,8 @@ from plane.api.views import (
     IssueActivityAPIEndpoint,
     WorkspaceIssueAPIEndpoint,
     IssueAttachmentV2Endpoint,
-    IssueTypeAPIEndpoint
+    IssueTypeAPIEndpoint,
+    IssueAttachmentEndpoint
 )
 
 urlpatterns = [

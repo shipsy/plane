@@ -24,7 +24,6 @@ import {
   FilterStartDate,
   FilterState,
   FilterStateGroup,
-  FilterTargetDate,
   FilterAdditionalProperties,
   FilterCycle,
   FilterModule,

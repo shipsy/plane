@@ -1,6 +1,8 @@
 # Module imports
 from plane.db.models import APIActivityLog
-from plane.utils.ip_address import get_client_ipfrom django.urls import resolve
+from plane.utils.ip_address import get_client_ip
+from django.urls import resolve
+
 
 
 class APITokenLogMiddleware:
