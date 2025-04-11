@@ -1,3 +1,4 @@
+import { EUserProjectRoles } from "@plane/constants";
 import type {
   IProjectViewProps,
   IUser,
@@ -147,4 +148,47 @@ export interface ISearchIssueResponse {
   state__name: string;
   workspace__slug: string;
   type_id: string;
+}
+
+export interface IPartialProject {
+  id: string;
+  name: string;
+  identifier: string;
+  sort_order: number | null;
+  logo_props: TLogoProps;
+  member_role?: TUserPermissions | EUserProjectRoles | null;
+  archived_at: string | null;
+  workspace: IWorkspace | string;
+  cycle_view: boolean;
+  issue_views_view: boolean;
+  module_view: boolean;
+  page_view: boolean;
+  inbox_view: boolean;
+  guest_view_all_features?: boolean;
+  project_lead?: IUserLite | string | null;
+  network?: number;
+  // Timestamps
+  created_at?: Date;
+  updated_at?: Date;
+  // actor
+  created_by?: string;
+  updated_by?: string;
+}
+
+export interface IProject extends IPartialProject {
+  archive_in?: number;
+  close_in?: number;
+  // only for uploading the cover image
+  cover_image_asset?: null;
+  cover_image?: string;
+  // only for rendering the cover image
+  readonly cover_image_url?: string;
+  default_assignee?: IUser | string | null;
+  default_state?: string | null;
+  description?: string;
+  estimate?: string | null;
+  anchor?: string | null;
+  is_favorite?: boolean;
+  members?: string[];
+  timezone?: string;
 }

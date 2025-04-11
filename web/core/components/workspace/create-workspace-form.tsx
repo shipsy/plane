@@ -12,7 +12,7 @@ import { IWorkspace } from "@plane/types";
 import { Button, CustomSelect, Input, TOAST_TYPE, setToast } from "@plane/ui";
 // constants
 import { WORKSPACE_CREATED } from "@/constants/event-tracker";
-import { ORGANIZATION_SIZE, RESTRICTED_URLS } from "@/constants/workspace";
+// import { ORGANIZATION_SIZE, RESTRICTED_URLS } from "@/constants/workspace";
 // hooks
 import { useEventTracker, useWorkspace } from "@/hooks/store";
 import { useAppRouter } from "@/hooks/use-app-router";

@@ -26,6 +26,10 @@ const nextConfig = {
     ],
     unoptimized: true,
   },
+  transpilePackages: [
+    "@plane/hooks",
+    "@plane/i18n",
+  ],
 };
 
 

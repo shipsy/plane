@@ -26,23 +26,17 @@ import { UpgradeBadge } from "@/plane-web/components/workspace";
 import { EUserPermissions, EUserPermissionsLevel } from "@/plane-web/constants/user-permissions";
 
 export const SidebarWorkspaceMenu = observer(() => {
-  // state
   const [isMenuActive, setIsMenuActive] = useState(false);
-  // refs
   const actionSectionRef = useRef<HTMLDivElement | null>(null);
-  // store hooks
   const { t } = useTranslation();
   const { toggleSidebar, sidebarCollapsed } = useAppTheme();
   const { captureEvent } = useEventTracker();
   const { isMobile } = usePlatformOS();
   const { allowPermissions } = useUserPermissions();
-  // router params
   const { workspaceSlug } = useParams();
-  // pathname
   const pathname = usePathname();
-  // local storage
   const { setValue: toggleWorkspaceMenu, storedValue } = useLocalStorage<boolean>("is_workspace_menu_open", true);
-  // derived values
+
   const isWorkspaceMenuOpen = !!storedValue;
   const isAdmin = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
 
@@ -58,6 +52,7 @@ export const SidebarWorkspaceMenu = observer(() => {
   useEffect(() => {
     if (sidebarCollapsed) toggleWorkspaceMenu(true);
   }, [sidebarCollapsed, toggleWorkspaceMenu]);
+
   useOutsideClickDetector(actionSectionRef, () => setIsMenuActive(false));
 
   const indicatorElement = (
@@ -69,79 +64,80 @@ export const SidebarWorkspaceMenu = observer(() => {
   return (
     <Disclosure as="div" defaultOpen>
       {!sidebarCollapsed && (
-        <div
-          className={cn(
-            "flex px-2 bg-custom-sidebar-background-100 group/workspace-button hover:bg-custom-sidebar-background-90 rounded",
-            {
-              "mt-2.5": !sidebarCollapsed,
-            }
-          )}
-        >
-          {" "}
-          <Disclosure.Button
-            as="button"
-            className="flex-1 sticky top-0  z-10  w-full  py-1.5 flex items-center justify-between gap-1 text-custom-sidebar-text-400  text-xs font-semibold"
-            onClick={() => toggleWorkspaceMenu(!isWorkspaceMenuOpen)}
-          >
-            <span>{t("workspace").toUpperCase()}</span>
-          </Disclosure.Button>
-          <CustomMenu
-            customButton={
-              <span
-                ref={actionSectionRef}
-                className="grid place-items-center p-0.5 text-custom-sidebar-text-400 hover:bg-custom-sidebar-background-80 rounded my-auto"
-                onClick={() => {
-                  setIsMenuActive(!isMenuActive);
-                }}
-              >
-                <MoreHorizontal className="size-4" />
-              </span>
-            }
+        <>
+          <div
             className={cn(
-              "h-full flex items-center opacity-0 z-20 pointer-events-none flex-shrink-0 group-hover/workspace-button:opacity-100 group-hover/workspace-button:pointer-events-auto my-auto",
+              "flex px-2 bg-custom-sidebar-background-100 group/workspace-button hover:bg-custom-sidebar-background-90 rounded",
               {
-                "opacity-100 pointer-events-auto": isMenuActive,
+                "mt-2.5": !sidebarCollapsed,
               }
             )}
-            customButtonClassName="grid place-items-center"
-            placement="bottom-start"
           >
-            <CustomMenu.MenuItem>
-              <Link href={`/${workspaceSlug}/projects/archives`}>
-                <div className="flex items-center justify-start gap-2">
-                  <ArchiveIcon className="h-3.5 w-3.5 stroke-[1.5]" />
-                  <span>{t("archives")}</span>
-                </div>
-              </Link>
-            </CustomMenu.MenuItem>
+            <Disclosure.Button
+              as="button"
+              className="flex-1 sticky top-0 z-10 w-full py-1.5 flex items-center justify-between gap-1 text-custom-sidebar-text-400 text-xs font-semibold"
+              onClick={() => toggleWorkspaceMenu(!isWorkspaceMenuOpen)}
+            >
+              <span>{t("workspace").toUpperCase()}</span>
+            </Disclosure.Button>
 
-            {isAdmin && (
+            <CustomMenu
+              customButton={
+                <span
+                  ref={actionSectionRef}
+                  className="grid place-items-center p-0.5 text-custom-sidebar-text-400 hover:bg-custom-sidebar-background-80 rounded my-auto"
+                  onClick={() => setIsMenuActive(!isMenuActive)}
+                >
+                  <MoreHorizontal className="size-4" />
+                </span>
+              }
+              className={cn(
+                "h-full flex items-center opacity-0 z-20 pointer-events-none flex-shrink-0 group-hover/workspace-button:opacity-100 group-hover/workspace-button:pointer-events-auto my-auto",
+                {
+                  "opacity-100 pointer-events-auto": isMenuActive,
+                }
+              )}
+              customButtonClassName="grid place-items-center"
+              placement="bottom-start"
+            >
               <CustomMenu.MenuItem>
-                <Link href={`/${workspaceSlug}/settings`}>
+                <Link href={`/${workspaceSlug}/projects/archives`}>
                   <div className="flex items-center justify-start gap-2">
-                    <Settings className="h-3.5 w-3.5 stroke-[1.5]" />
-                    <span>{t("settings")}</span>
+                    <ArchiveIcon className="h-3.5 w-3.5 stroke-[1.5]" />
+                    <span>{t("archives")}</span>
                   </div>
                 </Link>
               </CustomMenu.MenuItem>
-            )}
-          </CustomMenu>
-          <Disclosure.Button
-            as="button"
-            className="sticky top-0 z-10 group/workspace-button px-0.5 py-1.5 flex items-center justify-between gap-1 text-custom-sidebar-text-400 hover:bg-custom-sidebar-background-90 rounded text-xs font-semibold"
-            onClick={() => toggleWorkspaceMenu(!isWorkspaceMenuOpen)}
-          >
-            {" "}
-            <span className="flex-shrink-0 opacity-0 pointer-events-none group-hover/workspace-button:opacity-100 group-hover/workspace-button:pointer-events-auto rounded hover:bg-custom-sidebar-background-80">
-              <ChevronRight
-                className={cn("size-4 flex-shrink-0 text-custom-sidebar-text-400 transition-transform", {
-                  "rotate-90": isWorkspaceMenuOpen,
-                })}
-              />
-            </span>
-          </Disclosure.Button>
-        </div>
+
+              {isAdmin && (
+                <CustomMenu.MenuItem>
+                  <Link href={`/${workspaceSlug}/settings`}>
+                    <div className="flex items-center justify-start gap-2">
+                      <Settings className="h-3.5 w-3.5 stroke-[1.5]" />
+                      <span>{t("settings")}</span>
+                    </div>
+                  </Link>
+                </CustomMenu.MenuItem>
+              )}
+            </CustomMenu>
+
+            <Disclosure.Button
+              as="button"
+              className="sticky top-0 z-10 group/workspace-button px-0.5 py-1.5 flex items-center justify-between gap-1 text-custom-sidebar-text-400 hover:bg-custom-sidebar-background-90 rounded text-xs font-semibold"
+              onClick={() => toggleWorkspaceMenu(!isWorkspaceMenuOpen)}
+            >
+              <span className="flex-shrink-0 opacity-0 pointer-events-none group-hover/workspace-button:opacity-100 group-hover/workspace-button:pointer-events-auto rounded hover:bg-custom-sidebar-background-80">
+                <ChevronRight
+                  className={cn("size-4 flex-shrink-0 text-custom-sidebar-text-400 transition-transform", {
+                    "rotate-90": isWorkspaceMenuOpen,
+                  })}
+                />
+              </span>
+            </Disclosure.Button>
+          </div>
+        </>
       )}
+
       <Transition
         show={isWorkspaceMenuOpen}
         enter="transition duration-100 ease-out"
@@ -161,6 +157,7 @@ export const SidebarWorkspaceMenu = observer(() => {
           >
             {SIDEBAR_WORKSPACE_MENU_ITEMS.map((link) => {
               if (!isWorkspaceFeatureEnabled(link.value, workspaceSlug.toString())) return null;
+
               return (
                 allowPermissions(link.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug.toString()) && (
                   <Tooltip
@@ -183,14 +180,17 @@ export const SidebarWorkspaceMenu = observer(() => {
                               "rotate-180": link.value === "active-cycles",
                             })}
                           />
-                          {!sidebarCollapsed && <p className="text-sm leading-5 font-medium">{t(link.key)}</p>}
+                          {!sidebarCollapsed && (
+                            <p className="text-sm leading-5 font-medium">{t(link.key)}</p>
+                          )}
                         </div>
                         {!sidebarCollapsed && link.value === "active-cycles" && indicatorElement}
                       </SidebarNavItem>
                     </Link>
                   </Tooltip>
                 )
-            )}
+              );
+            })}
           </Disclosure.Panel>
         )}
       </Transition>

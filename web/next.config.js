@@ -33,7 +33,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  transpilePackages: ["@plane/i18n"],
+  transpilePackages: [
+    "@plane/i18n",
+    "@plane/hooks"
+  ],
   // webpack: (config, { isServer }) => {
   //   if (!isServer) {
   //     // Ensure that all imports of 'yjs' resolve to the same instance

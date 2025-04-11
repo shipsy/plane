@@ -9,6 +9,10 @@ const nextConfig = {
     unoptimized: true,
   },
   basePath: process.env.NEXT_PUBLIC_ADMIN_BASE_PATH || "",
+  transpilePackages: [
+    "@plane/hooks",
+    "@plane/i18n",
+  ],
 };
 
 module.exports = nextConfig;
