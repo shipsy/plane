@@ -20,12 +20,12 @@ class Instance(BaseModel):
     instance_name = models.CharField(max_length=255)
     whitelist_emails = models.TextField(blank=True, null=True)
     instance_id = models.CharField(max_length=255, unique=True)
-    license_key = models.CharField(max_length=256, null=True, blank=True)
+    # license_key = models.CharField(max_length=256, null=True, blank=True)
     current_version = models.CharField(max_length=255)
-    latest_version = models.CharField(max_length=255, null=True, blank=True)
-    product = models.CharField(
-        max_length=255, default=ProductTypes.PLANE_CE.value
-    )
+    # latest_version = models.CharField(max_length=255, null=True, blank=True)
+    # product = models.CharField(
+    #     max_length=255, default=ProductTypes.PLANE_CE.value
+    # )
     domain = models.TextField(blank=True)
     # Instance specifics
     last_checked_at = models.DateTimeField()
@@ -38,7 +38,7 @@ class Instance(BaseModel):
     # signup screen
     is_signup_screen_visited = models.BooleanField(default=False)
     # users
-    user_count = models.PositiveBigIntegerField(default=0)
+    # user_count = models.PositiveBigIntegerField(default=0)
     is_verified = models.BooleanField(default=False)
 
     class Meta:
