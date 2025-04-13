@@ -156,7 +156,7 @@ export const SidebarWorkspaceMenu = observer(() => {
             static
           >
             {SIDEBAR_WORKSPACE_MENU_ITEMS.map((link) => {
-              if (!isWorkspaceFeatureEnabled(link.value, workspaceSlug.toString())) return null;
+              // if (!isWorkspaceFeatureEnabled(link.value, workspaceSlug.toString())) return null;
 
               return (
                 allowPermissions(link.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug.toString()) && (

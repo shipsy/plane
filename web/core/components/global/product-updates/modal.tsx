@@ -1,6 +1,8 @@
 import { FC, useRef } from "react";
 import { observer } from "mobx-react-lite";
 import { useTranslation } from "@plane/i18n";
+import useSWR from "swr";
+import { DocumentReadOnlyEditorWithRef, EditorRefApi } from "@plane/editor";
 // ui
 import { EModalPosition, EModalWidth, ModalCore } from "@plane/ui";
 // helpers
@@ -21,7 +23,13 @@ export type ProductUpdatesModalProps = {
 export const ProductUpdatesModal: FC<ProductUpdatesModalProps> = observer((props) => {
   const { isOpen, handleClose } = props;
   const { t } = useTranslation();
-  const { config } = useInstance();
+  const editorRef = useRef<EditorRefApi>(null);
+  // const { config } = useInstance();
+  const { data, isLoading, error } = useSWR(`INSTANCE_CHANGELOG`, () => instanceService.getInstanceChangeLog(), {
+    shouldRetryOnError: false,
+    revalidateIfStale: false,
+    revalidateOnFocus: false,
+  });
 
   return (
     <ModalCore isOpen={isOpen} handleClose={handleClose} position={EModalPosition.CENTER} width={EModalWidth.XXL}>

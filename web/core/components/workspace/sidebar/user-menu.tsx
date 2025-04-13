@@ -62,7 +62,7 @@ export const SidebarUserMenu = observer(() => {
     >
       {SIDEBAR_USER_MENU_ITEMS.map((link) => {
         if (link.value === "drafts" && draftIssueCount === 0) return null;
-        if (!isUserFeatureEnabled(link.value)) return null;
+        // if (!isUserFeatureEnabled(link.value)) return null;
         return (
           allowPermissions(link.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug.toString()) && (
             <Tooltip
