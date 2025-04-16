@@ -828,7 +828,8 @@ class IssueUserDisplayPropertyEndpoint(BaseAPIView):
         # Create a dictionary with filtered custom property names as keys and True as values
         custom_props_dict = {prop: True for prop in filtered_custom_properties}
         display_properties = response_data['display_properties']
-        display_properties.update(custom_props_dict)
+        display_properties['custom_properties']=custom_props_dict
+        # display_properties.update(custom_props_dict)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

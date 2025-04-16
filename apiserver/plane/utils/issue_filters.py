@@ -669,11 +669,15 @@ def build_custom_property_q_objects(custom_properties):
                 filter_kwargs[f"{base_field}__in"] = bool_values
             
             q_object = Q(id__in=IssueCustomProperty.objects.filter(**filter_kwargs).values("issue_id"))
-
-        # Number filters
-        elif data_type in ["number"]:
+                
+        elif data_type in ["number", "date"]:
+            # Handle value conversion based on data type
             try:
-                value_input = int(values[0]) if values else None
+                if data_type == "number":
+                    value_input = int(values[0]) if values else None
+                else:  # data_type == "date"
+                    # For dates, use the string value directly - no conversion needed
+                    value_input = values[0] if values else None
             except (ValueError, TypeError):
                 continue
             
@@ -695,17 +699,23 @@ def build_custom_property_q_objects(custom_properties):
                     filter_kwargs[f"{base_field}__isnull"] = (operator == "isnull")
                 else:
                     try:
-                        filter_kwargs[f"{base_field}__in"] = list(map(int, values))
+                        if data_type == "number":
+                            # For numbers, convert to integers
+                            filter_kwargs[f"{base_field}__in"] = list(map(int, values))
+                        else:  # data_type == "date"
+                            # For dates, use the string values directly
+                            filter_kwargs[f"{base_field}__in"] = values
                     except (ValueError, TypeError):
-                        # Handle case when values can't be converted to int
+                        # Handle case when values can't be converted
                         continue
                 
                 q_object = Q(id__in=IssueCustomProperty.objects.filter(**filter_kwargs).values("issue_id"))
         
+        
         # String filters
         else:
             if operator == "ne":
-                # For string 'not equal', use same approach as number
+                # For string 'not equal'
                 exists_filter = IssueCustomProperty.objects.filter(**base_filters).values("issue_id")
                 not_equal_filter = IssueCustomProperty.objects.filter(
                     **base_filters,
