@@ -600,17 +600,21 @@ def filter_character_fields(params, issue_filter, method, prefix=""):
         "customer_code",
         "customer_name",
         "vendor_name",
-        "worker_name"
         "vendor_code",
         "worker_code",
+        "worker_name",
+        "source",
+
     ]
 
     for field in character_fields:
-        value = params.get(field, "").strip()  # Remove spaces to avoid blank entries
-        if value:  
-            issue_filter[f"{prefix}{field}__iexact"] = value  # Case-insensitive filtering
+        value = params.get(field, "").strip()
+        if value:
+            values_list = [v.strip() for v in value.split(",") if v.strip()]
+            issue_filter[f"{prefix}{field}__in"] = values_list
 
     return issue_filter
+
 
 def build_custom_property_q_objects(custom_properties):
     custom_filters = []
@@ -748,6 +752,15 @@ def build_custom_property_q_objects(custom_properties):
     return custom_filters
 
 
+def filter_issue_type_id(params, issue_filter, method, prefix=""):
+    """
+    Filter issues by type_id
+    """
+    type_id = params.get(f"{prefix}type_id", None)
+    if type_id is not None:
+        issue_filter[f"{prefix}type_id"] = type_id
+
+
 def issue_filters(query_params, method, prefix=""):
     issue_filter = {}
 
@@ -770,6 +783,7 @@ def issue_filters(query_params, method, prefix=""):
         "target_date": filter_target_date,
         "completed_at": filter_completed_at,
         "type": filter_issue_state_type,
+        "type_id": filter_issue_type_id,
         "project": filter_project,
         "cycle": filter_cycle,
         "module": filter_module,
