@@ -43,7 +43,7 @@ def is_uuid(value):
 class IssueCustomPropertySerializer(BaseSerializer):
     class Meta:
         model = IssueCustomProperty
-        fields = ["key", "value", "data_type", "int_value", "bool_value", "date_value", "issue_type_custom_property"]
+        fields = ["key", "value", "data_type", "int_value", "bool_value", "date_value", "issue_type_custom_property","id"]
         read_only_fields = [
             "id",
             "issue",
