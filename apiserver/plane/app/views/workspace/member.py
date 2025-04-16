@@ -325,7 +325,8 @@ class WorkspaceMemberUserEndpoint(BaseAPIView):
         custom_props_dict = {prop: True for prop in filtered_custom_properties}
         default_props = response_data['default_props']
         display_properties = default_props['display_properties']
-        display_properties.update(custom_props_dict)
+        display_properties['custom_properties']=custom_props_dict
+        # display_properties.update(custom_props_dict)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 

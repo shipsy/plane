@@ -412,9 +412,6 @@ class ProjectMemberUserEndpoint(BaseAPIView):
         allowed_properties = ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP.get(slug, [])
         filtered_custom_properties = [prop for prop in custom_properties if prop in allowed_properties]
         custom_props_dict = {prop: True for prop in filtered_custom_properties}
-        # Create a dictionary with custom property names as keys and True as values
-        # custom_props_dict = {prop: True for prop in custom_properties}
-
         default_props = response_data['default_props']['display_properties']=custom_props_dict
 
         return Response(serializer.data, status=status.HTTP_200_OK)
