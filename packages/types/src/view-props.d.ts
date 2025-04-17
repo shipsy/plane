@@ -69,7 +69,8 @@ export type TIssueOrderByOptions =
   | "worker_code"
   | "-worker_code"
   | "worker_name"
-  | "-worker_name";
+  | "-worker_name"
+  | string;
 
 export type TIssueGroupingFilters = "active" | "backlog" | null;
 
