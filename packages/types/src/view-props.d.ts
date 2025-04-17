@@ -175,6 +175,8 @@ export interface IIssueDisplayProperties {
   vendor_code?: boolean;
   worker_code?: boolean;
   worker_name?: boolean;
+  custom_properties?: Record<string, boolean>;
+  [key: string]: boolean;
 }
 
 export type TIssueKanbanFilters = {
