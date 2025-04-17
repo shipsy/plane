@@ -39,10 +39,12 @@ from plane.db.models import (
     Workspace,
     WorkspaceMember,
     DraftIssue,
+    IssueTypeCustomProperty,
 )
 from plane.utils.cache import cache_response, invalidate_cache
 
 from .. import BaseViewSet
+from plane.utils.constants import ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP
 
 
 class WorkSpaceMemberViewSet(BaseViewSet):
@@ -310,6 +312,20 @@ class WorkspaceMemberUserEndpoint(BaseAPIView):
             .first()
         )
         serializer = WorkspaceMemberMeSerializer(workspace_member)
+        response_data = dict(serializer.data)
+
+        # Get distinct custom property names
+        custom_properties = IssueTypeCustomProperty.objects.filter(
+            issue_type__workspace__slug=slug,
+            is_active=True
+        ).values_list('name', flat=True).distinct()
+
+        allowed_properties = ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP.get(slug, [])
+        filtered_custom_properties = [prop for prop in custom_properties if prop in allowed_properties]
+        custom_props_dict = {prop: True for prop in filtered_custom_properties}
+        default_props = response_data['default_props']
+        display_properties = default_props['display_properties']
+        display_properties['custom_properties']=custom_props_dict
         return Response(serializer.data, status=status.HTTP_200_OK)
 
 
