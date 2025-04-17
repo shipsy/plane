@@ -36,17 +36,15 @@ export const IssueColumn = observer((props: Props) => {
   const combinedPropertyDetails = {
     ...SPREADSHEET_PROPERTY_DETAILS
   };
-
+  
   const customPropertiesForSpreadsheet = Object.keys(
     workspaceUserInfo[workspaceSlug?.toString()]?.default_props?.display_properties?.custom_properties || {}
-  ).map((key) => ({
-    key,
-  }));
-
-  Object.keys(customPropertiesForSpreadsheet).forEach((propertyName) => {
+  );
+  
+  customPropertiesForSpreadsheet.forEach((propertyName) => {
     combinedPropertyDetails[propertyName] = {
       title: propertyName,
-      ascendingOrderKey: "propertyName",
+      ascendingOrderKey: propertyName,
       ascendingOrderTitle: "A",
       descendingOrderKey: `-${propertyName}`,
       descendingOrderTitle: "Z",
