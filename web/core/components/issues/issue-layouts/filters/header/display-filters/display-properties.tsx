@@ -35,9 +35,7 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
   } = props;
   const { t } = useTranslation();
   // router
-  const { projectId: routerProjectId } = useParams();
-  const { routerWorkspaceSlug } = useParams();
-  const workspaceSlug = routerWorkspaceSlug?.toString();
+  const { workspaceSlug, projectId: routerProjectId } = useParams();
   // states
   const [previewEnabled, setPreviewEnabled] = React.useState(true);
   // derived values
@@ -45,7 +43,7 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
   const { workspaceUserInfo } = useUserPermissions();
 
   const customPropertiesForDisplay: IProperty[] = Object.keys(
-    workspaceUserInfo[workspaceSlug.toString()]?.default_props?.display_properties?.custom_properties || {}
+    workspaceUserInfo[workspaceSlug?.toString()]?.default_props?.display_properties?.custom_properties || {}
   ).map((key) => ({
     key,
     title: key,
@@ -59,6 +57,9 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
   // Filter out "cycle" and "module" keys if cycleViewDisabled or moduleViewDisabled is true
   // Also filter out display properties that should not be rendered
   const filteredDisplayProperties = combinedPropertiesForDisplay.filter((property) => {
+    if (customPropertiesForDisplay.some((customProperty) => customProperty.key === property.key)) {
+      return true;
+    }
     if (!displayPropertiesToRender.includes(property.key)) return false;
     switch (property.key) {
       case "cycle":
