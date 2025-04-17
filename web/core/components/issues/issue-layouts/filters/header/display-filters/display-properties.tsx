@@ -96,7 +96,7 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
                   })
                 }
               >
-                {t(displayProperty.key)}
+                {t(displayProperty.key as string)}
               </button>
             </>
           ))}

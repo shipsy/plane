@@ -11,12 +11,14 @@ type Props = {
 
 export const SpreadsheetCustomPropertiesColumn: React.FC<Props> = observer((props) => {
   const { issue, property } = props;
+  const customProperties = issue?.custom_propertiess ?? [];
+  const propertyValue = customProperties.find(item => item.hasOwnProperty(property))?.[property] ?? "N/A";
 
   return (
-    <Tooltip tooltipContent={issue?.custom_propertiess && property && property in issue.custom_propertiess ? issue.custom_propertiess[property] : "No data available"}>
-  <Row className="h-11 truncate border-b-[0.5px] border-custom-border-200 pt-[1.25em] text-xs hover:bg-custom-background-80">
-    {issue?.custom_propertiess && property && property in issue.custom_propertiess ? issue.custom_propertiess[property] : "N/A"}
-  </Row>
-</Tooltip>
+    <Tooltip tooltipContent={propertyValue !== "N/A" ? propertyValue : "No data available"}>
+      <Row className="h-11 truncate border-b-[0.5px] border-custom-border-200 pt-[1.25em] text-xs hover:bg-custom-background-80">
+        {propertyValue}
+      </Row>
+    </Tooltip>
   );
 });
