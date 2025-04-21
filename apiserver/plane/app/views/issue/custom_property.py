@@ -17,6 +17,8 @@ from plane.api.serializers import (
 )
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.db.models import (
+    Issue,
+    Project,
     IssueCustomProperty,
     IssueTypeCustomProperty,
     Workspace
