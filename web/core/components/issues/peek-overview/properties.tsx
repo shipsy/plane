@@ -74,14 +74,13 @@ export const PeekOverviewProperties: FC<IPeekOverviewProperties> = observer((pro
     try {
       const updateRequests = updatedProperties.map((property) => {
         const customPropertyId = property?.id || "";
-        const apiUrl = `/api/v1/workspaces/${workspaceSlug}/issues/${issueId}/custom-properties/`;
+        const apiUrl = `/api/workspaces/${workspaceSlug}/issues/${issueId}/custom-properties/`;
         if (customPropertyId) {
           return axios.patch(
             `${apiUrl}${customPropertyId}/`, 
             { value: property.value },
             {
               headers: {
-                'x-api-key': 'TEST_API_TOKEN',
                 'Content-Type': 'application/json'
               }
             }
