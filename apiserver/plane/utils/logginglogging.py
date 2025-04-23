@@ -8,6 +8,7 @@ import queue
 from django.conf import settings
 from opensearchpy import OpenSearch, helpers
 from logging.handlers import MemoryHandler
+from plane.utils.formatters import APILogStandardFormatter
 
 # OpenSearch settings from Django settings
 OPENSEARCH_HOST = getattr(settings, 'OPENSEARCH_HOST', 'opensearch-node1')  # Updated to use container name
@@ -142,7 +143,7 @@ def setup_api_logging(logger, index_name):
 
     memory_handler.setTarget(opensearch_handler)
     # Set formatters
-    api_formatter = APILogFormatter()
+    api_formatter = APILogStandardFormatter()
     opensearch_handler.setFormatter(api_formatter)
     memory_handler.setFormatter(api_formatter)
     
