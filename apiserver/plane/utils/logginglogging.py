@@ -53,12 +53,12 @@ class OpensearchHandler(logging.Handler):
         except Exception as e:
             print(f"[ERROR] Failed to bulk insert logs to OpenSearch: {str(e)}")
 
-class APILogFormatter(logging.Formatter):
-    def format(self, record):
-        # For API logs, we're already passing in formatted JSON
-        # Just return the message which should be pre-formatted
-        print(f"[DEBUG] Formatting log record: {record}")
-        return record.getMessage()
+# class APILogFormatter(logging.Formatter):
+#     def format(self, record):
+#         # For API logs, we're already passing in formatted JSON
+#         # Just return the message which should be pre-formatted
+#         print(f"[DEBUG] Formatting log record: {record}")
+#         return record.getMessage()
 
 class OpensearchMemoryHandler(MemoryHandler):
     def __init__(self, capacity, target_handler, index_name):
