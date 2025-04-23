@@ -8,10 +8,9 @@ class APILoggingMiddleware:
         self.get_response = get_response
         # We'll initialize the logger after creating the logging setup
         self.logger = setup_api_logging(logging.getLogger('plane.app'), 'plane-api-logs')
-        self.logger.handlers[0].flush()
+        # self.logger.handlers[0].flush()
     def __call__(self, request):
         start_time = time.time()
-        request_id = request.headers.get('X-Request-ID', '')
 
         request_body = None
         if request.body:
@@ -48,7 +47,6 @@ class APILoggingMiddleware:
 
             log_data = {
                 'timestamp': timezone.now().isoformat(),
-                'request_id': request_id,
                 'username': username,
                 'request_method': request.method,
                 'request_path': request.path,

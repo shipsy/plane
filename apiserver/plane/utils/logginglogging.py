@@ -7,6 +7,7 @@ import time
 import queue
 from django.conf import settings
 from opensearchpy import OpenSearch, helpers
+from logging.handlers import MemoryHandler
 
 # OpenSearch settings from Django settings
 OPENSEARCH_HOST = getattr(settings, 'OPENSEARCH_HOST', 'opensearch-node1')  # Updated to use container name
@@ -55,9 +56,10 @@ class APILogFormatter(logging.Formatter):
     def format(self, record):
         # For API logs, we're already passing in formatted JSON
         # Just return the message which should be pre-formatted
+        print(f"[DEBUG] Formatting log record: {record}")
         return record.getMessage()
 
-class OpensearchMemoryHandler(logging.handlers.MemoryHandler):
+class OpensearchMemoryHandler(MemoryHandler):
     def __init__(self, capacity, target_handler, index_name):
         super().__init__(capacity=capacity, target=target_handler)
         self.index_name = index_name
@@ -65,19 +67,15 @@ class OpensearchMemoryHandler(logging.handlers.MemoryHandler):
     def flush(self):
         self.acquire()
         try:
-            if self.target and len(self.buffer) > 0:
+            if self.target :
                 print(f"[DEBUG] Processing {len(self.buffer)} log records for {self.index_name}.")
                 actions = []
                 for record in self.buffer:
                     log_entry = self.format(record)
-                    
+                    print(f"[DEBUG] Log entry: {log_entry}")
                     # Parse the JSON string back to a dict if needed
-                    try:
-                        if isinstance(log_entry, str):
-                            log_entry = json.loads(log_entry)
-                    except:
-                        # If it's not valid JSON, use it as-is
-                        pass
+                    if isinstance(log_entry, dict):
+                        log_entry['message'] = log_entry['message'].replace('"', '\\"').replace("'", "\\'")
                     
                     action = {
                         "_index": self.index_name,
@@ -109,69 +107,70 @@ def log_worker():
                     print(f"[DEBUG] Processing log queue for {index_name}. Queue size: {queue_size}")
                     actions = log_queue.get()
                     print(f"[DEBUG] Got {len(actions)} actions from queue")
-                    opensearch_handler = OpensearchHandler(index_name=index_name)
                     try:
-                        opensearch_handler.bulk_insert(actions)
+                        opensearch_handler = OpensearchHandler(index_name=index_name)
+                        helpers.bulk(opensearch_handler.opensearch, actions)
+                        # opensearch_handler.bulk_insert(actions)
+                        print("Flushed logs to OpenSearch")
                         print(f"[DEBUG] Successfully sent logs to OpenSearch for {index_name}")
                     except Exception as e:
-                        print(f"[ERROR] Failed to insert logs to OpenSearch: {e}")
-                        print(f"[ERROR] Exception type: {type(e)}")
-                        import traceback
-                        traceback.print_exc()
+                        print(f"[ERROR] Failed to insert log into OpenSearch for {index_name}: {e}")
+            
                     log_queue.task_done()
+                    print(f"Queue length after processing for {index_name}: {log_queue.qsize()}")
             except Exception as e:
                 print(f"[ERROR] Error processing log queue for {index_name}: {e}")
-                import traceback
-                traceback.print_exc()
         time.sleep(1)  # Sleep to prevent CPU hogging
 # Start the worker thread
 worker_thread = threading.Thread(target=log_worker, daemon=True)
 worker_thread.start()
 
+
+# Global handlers to ensure that the same handler is used across the application
+global_opensearch_handler = OpensearchHandler(index_name=OPENSEARCH_APPLOG_INDEX)
+global_memory_handler = OpensearchMemoryHandler(capacity=APP_LOGS_CAPACITY, target_handler=global_opensearch_handler, index_name=OPENSEARCH_APPLOG_INDEX)
+
 # Setup function to initialize logging
 def setup_api_logging(logger, index_name):
-    # Remove any existing handlers
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
     
-    # Create handlers
-    opensearch_handler = OpensearchHandler(index_name=index_name)
-    memory_handler = OpensearchMemoryHandler(
-        capacity=APP_LOGS_CAPACITY,
-        target_handler=opensearch_handler,
-        index_name=index_name
-    )
-    
+    if index_name == OPENSEARCH_APPLOG_INDEX:
+        opensearch_handler = global_opensearch_handler
+        memory_handler = global_memory_handler
+    else:
+        opensearch_handler = OpensearchHandler(index_name=index_name)
+        memory_handler = OpensearchMemoryHandler(capacity=APP_LOGS_CAPACITY, target_handler=opensearch_handler, index_name=index_name)
+
+    memory_handler.setTarget(opensearch_handler)
     # Set formatters
     api_formatter = APILogFormatter()
+    opensearch_handler.setFormatter(api_formatter)
     memory_handler.setFormatter(api_formatter)
     
     # Add handler to logger
     logger.addHandler(memory_handler)
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     
-    # Create index if it doesn't exist
-    try:
-        if not opensearch_handler.opensearch.indices.exists(index=index_name):
-            mapping = {
-                "mappings": {
-                    "properties": {
-                        "timestamp": {"type": "date"},
-                        "request_id": {"type": "keyword"},
-                        "username": {"type": "keyword"},
-                        "request_method": {"type": "keyword"},
-                        "request_path": {"type": "keyword"},
-                        "request_query": {"type": "object"},
-                        "request_body": {"type": "object", "enabled": False},
-                        "status_code": {"type": "integer"},
-                        "duration": {"type": "float"},
-                        "client_ip": {"type": "ip"},
-                        "user_agent": {"type": "text"}
-                    }
-                }
-            }
-            opensearch_handler.opensearch.indices.create(index=index_name, body=mapping)
-    except Exception as e:
-        print(f"[WARNING] Could not create index: {e}")
-    
+    # # Create index if it doesn't exist
+    # try:
+    #     if not opensearch_handler.opensearch.indices.exists(index=index_name):
+    #         mapping = {
+    #             "mappings": {
+    #                 "properties": {
+    #                     "timestamp": {"type": "date"},
+    #                     "request_id": {"type": "keyword"},
+    #                     "username": {"type": "keyword"},
+    #                     "request_method": {"type": "keyword"},
+    #                     "request_path": {"type": "keyword"},
+    #                     "request_query": {"type": "object"},
+    #                     "request_body": {"type": "object", "enabled": False},
+    #                     "status_code": {"type": "integer"},
+    #                     "duration": {"type": "float"},
+    #                     "client_ip": {"type": "ip"},
+    #                     "user_agent": {"type": "text"}
+    #                 }
+    #             }
+    #         }
+    #         opensearch_handler.opensearch.indices.create(index=index_name, body=mapping)
+    # except Exception as e:
+    #     print(f"[WARNING] Could not create index: {e}")
     return logger
