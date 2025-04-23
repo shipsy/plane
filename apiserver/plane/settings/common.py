@@ -90,6 +90,7 @@ MIDDLEWARE = [
     "crum.CurrentRequestUserMiddleware",
     "django.middleware.gzip.GZipMiddleware",
     "plane.middleware.api_log_middleware.APITokenLogMiddleware",
+    "plane.app.middleware.api_logging_middleware.APILoggingMiddleware",
 ]
 
 # Rest Framework settings
@@ -455,3 +456,10 @@ ATTACHMENT_MIME_TYPES = [
     "text/csv",
     "application/xml",
 ]
+
+# Opensearch setting
+OPENSEARCH_HOST = os.environ.get('OPENSEARCH_HOST', 'opensearch-node1')
+OPENSEARCH_PORT = os.environ.get('OPENSEARCH_PORT', 9200)
+OPENSEARCH_SCHEME = os.environ.get('OPENSEARCH_SCHEME', 'http')
+OPENSEARCH_USERNAME = os.environ.get('OPENSEARCH_USERNAME', 'admin')
+OPENSEARCH_PASSWORD = os.environ.get('OPENSEARCH_PASSWORD', 'admin')

@@ -3,3 +3,4 @@
 django-debug-toolbar==4.3.0
 # formatter
 ruff==0.4.2
+opensearch-py==2.7.1

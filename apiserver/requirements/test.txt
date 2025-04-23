@@ -2,3 +2,4 @@
 # test checker
 pytest==7.1.2
 coverage==6.5.0
+opensearch-py==2.7.1

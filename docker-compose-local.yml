@@ -104,6 +104,7 @@ services:
     restart: unless-stopped
     networks:
       - dev_env
+      - opensearch-net  # Added OpenSearch network here
     volumes:
       - ./apiserver:/code
     command: ./bin/docker-entrypoint-api-local.sh
@@ -124,6 +125,7 @@ services:
     restart: unless-stopped
     networks:
       - dev_env
+      - opensearch-net  # Added OpenSearch network here too since worker may need to log
     volumes:
       - ./apiserver:/code
     command: ./bin/docker-entrypoint-worker.sh
@@ -143,6 +145,7 @@ services:
     restart: unless-stopped
     networks:
       - dev_env
+      - opensearch-net  # Added OpenSearch network here too since beat-worker may need to log
     volumes:
       - ./apiserver:/code
     command: ./bin/docker-entrypoint-beat.sh
@@ -200,3 +203,6 @@ volumes:
 networks:
   dev_env:
     driver: bridge
+  opensearch-net:
+    external: true  # This connects to the existing OpenSearch network
+    name: plane_opensearch-net
