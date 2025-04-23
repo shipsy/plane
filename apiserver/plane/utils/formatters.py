@@ -20,7 +20,7 @@ class APILogStandardFormatter(logging.Formatter):
             'method': message_dict.get('method'),
             'url': message_dict.get('url'),
             'query': json.dumps(message_dict.get('query', {})),  # Convert to string
-            'body': json.dumps(message_dict.get('body')) if message_dict.get('request_body') else None,
+            'body': json.dumps(message_dict.get('body')) if message_dict.get('body') else None,
             'response': json.dumps(message_dict.get('response')) if message_dict.get('response') else None,
             'status_code': message_dict.get('status_code'),
             'duration': message_dict.get('duration'),
