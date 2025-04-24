@@ -2,12 +2,14 @@ import time
 import logging
 import json
 from django.utils import timezone
+from django.conf import settings
 from plane.utils.logginglogging import setup_api_logging
+OPENSEARCH_APPLOG_INDEX = getattr(settings, 'OPENSEARCH_APPLOG_INDEX', 'plane-api-logs')
 class APILoggingMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
         # We'll initialize the logger after creating the logging setup
-        self.logger = setup_api_logging(logging.getLogger('plane.app'), 'plane-api-logs')
+        self.logger = setup_api_logging(logging.getLogger('plane.app'), OPENSEARCH_APPLOG_INDEX)
         # self.logger.handlers[0].flush()
     def __call__(self, request):
         start_time = time.time()

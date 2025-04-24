@@ -19,9 +19,9 @@ OPENSEARCH_PUSH_METHOD = getattr(settings, 'OPENSEARCH_PUSH_METHOD', 'opensearch
 OPENSEARCH_HOST = getattr(settings, 'OPENSEARCH_HOST', 'opensearch-node1')  # Updated to use container name
 OPENSEARCH_PORT = getattr(settings, 'OPENSEARCH_PORT', 9200)
 OPENSEARCH_SCHEME = getattr(settings, 'OPENSEARCH_SCHEME', 'http')
-OPENSEARCH_USERNAME = getattr(settings, 'OPENSEARCH_USERNAME', 'admin')  # Updated credentials
-OPENSEARCH_PASSWORD = getattr(settings, 'OPENSEARCH_PASSWORD', 'admin')  # Updated credentials
-APP_LOGS_CAPACITY = getattr(settings, 'APP_LOGS_CAPACITY', 50)  # Keep your increased capacity
+OPENSEARCH_USERNAME = getattr(settings, 'OPENSEARCH_USERNAME', '')  # Updated credentials
+OPENSEARCH_PASSWORD = getattr(settings, 'OPENSEARCH_PASSWORD', '')  # Updated credentials
+APP_LOGS_CAPACITY = getattr(settings, 'APP_LOGS_CAPACITY', 5)  # Keep your increased capacity
 OPENSEARCH_APPLOG_INDEX = getattr(settings, 'OPENSEARCH_APPLOG_INDEX', 'plane-api-logs')
 
 #Firehose Settings 
@@ -261,28 +261,4 @@ def setup_api_logging(logger, index_name):
     # Add handler to logger
     logger.addHandler(memory_handler)
     logger.setLevel(logging.DEBUG)
-    
-    # # Create index if it doesn't exist
-    # try:
-    #     if not opensearch_handler.opensearch.indices.exists(index=index_name):
-    #         mapping = {
-    #             "mappings": {
-    #                 "properties": {
-    #                     "timestamp": {"type": "date"},
-    #                     "request_id": {"type": "keyword"},
-    #                     "username": {"type": "keyword"},
-    #                     "request_method": {"type": "keyword"},
-    #                     "request_path": {"type": "keyword"},
-    #                     "request_query": {"type": "object"},
-    #                     "request_body": {"type": "object", "enabled": False},
-    #                     "status_code": {"type": "integer"},
-    #                     "duration": {"type": "float"},
-    #                     "client_ip": {"type": "ip"},
-    #                     "user_agent": {"type": "text"}
-    #                 }
-    #             }
-    #         }
-    #         opensearch_handler.opensearch.indices.create(index=index_name, body=mapping)
-    # except Exception as e:
-    #     print(f"[WARNING] Could not create index: {e}")
     return logger
