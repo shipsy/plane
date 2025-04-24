@@ -463,11 +463,12 @@ OPENSEARCH_PORT = os.environ.get('OPENSEARCH_PORT', 9200)
 OPENSEARCH_SCHEME = os.environ.get('OPENSEARCH_SCHEME', 'http')
 OPENSEARCH_USERNAME = os.environ.get('OPENSEARCH_USERNAME', '')
 OPENSEARCH_PASSWORD = os.environ.get('OPENSEARCH_PASSWORD', '')
+OPENSEARCH_INDEX_SUFFIX = os.environ.get('OPENSEARCH_INDEX_SUFFIX', 'local')
 APP_LOGS_CAPACITY = int(os.environ.get('APP_LOGS_CAPACITY', 5))
 
 OPENSEARCH_PUSH_METHOD = os.environ.get('OPENSEARCH_PUSH_METHOD', 'opensearch') #options are opensearch, firehose
 OPENSEARCH_AUTH_METHOD = os.environ.get('OPENSEARCH_AUTH_METHOD', 'basic') #options are basic, iam
-OPENSEARCH_APPLOG_INDEX = os.environ.get('OPENSEARCH_APPLOG_INDEX', 'plane-api-logs')
+OPENSEARCH_APPLOG_INDEX = 'plane-demo-' + OPENSEARCH_INDEX_SUFFIX
 
 FIREHOSE_REGION_NAME = os.environ.get('FIREHOSE_REGION_NAME', 'ap-south-1')
 FIREHOSE_ACCESS_KEY_ID = os.environ.get('FIREHOSE_ACCESS_KEY_ID', '')

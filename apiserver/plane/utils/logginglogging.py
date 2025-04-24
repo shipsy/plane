@@ -22,7 +22,7 @@ OPENSEARCH_SCHEME = getattr(settings, 'OPENSEARCH_SCHEME', 'http')
 OPENSEARCH_USERNAME = getattr(settings, 'OPENSEARCH_USERNAME', '')  # Updated credentials
 OPENSEARCH_PASSWORD = getattr(settings, 'OPENSEARCH_PASSWORD', '')  # Updated credentials
 APP_LOGS_CAPACITY = getattr(settings, 'APP_LOGS_CAPACITY', 5)  # Keep your increased capacity
-OPENSEARCH_APPLOG_INDEX = getattr(settings, 'OPENSEARCH_APPLOG_INDEX', 'plane-api-logs')
+OPENSEARCH_APPLOG_INDEX = getattr(settings, 'OPENSEARCH_APPLOG_INDEX', 'logs')
 
 #Firehose Settings 
 FIREHOSE_REGION_NAME = getattr(settings, 'FIREHOSE_REGION_NAME', 'ap-south-1')
