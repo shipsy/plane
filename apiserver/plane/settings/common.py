@@ -463,3 +463,11 @@ OPENSEARCH_PORT = os.environ.get('OPENSEARCH_PORT', 9200)
 OPENSEARCH_SCHEME = os.environ.get('OPENSEARCH_SCHEME', 'http')
 OPENSEARCH_USERNAME = os.environ.get('OPENSEARCH_USERNAME', 'admin')
 OPENSEARCH_PASSWORD = os.environ.get('OPENSEARCH_PASSWORD', 'admin')
+
+OPENSEARCH_PUSH_METHOD = os.environ.get('OPENSEARCH_PUSH_METHOD', 'opensearch') #options are opensearch, firehose
+OPENSEARCH_AUTH_METHOD = os.environ.get('OPENSEARCH_AUTH_METHOD', 'basic') #options are basic, iam
+FIREHOSE_REGION_NAME = os.environ.get('FIREHOSE_REGION_NAME', 'ap-south-1')
+FIREHOSE_ACCESS_KEY_ID = os.environ.get('FIREHOSE_ACCESS_KEY_ID', '')
+FIREHOSE_SECRET_ACCESS_KEY = os.environ.get('FIREHOSE_SECRET_ACCESS_KEY', '')
+FIREHOSE_RETRY_COUNT = int(os.environ.get('FIREHOSE_RETRY_COUNT', 3))
+FIREHOSE_RETRY_DELAY = int(os.environ.get('FIREHOSE_RETRY_DELAY', 1))
