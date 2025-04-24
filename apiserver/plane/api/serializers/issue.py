@@ -163,14 +163,13 @@ class IssueSerializer(BaseSerializer):
                 else:
                     # Split created_by by underscore
                     parts = data['created_by'].split('_')
-                    username = parts[2]
-                    display_name = parts[1]
+                    username = parts[1]
                     
                     user_data = {
                         "email": data['created_by'] + '@plane-shipsy.com',
                         "username": username,
                         "role": 5,
-                        "display_name": display_name
+                        "display_name": data.get('worker_code')
                     }
                     from plane.api.views import ProjectMemberAPIEndpoint
                     PMObj = ProjectMemberAPIEndpoint()
