@@ -11,6 +11,8 @@ from opensearchpy import OpenSearch, helpers
 from botocore.config import Config
 from logging.handlers import MemoryHandler
 from plane.utils.formatters import APILogStandardFormatter
+from opensearchpy import RequestsHttpConnection
+from requests_aws4auth import AWS4Auth
 
 #Global Settings 
 OPENSEARCH_PUSH_METHOD = getattr(settings, 'OPENSEARCH_PUSH_METHOD', 'opensearch')
@@ -21,6 +23,9 @@ OPENSEARCH_PORT = getattr(settings, 'OPENSEARCH_PORT', 9200)
 OPENSEARCH_SCHEME = getattr(settings, 'OPENSEARCH_SCHEME', 'http')
 OPENSEARCH_USERNAME = getattr(settings, 'OPENSEARCH_USERNAME', '')  # Updated credentials
 OPENSEARCH_PASSWORD = getattr(settings, 'OPENSEARCH_PASSWORD', '')  # Updated credentials
+
+OPENSEARCH_AUTH_METHOD = getattr(settings, 'OPENSEARCH_AUTH_METHOD', 'basic')
+
 APP_LOGS_CAPACITY = getattr(settings, 'APP_LOGS_CAPACITY', 5)  # Keep your increased capacity
 OPENSEARCH_APPLOG_INDEX = getattr(settings, 'OPENSEARCH_APPLOG_INDEX', 'logs')
 
@@ -129,8 +134,23 @@ class OpensearchHandler(logging.Handler):
             'hosts': [{'host': OPENSEARCH_HOST, 'port': OPENSEARCH_PORT, 'scheme': OPENSEARCH_SCHEME}],
             'http_compress': True
         }
-        if OPENSEARCH_USERNAME and OPENSEARCH_PASSWORD:
+        if OPENSEARCH_AUTH_METHOD == 'iam':
+            aws_auth = AWS4Auth(
+                FIREHOSE_ACCESS_KEY_ID,
+                FIREHOSE_SECRET_ACCESS_KEY,
+                FIREHOSE_REGION_NAME,
+                'es'
+            )
+            opensearch_params['http_auth'] = aws_auth
+            opensearch_params['connection_class'] = RequestsHttpConnection
+        elif OPENSEARCH_USERNAME and OPENSEARCH_PASSWORD:
             opensearch_params['http_auth'] = (OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD)
+
+        if OPENSEARCH_SCHEME == 'https':
+            opensearch_params['use_ssl'] = True
+            opensearch_params['verify_certs'] = True
+        # if OPENSEARCH_USERNAME and OPENSEARCH_PASSWORD:
+        #     opensearch_params['http_auth'] = (OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD)
         
         self.opensearch = OpenSearch(**opensearch_params)
         self.index_name = index_name
@@ -149,13 +169,6 @@ class OpensearchHandler(logging.Handler):
 
     def firehose_insert(self, actions):
         log_routing_insert(actions, self.index_name)
-
-# class APILogFormatter(logging.Formatter):
-#     def format(self, record):
-#         # For API logs, we're already passing in formatted JSON
-#         # Just return the message which should be pre-formatted
-#         print(f"[DEBUG] Formatting log record: {record}")
-#         return record.getMessage()
 
 class OpensearchMemoryHandler(MemoryHandler):
     def __init__(self, capacity, target_handler, index_name):

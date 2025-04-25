@@ -458,19 +458,18 @@ ATTACHMENT_MIME_TYPES = [
 ]
 
 # Opensearch setting
-OPENSEARCH_HOST = os.environ.get('OPENSEARCH_HOST', 'opensearch-node1')
-OPENSEARCH_PORT = os.environ.get('OPENSEARCH_PORT', 9200)
-OPENSEARCH_SCHEME = os.environ.get('OPENSEARCH_SCHEME', 'http')
-OPENSEARCH_USERNAME = os.environ.get('OPENSEARCH_USERNAME', '')
-OPENSEARCH_PASSWORD = os.environ.get('OPENSEARCH_PASSWORD', '')
-OPENSEARCH_INDEX_SUFFIX = os.environ.get('OPENSEARCH_INDEX_SUFFIX', 'local')
-APP_LOGS_CAPACITY = int(os.environ.get('APP_LOGS_CAPACITY', 5))
+OPENSEARCH_HOST = os.environ.get('OPENSEARCH_HOST', 'host.docker.internal')
+OPENSEARCH_PORT = os.environ.get('OPENSEARCH_PORT', 443)
+OPENSEARCH_SCHEME = os.environ.get('OPENSEARCH_SCHEME', 'https')
+OPENSEARCH_USERNAME = os.environ.get('OPENSEARCH_USERNAME', None)
+OPENSEARCH_PASSWORD = os.environ.get('OPENSEARCH_PASSWORD', None)
+APP_LOGS_CAPACITY = int(os.environ.get('APP_LOGS_CAPACITY', 50))
 
 OPENSEARCH_PUSH_METHOD = os.environ.get('OPENSEARCH_PUSH_METHOD', 'opensearch') #options are opensearch, firehose
 OPENSEARCH_AUTH_METHOD = os.environ.get('OPENSEARCH_AUTH_METHOD', 'basic') #options are basic, iam
-OPENSEARCH_APPLOG_INDEX = 'plane-demo-' + OPENSEARCH_INDEX_SUFFIX
+OPENSEARCH_APPLOG_INDEX = os.environ.get('OPENSEARCH_APPLOG_INDEX','plane-application-demo')
 
-FIREHOSE_REGION_NAME = os.environ.get('FIREHOSE_REGION_NAME', 'ap-south-1')
+FIREHOSE_REGION_NAME = os.environ.get('FIREHOSE_REGION_NAME', 'us-west-2')
 FIREHOSE_ACCESS_KEY_ID = os.environ.get('FIREHOSE_ACCESS_KEY_ID', '')
 FIREHOSE_SECRET_ACCESS_KEY = os.environ.get('FIREHOSE_SECRET_ACCESS_KEY', '')
 FIREHOSE_RETRY_COUNT = int(os.environ.get('FIREHOSE_RETRY_COUNT', 3))
