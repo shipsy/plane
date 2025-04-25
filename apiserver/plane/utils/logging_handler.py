@@ -208,11 +208,9 @@ def log_worker():
     print("[INFO] Log worker thread started")
     while True:
         total_queues = len(log_routing)
-        print(f"[DEBUG] Checking {total_queues} log queues")
         for index_name, log_queue in list(log_routing.items()):
             try:
                 queue_size = log_queue.qsize()
-                print(f"[DEBUG] Queue '{index_name}' size: {queue_size}")
                 if not log_queue.empty():
                     print("Processing log queue for", index_name)
                     print(f"Queue length for {index_name}: {log_queue.qsize()}")

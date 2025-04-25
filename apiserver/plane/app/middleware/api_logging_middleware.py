@@ -3,7 +3,7 @@ import logging
 import json
 from django.utils import timezone
 from django.conf import settings
-from apiserver.plane.utils.logging_handler import setup_api_logging
+from plane.utils.logging_handler import setup_api_logging
 OPENSEARCH_APPLOG_INDEX = getattr(settings, 'OPENSEARCH_APPLOG_INDEX', 'logs')
 class APILoggingMiddleware:
     def __init__(self, get_response):
@@ -24,7 +24,6 @@ class APILoggingMiddleware:
          # Initialize error fields as None
         error_message = None
         error_reason = None
-        error_stack = None
         try:
             # Process the request and get the response
             response = self.get_response(request)
@@ -58,7 +57,6 @@ class APILoggingMiddleware:
             # Capture exceptions that occur during processing
             error_message = str(e)
             error_reason = e.__class__.__name__
-            error_stack = traceback.format_exc()
             status_code = 500
             # Create a response for the exception
             from django.http import JsonResponse
@@ -92,9 +90,6 @@ class APILoggingMiddleware:
                     'reason': error_reason
                 }
 
-            print("\n=== API REQUEST LOG ===")
-            print(json.dumps(log_data, indent=2, default=str))
-            print("======================\n")
             self.logger.info(json.dumps(log_data, default=str))
 
         return response
