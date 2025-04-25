@@ -119,12 +119,6 @@ class FireHoseHandler(logging.Handler):
                 else:
                     # If we've exhausted all retries, clear the batch to prevent backlog
                     actions.clear()
-
-        # #Write to CloudWatch and Move on
-        # if failed_records:
-        #     from wms_base.wms_utils import cloudwatch_logger
-        #     for action in failed_records:
-        #          cloudwatch_logger.error(f"Failed to bulk insert log to Opensearch: {str(e)} Action: {action}")
     
 class OpensearchHandler(logging.Handler):
     def __init__(self, index_name='plane-api-logs'):
@@ -149,8 +143,6 @@ class OpensearchHandler(logging.Handler):
         if OPENSEARCH_SCHEME == 'https':
             opensearch_params['use_ssl'] = True
             opensearch_params['verify_certs'] = True
-        # if OPENSEARCH_USERNAME and OPENSEARCH_PASSWORD:
-        #     opensearch_params['http_auth'] = (OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD)
         
         self.opensearch = OpenSearch(**opensearch_params)
         self.index_name = index_name

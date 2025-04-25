@@ -3,7 +3,7 @@ import logging
 import json
 from django.utils import timezone
 from django.conf import settings
-from plane.utils.logginglogging import setup_api_logging
+from apiserver.plane.utils.logging_handler import setup_api_logging
 OPENSEARCH_APPLOG_INDEX = getattr(settings, 'OPENSEARCH_APPLOG_INDEX', 'logs')
 class APILoggingMiddleware:
     def __init__(self, get_response):
