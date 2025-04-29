@@ -120,7 +120,7 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
             )
             .filter(**filters)
             .select_related("workspace", "project", "state", "parent")
-            .prefetch_related("assignees", "labels", "issue_module__module")
+            .prefetch_related("assignees", "labels", "issue_module__module", "issue_type")
             .annotate(
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(

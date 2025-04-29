@@ -70,6 +70,7 @@ def get_default_display_properties():
         "estimate": True,
         "key": True,
         "labels": True,
+        "issue_type" : True,
         "link": True,
         "priority": True,
         "start_date": True,
