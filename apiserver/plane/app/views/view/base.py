@@ -42,7 +42,8 @@ from plane.db.models import (
     ProjectMember,
     Project,
     CycleIssue,
-    IssueCustomProperty
+    IssueCustomProperty,
+    IssueType
 )
 from plane.utils.grouper import (
     issue_group_values,
@@ -293,6 +294,9 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                     ),
                     Value([], output_field=ArrayField(UUIDField())),
                 ),
+                issue_type_name = IssueType.objects.filter(
+                    id = OuterRef("type")    
+                ).values("name"),
                 custom_propertiess=Coalesce(
                     ArrayAgg(
                         Func(
