@@ -50,6 +50,7 @@ from plane.db.models import (
     ProjectMember,
     CycleIssue,
     IssueCustomProperty,
+    IssueType
 )
 from plane.utils.grouper import (
     issue_group_values,
@@ -272,6 +273,11 @@ class IssueViewSet(BaseViewSet):
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
+            )
+            .annotate(
+                issue_type_name = IssueType.objects.filter(
+                    id = OuterRef("type")    
+                ).values("name")
             )
             .annotate(
                 custom_propertiess=Coalesce(
