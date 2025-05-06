@@ -121,6 +121,7 @@ const whileListedCustomProperties = [
   { key: "vendor_code", title: "Vendor Code" },
   { key: "worker_code", title: "Worker Code" },
   { key: "worker_name", title: "Worker Name" },
+  { key: "issue_type_name", title: "Issue Type"}  
 ];
 
 export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = [
@@ -150,6 +151,7 @@ export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = 
   "vendor_code",
   "worker_code",
   "worker_name",
+  "issue_type_name"
 ];
 
 export const ISSUE_DISPLAY_PROPERTIES: {
@@ -180,6 +182,7 @@ export const ISSUE_DISPLAY_PROPERTIES: {
   { key: "vendor_code", title: "Vendor Code" },
   { key: "worker_code", title: "Worker Code" },
   { key: "worker_name", title: "Worker Name" },
+  { key: "issue_type_name", title: "Issue Type"}
 ];
 
 export const ISSUE_EXTRA_OPTIONS: {
@@ -347,6 +350,7 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
         "vendor_code",
         "trip_reference_number",
         "reference_number",
+        "issue_type_name",
         "custom_properties",
       ],
       display_properties: ISSUE_DISPLAY_PROPERTIES_KEYS,
@@ -401,6 +405,7 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
         "vendor_code",
         "trip_reference_number",
         "reference_number",
+        "issue_type_name",
         "custom_properties"
       ],
       display_properties: ISSUE_DISPLAY_PROPERTIES_KEYS,
@@ -482,7 +487,8 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
         "vendor_code",
         "trip_reference_number",
         "reference_number",
-        "custom_properties"
+        "custom_properties",
+        "issue_type_name"
       ],
       display_properties: ISSUE_DISPLAY_PROPERTIES_KEYS,
       display_filters: {
@@ -563,5 +569,6 @@ export const ISSUE_ADDITIONAL_PROPERTIES: {
     { key: "vendor_code", title: "Vendor Code" },
     { key: "vendor_name", title: "Vendor Name" },
     { key: "worker_code", title: "Worker Code" },
-    { key: "worker_name", title: "Worker Name" }
+    { key: "worker_name", title: "Worker Name" },
+    { key: "issue_type_name", title: "Issue Type" }
   ];

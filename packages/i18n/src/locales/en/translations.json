@@ -339,6 +339,7 @@
   "sub_issue_count": "Sub-issue",
   "trip_reference_number": "Trip Ref Number",
   "reference_number": "Reference Number",
+  "issue_type_name": "Issue Type",
   "hub_code": "Hub Code",
   "hub_name": "Hub Name",
   "customer_code": "Customer Code",

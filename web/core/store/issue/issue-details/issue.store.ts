@@ -187,7 +187,8 @@ export class IssueStore implements IIssueStore {
       reference_number: issue?.reference_number, 
       trip_reference_number: issue?.trip_reference_number, 
       vendor_code: issue?.vendor_code, 
-      worker_code: issue?.worker_code
+      worker_code: issue?.worker_code,
+      issue_type_name: issue?.issue_type_name
     };
 
     this.rootIssueDetailStore.rootIssueStore.issues.addIssue([issuePayload]);
