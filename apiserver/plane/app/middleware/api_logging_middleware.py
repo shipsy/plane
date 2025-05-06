@@ -4,6 +4,7 @@ import json
 from django.utils import timezone
 from django.conf import settings
 from plane.utils.logging_handler import setup_api_logging
+from django.http import JsonResponse
 OPENSEARCH_APPLOG_INDEX = getattr(settings, 'OPENSEARCH_APPLOG_INDEX', 'logs')
 class APILoggingMiddleware:
     def __init__(self, get_response):
@@ -58,7 +59,6 @@ class APILoggingMiddleware:
             status_code = 500
             response_data = {"error": str(e)}
             # Create a response for the exception
-            from django.http import JsonResponse
             response = JsonResponse({"error": str(e)}, status=500)
             
         duration = time.time() - start_time
