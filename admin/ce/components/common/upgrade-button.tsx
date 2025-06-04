@@ -4,7 +4,7 @@ import React from "react";
 // icons
 import { SquareArrowOutUpRight } from "lucide-react";
 // ui
-import { getButtonStyling } from "@plane/ui";
+// import { getButtonStyling } from "@plane/ui";
 // helpers
 import { cn } from "@/helpers/common.helper";
 
