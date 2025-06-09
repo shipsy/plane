@@ -86,7 +86,8 @@ class BaseAPIView(TimezoneMixin, APIView, BasePaginator):
                 )
 
             if isinstance(e, ValidationError):
-                import traceback; traceback.print_exc()
+                import traceback
+                traceback.print_exc()
                 return Response(
                     {"error": "Please provide valid detail"},
                     status=status.HTTP_400_BAD_REQUEST,

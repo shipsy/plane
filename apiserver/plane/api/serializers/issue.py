@@ -36,6 +36,7 @@ from django.core.validators import URLValidator
 def is_uuid(value):
     try:
         uuid_obj = uuid.UUID(str(value))  # Convert to string in case it's not already
+        print(uuid_obj)
         return True
     except (ValueError, TypeError):
         return False
