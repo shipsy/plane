@@ -161,7 +161,7 @@ Each object in `custom_properties` can have:
 - If `assignees` is not provided, the default assignee(s) for the project will be used, if configured. Otherwise, it may be empty.
 - Other optional fields, if not provided, will generally be `null` or an empty equivalent (e.g., empty array for `labels`).
 
-### Notes
+### Validations
 
 - If `created_by` is not provided, the current authenticated user is used.
 - If `assignees` is not provided, the default assignee for the project is used (if set).
@@ -621,3 +621,315 @@ PATCH /api/v1/workspaces/{slug}/projects/{project_id}/issues/{issue_id}/
   // ... other fields ...
 }
 ```
+
+## Delete Issue API
+
+**Endpoint:**
+
+```text
+DELETE /api/v1/workspaces/{slug}/projects/{project_id}/issues/{issue_id}/
+```
+
+### Delete Issue API Path Parameters
+
+| Parameter   | Type | Description    |
+|-------------|------|----------------|
+| slug        | str  | Workspace slug |
+| project_id  | UUID | Project ID     |
+| issue_id    | UUID | Issue ID       |
+
+### Delete Issue API Response Codes
+
+- **204 No Content**: Issue was successfully deleted.
+- **401 Unauthorized**: If authentication is missing or invalid.
+- **403 Forbidden**: If the authenticated user does not have permission to delete the issue.
+- **404 Not Found**: If the issue with the given `issue_id` does not exist or is not accessible.
+
+## Bulk Delete Issues API
+
+**Endpoint:**
+
+```text
+DELETE /api/v1/workspaces/{slug}/projects/{project_id}/bulk-delete-issues/
+```
+
+### Bulk Delete Issues API Path Parameters
+
+| Parameter   | Type | Description    |
+|-------------|------|----------------|
+| slug        | str  | Workspace slug |
+| project_id  | UUID | Project ID     |
+
+### Bulk Delete Issues API Request Body
+
+```json
+{
+  "issue_ids": ["uuid1", "uuid2", "uuid3"]
+}
+```
+
+### Bulk Delete Issues API Response Codes
+
+- **200 OK**: Returns a success message with the number of issues deleted.
+- **400 Bad Request**: If no issue IDs are provided or if the request is malformed.
+- **401 Unauthorized**: If authentication is missing or invalid.
+- **403 Forbidden**: If the authenticated user does not have permission to delete issues.
+
+### Bulk Delete Issues API Example Response
+
+```json
+{
+  "message": "3 issues were deleted"
+}
+```
+
+## Issue Attachments API
+
+### Upload Attachment
+
+**Endpoint:**
+
+```text
+POST /api/v1/workspaces/{slug}/projects/{project_id}/issues/{issue_id}/issue-attachments/
+```
+
+### Upload Attachment Path Parameters
+
+| Parameter   | Type | Description    |
+|-------------|------|----------------|
+| slug        | str  | Workspace slug |
+| project_id  | UUID | Project ID     |
+| issue_id    | UUID | Issue ID       |
+
+### Upload Attachment Request Body
+
+```json
+{
+  "name": "filename.pdf",
+  "type": "application/pdf",
+  "size": 1024
+}
+```
+
+### Upload Attachment Response Codes
+
+- **200 OK**: Returns the upload data including presigned URL and attachment details.
+- **400 Bad Request**: If the file type is invalid or size exceeds the limit.
+- **401 Unauthorized**: If authentication is missing or invalid.
+- **403 Forbidden**: If the authenticated user does not have permission to upload attachments.
+
+### Upload Attachment Example Response
+
+```json
+{
+  "upload_data": {
+    "url": "https://s3-presigned-url",
+    "fields": {
+      "key": "workspace-id/uuid-filename.pdf",
+      "policy": "...",
+      "signature": "..."
+    }
+  },
+  "asset_id": "asset-uuid",
+  "attachment": {
+    "id": "attachment-uuid",
+    "name": "filename.pdf",
+    "type": "application/pdf",
+    "size": 1024,
+    "asset_url": "https://asset-url"
+  },
+  "asset_url": "https://asset-url"
+}
+```
+
+### List Attachments
+
+**Endpoint:**
+
+```text
+GET /api/v1/workspaces/{slug}/projects/{project_id}/issues/{issue_id}/issue-attachments/
+```
+
+### List Attachments Path Parameters
+
+| Parameter   | Type | Description    |
+|-------------|------|----------------|
+| slug        | str  | Workspace slug |
+| project_id  | UUID | Project ID     |
+| issue_id    | UUID | Issue ID       |
+
+### List Attachments Response Codes
+
+- **200 OK**: Returns a list of attachments.
+- **401 Unauthorized**: If authentication is missing or invalid.
+- **403 Forbidden**: If the authenticated user does not have permission to view attachments.
+- **404 Not Found**: If the issue does not exist.
+
+### List Attachments Example Response
+
+```json
+[
+  {
+    "id": "attachment-uuid",
+    "name": "filename.pdf",
+    "type": "application/pdf",
+    "size": 1024,
+    "asset_url": "https://asset-url",
+    "created_at": "2024-06-01T12:00:00Z",
+    "updated_at": "2024-06-01T12:00:00Z"
+  }
+]
+```
+
+### Delete Attachment
+
+**Endpoint:**
+
+```text
+DELETE /api/v1/workspaces/{slug}/projects/{project_id}/issues/{issue_id}/issue-attachments/{attachment_id}/
+```
+
+### Delete Attachment Path Parameters
+
+| Parameter      | Type | Description     |
+|----------------|------|-----------------|
+| slug           | str  | Workspace slug  |
+| project_id     | UUID | Project ID      |
+| issue_id       | UUID | Issue ID        |
+| attachment_id  | UUID | Attachment ID   |
+
+### Delete Attachment Response Codes
+
+- **204 No Content**: Attachment was successfully deleted.
+- **401 Unauthorized**: If authentication is missing or invalid.
+- **403 Forbidden**: If the authenticated user does not have permission to delete the attachment.
+- **404 Not Found**: If the attachment does not exist.
+
+### Uploading Images to Issues
+
+To upload an image to an issue, follow these steps:
+
+1.First, make a POST request to get the upload URL:
+
+```text
+POST /api/v1/workspaces/{slug}/projects/{project_id}/issues/{issue_id}/issue-attachments/
+```
+
+Request body:
+
+```json
+{
+  "name": "image.jpg",
+  "type": "image/jpeg",  // or "image/png", "image/gif", etc.
+  "size": 1024  // size in bytes
+}
+```
+
+2.The response will contain a presigned URL and upload fields. Use these to upload the image file directly to the storage service. (use `response.upload_data.url`)
+
+3.After successful upload, the image will be available at the `asset_url` provided in the response.
+
+4.To validate if the image was uploaded successfully, make a PATCH request to update the upload status:
+
+```text
+PATCH /api/v1/workspaces/{slug}/projects/{project_id}/issues/{issue_id}/issue-attachments/{asset_id}/
+```
+
+This endpoint will:
+
+- Mark the attachment as uploaded
+- Generate storage metadata
+- Create an activity log entry
+- Return a 204 No Content response if successful
+
+Response codes:
+
+- **204 No Content**: Image was successfully uploaded and validated
+- **400 Bad Request**: If the asset_id is invalid
+- **401 Unauthorized**: If authentication is missing or invalid
+- **403 Forbidden**: If the authenticated user does not have permission
+- **404 Not Found**: If the asset or issue does not exist
+
+Supported image formats:
+
+- JPEG/JPG
+- PNG
+- GIF
+- WebP
+- SVG
+
+Maximum file size limits:
+
+- Default: 5MB per file
+- Maximum: 10MB per file
+
+Note: The actual file upload is a two-step process:
+
+1. Get the presigned URL from the API
+2. Upload the file directly to the storage service using the presigned URL
+
+## Create Issue State API
+
+**Endpoint:**
+
+```text
+POST /api/v1/workspaces/{slug}/projects/{project_id}/states/
+```
+
+### Create Issue State Path Parameters
+
+| Parameter   | Type | Description    |
+|-------------|------|----------------|
+| slug        | str  | Workspace slug |
+| project_id  | UUID | Project ID     |
+
+### Create Issue State Request Body
+
+```json
+{
+  "name": "In Progress",
+  "color": "#ff0000",
+  "group": "started",
+  "description": "Issues that are currently being worked on"
+}
+```
+
+### Create Issue State Response Codes
+
+- **201 Created**: State was successfully created.
+- **400 Bad Request**: If the request data is invalid.
+- **401 Unauthorized**: If authentication is missing or invalid.
+- **403 Forbidden**: If the authenticated user does not have permission to create states.
+
+### Create Issue State Example Response
+
+```json
+{
+  "id": "state-uuid",
+  "name": "In Progress",
+  "color": "#ff0000",
+  "group": "started",
+  "description": "Issues that are currently being worked on",
+  "created_at": "2024-06-01T12:00:00Z",
+  "updated_at": "2024-06-01T12:00:00Z"
+}
+```
+
+### Notes
+
+1. For file attachments:
+   - Maximum file size is determined by the server settings
+   - Only certain file types are allowed (configured in server settings)
+   - Files are uploaded to S3 storage
+   - The upload process is two-step: first get a presigned URL, then upload the file
+
+2. For issue states:
+   - The `group` field must be one of: `backlog`, `unstarted`, `started`, `completed`, `cancelled`
+   - Color should be a valid hex color code
+   - States can be marked as default for the project
+   - States cannot be deleted if they contain issues
+
+3. For bulk delete:
+   - Only empty states can be deleted
+   - Default states cannot be deleted
+   - The operation is atomic - either all issues are deleted or none are
