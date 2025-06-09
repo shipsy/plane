@@ -27,6 +27,7 @@
   "packageManager": "yarn@1.22.22",
   "name": "plane",
   "dependencies": {
+    "esbuild": "^0.25.0",
     "@headlessui/react": "^2.2.4"
   }
 }

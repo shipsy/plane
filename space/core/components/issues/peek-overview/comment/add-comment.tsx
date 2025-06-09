@@ -5,7 +5,6 @@ import { observer } from "mobx-react";
 import { useForm, Controller } from "react-hook-form";
 // editor
 import { EditorRefApi } from "@plane/editor";
-import { useTranslation } from "@plane/i18n";
 // ui
 import { useTranslation } from "@plane/i18n";
 import { TOAST_TYPE, setToast } from "@plane/ui";
