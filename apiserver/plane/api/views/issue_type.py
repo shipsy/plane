@@ -104,6 +104,7 @@ class IssueTypeAPIEndpoint(BaseAPIView):
                 status=status.HTTP_409_CONFLICT,
             )
         workspace = Workspace.objects.get(slug=slug)
+        print(workspace)
         serializer = IssueTypeSerializer(
             data=request.data, 
             context={'workspace_id': workspace.id}
@@ -139,6 +140,7 @@ class IssueTypeAPIEndpoint(BaseAPIView):
             pk=pk,
         )
         requested_data = json.dumps(self.request.data, cls=DjangoJSONEncoder)
+        print(requested_data)
         current_instance = json.dumps(
             IssueTypeSerializer(issue_type).data,
             cls=DjangoJSONEncoder,
