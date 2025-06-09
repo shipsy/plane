@@ -6,6 +6,7 @@ import { observer } from "mobx-react";
 import { useRouter } from "next/navigation";
 import { useTranslation } from "@plane/i18n";
 // components
+import { useTranslation } from "@plane/i18n";
 import { FiltersDropdown } from "@/components/issues/filters/helpers/dropdown";
 import { FilterSelection } from "@/components/issues/filters/selection";
 // constants
@@ -16,7 +17,6 @@ import { queryParamGenerator } from "@/helpers/query-param-generator";
 import { useIssueFilter } from "@/hooks/store";
 // types
 import { TIssueQueryFilters } from "@/types/issue";
-
 
 type IssueFiltersDropdownProps = {
   anchor: string;
