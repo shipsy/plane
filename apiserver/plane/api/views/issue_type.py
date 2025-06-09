@@ -3,6 +3,7 @@ import json
 from django.core.serializers.json import DjangoJSONEncoder
 
 # Django imports
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import (
     Case,
@@ -142,7 +143,8 @@ class IssueTypeAPIEndpoint(BaseAPIView):
             IssueTypeSerializer(issue_comment).data,
             cls=DjangoJSONEncoder,
         )
-
+        print(requested_data)
+        print(current_instance)
         # Validation check if the issue already exists
         if (
             IssueType.objects.filter(
@@ -161,6 +163,7 @@ class IssueTypeAPIEndpoint(BaseAPIView):
         serializer = IssueTypeSerializer(
             issue_comment, data=request.data, partial=True
         )
+        print(issue_comment)
         if serializer.is_valid():
             serializer.save()
             # issue_activity.delay(
@@ -198,6 +201,7 @@ class IssueTypeAPIEndpoint(BaseAPIView):
 class IssueTypeCustomPropertyAPIEndpoint(BaseAPIView):
     def get(self, request, slug, issue_type, pk=None):
         workspace = Workspace.objects.get(slug=slug)
+        print(workspace)
         properties = IssueTypeCustomProperty.objects.filter(
             issue_type_id=issue_type
         )
