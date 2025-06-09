@@ -4,18 +4,23 @@ import React from "react";
 import { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import Head from "next/head";
 // ui
 import { Button } from "@plane/ui";
 // images
 import Image404 from "@/public/404.svg";
 
-export const metadata: Metadata = {
-  title: "404 - Page Not Found",
-};
+// export const metadata: Metadata = {
+//   title: "404 - Page Not Found",
+// };
 
 const PageNotFound = () => (
-  <div className={`h-screen w-full overflow-hidden bg-custom-background-100`}>
-    <div className="grid h-full place-items-center p-4">
+  <>
+    <Head>
+      <title>404 - Page Not Found</title>
+    </Head>
+    <div className={`h-screen w-full overflow-hidden bg-custom-background-100`}>
+      <div className="grid h-full place-items-center p-4">
       <div className="space-y-8 text-center">
         <div className="relative mx-auto h-60 w-60 lg:h-80 lg:w-80">
           <Image src={Image404} layout="fill" alt="404- Page not found" />
@@ -37,6 +42,7 @@ const PageNotFound = () => (
       </div>
     </div>
   </div>
+  </>
 );
 
 export default PageNotFound;
