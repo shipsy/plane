@@ -38,8 +38,8 @@ const GeneralSettingsPage = observer(() => {
   const isAdmin = allowPermissions(
     [EUserPermissions.ADMIN],
     EUserPermissionsLevel.PROJECT,
-    workspaceSlug.toString(),
-    projectId.toString()
+    workspaceSlug!.toString(),
+    projectId!.toString()
   );
 
   const pageTitle = currentProjectDetails?.name ? `${currentProjectDetails?.name} - General Settings` : undefined;

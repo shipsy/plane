@@ -11,5 +11,5 @@ import { BaseKanBanRoot } from "../base-kanban-root";
 export const ProjectViewKanBanLayout: React.FC = observer(() => {
   const { viewId } = useParams();
 
-  return <BaseKanBanRoot QuickActions={ProjectIssueQuickActions} viewId={viewId.toString()} />;
+  return <BaseKanBanRoot QuickActions={ProjectIssueQuickActions} viewId={viewId?.toString()} />;
 });

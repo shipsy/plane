@@ -29,7 +29,7 @@ export const WorkspaceSettingsSidebar = observer(() => {
           {WORKSPACE_SETTINGS_LINKS.map(
             (link) =>
               shouldRenderSettingLink(link.key) &&
-              allowPermissions(link.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug.toString()) && (
+              allowPermissions(link.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug!.toString()) && (
                 <Link key={link.key} href={`/${workspaceSlug}${link.href}`}>
                   <SidebarNavItem
                     key={link.key}

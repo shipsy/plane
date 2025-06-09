@@ -51,10 +51,10 @@ export const FavoriteFolder: React.FC<Props> = (props) => {
   const actionSectionRef = useRef<HTMLDivElement | null>(null);
   const elementRef = useRef<HTMLDivElement | null>(null);
 
-  !favorite.children && getGroupedFavorites(workspaceSlug.toString(), favorite.id);
+  !favorite.children && getGroupedFavorites(workspaceSlug!.toString(), favorite.id);
 
   const handleOnDrop = (source: string, destination: string) => {
-    moveFavorite(workspaceSlug.toString(), source, {
+    moveFavorite(workspaceSlug!.toString(), source, {
       parent: destination,
     })
       .then(() => {
@@ -74,7 +74,7 @@ export const FavoriteFolder: React.FC<Props> = (props) => {
   };
 
   const handleOnDropFolder = (payload: Partial<IFavorite>) => {
-    moveFavoriteFolder(workspaceSlug.toString(), favorite.id, payload)
+    moveFavoriteFolder(workspaceSlug!.toString(), favorite.id, payload)
       .then(() => {
         setToast({
           type: TOAST_TYPE.SUCCESS,
@@ -319,7 +319,7 @@ export const FavoriteFolder: React.FC<Props> = (props) => {
                   {uniqBy(favorite.children, "id").map((child) => (
                     <FavoriteRoot
                       key={child.id}
-                      workspaceSlug={workspaceSlug.toString()}
+                      workspaceSlug={workspaceSlug!.toString()}
                       favorite={child}
                       handleRemoveFromFavorites={handleRemoveFromFavorites}
                       handleRemoveFromFavoritesFolder={handleRemoveFromFavoritesFolder}

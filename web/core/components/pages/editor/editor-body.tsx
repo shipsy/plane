@@ -138,8 +138,8 @@ export const PageEditorBody: React.FC<Props> = observer((props) => {
       return {
         url: WS_LIVE_URL.toString(),
         queryParams: {
-          workspaceSlug: workspaceSlug?.toString(),
-          projectId: projectId?.toString(),
+          workspaceSlug: workspaceSlug!.toString(),
+          projectId: projectId!.toString(),
           documentType: "project_page",
         },
       };

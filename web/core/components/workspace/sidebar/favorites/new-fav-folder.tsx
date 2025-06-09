@@ -2,9 +2,9 @@ import { useEffect, useRef } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import { Controller, SubmitHandler, useForm } from "react-hook-form";
-import { useTranslation } from "@plane/i18n";
 // plane helpers
 import { useOutsideClickDetector } from "@plane/helpers";
+import { useTranslation } from "@plane/i18n";
 // plane ui
 import { FavoriteFolderIcon, Input, setToast, TOAST_TYPE } from "@plane/ui";
 // hooks
@@ -62,7 +62,7 @@ export const NewFavoriteFolder = observer((props: TProps) => {
         message: t("folder_name_cannot_be_empty"),
       });
 
-    addFavorite(workspaceSlug.toString(), formData)
+    addFavorite(workspaceSlug!.toString(), formData)
       .then(() => {
         setToast({
           type: TOAST_TYPE.SUCCESS,
@@ -100,7 +100,7 @@ export const NewFavoriteFolder = observer((props: TProps) => {
         message: t("folder_name_cannot_be_empty"),
       });
 
-    updateFavorite(workspaceSlug.toString(), favoriteId, payload)
+    updateFavorite(workspaceSlug!.toString(), favoriteId, payload)
       .then(() => {
         setToast({
           type: TOAST_TYPE.SUCCESS,

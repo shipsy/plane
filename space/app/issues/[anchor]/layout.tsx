@@ -14,15 +14,15 @@ import planeLogo from "@/public/plane-logo.svg";
 
 type Props = {
   children: React.ReactNode;
-  params: {
+  params: Promise<{
     anchor: string;
-  };
+  }>;
 };
 
-const IssuesLayout = observer((props: Props) => {
+const IssuesLayout = observer(async (props: Props) => {
   const { children, params } = props;
   // params
-  const { anchor } = params;
+  const { anchor } = await params;
   // store hooks
   const { fetchPublishSettings } = usePublishList();
   const publishSettings = usePublish(anchor);

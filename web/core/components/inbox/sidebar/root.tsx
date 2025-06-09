@@ -40,7 +40,7 @@ export const InboxSidebar: FC<IInboxSidebarProps> = observer((props) => {
   const { workspaceSlug, projectId, inboxIssueId, setIsMobileSidebar } = props;
   // ref
   const containerRef = useRef<HTMLDivElement>(null);
-  const [elementRef, setElementRef] = useState<HTMLDivElement | null>(null);
+  const elementRef = useRef<HTMLDivElement | null>(null);
   // store
   const { currentProjectDetails } = useProject();
   const {
@@ -61,7 +61,7 @@ export const InboxSidebar: FC<IInboxSidebarProps> = observer((props) => {
   }, [workspaceSlug, projectId, fetchInboxPaginationIssues]);
 
   // page observer
-  useIntersectionObserver(containerRef, elementRef, fetchNextPages, "20%");
+  useIntersectionObserver(containerRef, elementRef.current, fetchNextPages, "20%");
 
   useEffect(() => {
     if (workspaceSlug && projectId && currentTab && filteredInboxIssueIds.length > 0) {
@@ -140,7 +140,7 @@ export const InboxSidebar: FC<IInboxSidebarProps> = observer((props) => {
                 />
               </div>
             )}
-            <div ref={setElementRef}>
+            <div ref={elementRef}>
               {inboxIssuePaginationInfo?.next_page_results && (
                 <Loader className="mx-auto w-full space-y-4 py-4 px-2">
                   <Loader.Item height="64px" width="w-100" />

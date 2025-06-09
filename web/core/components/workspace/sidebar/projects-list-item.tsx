@@ -108,13 +108,13 @@ export const SidebarProjectsListItem: React.FC<Props> = observer((props) => {
   const isAdmin = allowPermissions(
     [EUserPermissions.ADMIN],
     EUserPermissionsLevel.PROJECT,
-    workspaceSlug.toString(),
+    workspaceSlug!.toString(),
     project?.id
   );
   const isAuthorized = allowPermissions(
     [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
     EUserPermissionsLevel.PROJECT,
-    workspaceSlug.toString(),
+    workspaceSlug!.toString(),
     project?.id
   );
 
@@ -477,7 +477,7 @@ export const SidebarProjectsListItem: React.FC<Props> = observer((props) => {
           >
             {isProjectListOpen && (
               <Disclosure.Panel as="div" className="flex flex-col gap-0.5 mt-1">
-                {navigation(workspaceSlug?.toString(), project?.id).map((item) => {
+                {navigation(workspaceSlug!.toString(), project!.id).map((item) => {
                   if (
                     (item.name === "Cycles" && !project.cycle_view) ||
                     (item.name === "Modules" && !project.module_view) ||
@@ -491,7 +491,7 @@ export const SidebarProjectsListItem: React.FC<Props> = observer((props) => {
                       {allowPermissions(
                         item.access,
                         EUserPermissionsLevel.PROJECT,
-                        workspaceSlug.toString(),
+                        workspaceSlug!.toString(),
                         project.id
                       ) && (
                         <Tooltip

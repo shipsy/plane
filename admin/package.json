@@ -12,7 +12,7 @@
     "lint:errors": "eslint . --ext .ts,.tsx --quiet"
   },
   "dependencies": {
-    "@headlessui/react": "^1.7.19",
+    "@headlessui/react": "^2.2.4",
     "@plane/constants": "*",
     "@plane/helpers": "*",
     "@plane/types": "*",
