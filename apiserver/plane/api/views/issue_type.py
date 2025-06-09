@@ -3,6 +3,7 @@ import json
 from django.core.serializers.json import DjangoJSONEncoder
 
 # Django imports
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import (
     Case,
@@ -103,6 +104,7 @@ class IssueTypeAPIEndpoint(BaseAPIView):
                 status=status.HTTP_409_CONFLICT,
             )
         workspace = Workspace.objects.get(slug=slug)
+        print(workspace)
         serializer = IssueTypeSerializer(
             data=request.data, 
             context={'workspace_id': workspace.id}
