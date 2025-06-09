@@ -140,7 +140,7 @@ class IssueTypeAPIEndpoint(BaseAPIView):
         )
         requested_data = json.dumps(self.request.data, cls=DjangoJSONEncoder)
         current_instance = json.dumps(
-            IssueTypeSerializer(issue_comment).data,
+            IssueTypeSerializer(issue_type).data,
             cls=DjangoJSONEncoder,
         )
         print(requested_data)
@@ -161,9 +161,8 @@ class IssueTypeAPIEndpoint(BaseAPIView):
             )
 
         serializer = IssueTypeSerializer(
-            issue_comment, data=request.data, partial=True
+            issue_type, data=request.data, partial=True
         )
-        print(issue_comment)
         if serializer.is_valid():
             serializer.save()
             # issue_activity.delay(
