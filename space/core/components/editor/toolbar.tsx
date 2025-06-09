@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 // editor
 import { EditorRefApi, TEditorCommands, TNonColorEditorCommands } from "@plane/editor";
-import { useTranslation } from "@plane/i18n";
 // ui
 import { useTranslation } from "@plane/i18n";
 import { Button, Tooltip } from "@plane/ui";
