@@ -38,7 +38,7 @@ export const IssueColumn = observer((props: Props) => {
   };
   
   const customPropertiesForSpreadsheet = Object.keys(
-    workspaceUserInfo[workspaceSlug?.toString()]?.default_props?.display_properties?.custom_properties || {}
+    workspaceUserInfo[workspaceSlug!.toString()]?.default_props?.display_properties?.custom_properties || {}
   );
   
   customPropertiesForSpreadsheet.forEach((propertyName) => {

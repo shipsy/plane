@@ -47,12 +47,12 @@ export const SidebarUserMenu = observer(() => {
 
   const notificationIndicatorElement = (
     <NotificationAppSidebarOption
-      workspaceSlug={workspaceSlug.toString()}
+      workspaceSlug={workspaceSlug!.toString()}
       isSidebarCollapsed={sidebarCollapsed ?? false}
     />
   );
 
-  const draftIssueCount = workspaceUserInfo[workspaceSlug.toString()]?.draft_issue_count;
+  const draftIssueCount = workspaceUserInfo[workspaceSlug!.toString()]?.draft_issue_count;
 
   return (
     <div
@@ -63,7 +63,7 @@ export const SidebarUserMenu = observer(() => {
       {SIDEBAR_USER_MENU_ITEMS.map((link) => {
         if (link.key === "drafts" && draftIssueCount === 0) return null;
         return (
-          allowPermissions(link.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug.toString()) && (
+          allowPermissions(link.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug!.toString()) && (
             <Tooltip
               key={link.key}
               tooltipContent={t(link.key)}

@@ -23,8 +23,8 @@ export const CycleDetailsSidebar: React.FC<Props> = observer((props) => {
 
   // store hooks
   const { cycle: cycleDetails } = useCyclesDetails({
-    workspaceSlug: workspaceSlug.toString(),
-    projectId: projectId.toString(),
+    workspaceSlug: workspaceSlug!.toString(),
+    projectId: projectId!.toString(),
     cycleId: cycleId?.toString() || props.cycleId,
   });
 
@@ -47,18 +47,18 @@ export const CycleDetailsSidebar: React.FC<Props> = observer((props) => {
     <div className="relative pb-2">
       <div className="flex flex-col gap-5 w-full">
         <CycleSidebarHeader
-          workspaceSlug={workspaceSlug.toString()}
-          projectId={projectId.toString()}
+          workspaceSlug={workspaceSlug!.toString()}
+          projectId={projectId!.toString()}
           cycleDetails={cycleDetails}
           isArchived={isArchived}
           handleClose={handleClose}
         />
-        <CycleSidebarDetails projectId={projectId.toString()} cycleDetails={cycleDetails} />
+        <CycleSidebarDetails projectId={projectId!.toString()} cycleDetails={cycleDetails} />
       </div>
 
       {workspaceSlug && projectId && cycleDetails?.id && (
         <CycleAnalyticsProgress
-          workspaceSlug={workspaceSlug.toString()}
+          workspaceSlug={workspaceSlug!.toString()}
           projectId={projectId.toString()}
           cycleId={cycleDetails?.id}
         />

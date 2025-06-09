@@ -1,4 +1,4 @@
-import React, { Fragment, Ref, useState } from "react";
+import React, { Fragment, Ref, useRef } from "react";
 import { usePopper } from "react-popper";
 import { Popover as HeadlessReactPopover, Transition } from "@headlessui/react";
 // helpers
@@ -20,12 +20,13 @@ export const Popover = (props: TPopover) => {
     popoverButtonRef,
     buttonRefClassName = "",
   } = props;
-  // states
-  const [referenceElement, setReferenceElement] = useState<HTMLDivElement | null>(null);
-  const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
+
+  // refs (fixing the issue)
+  const referenceElement = useRef<HTMLDivElement | null>(null);
+  const popperElement = useRef<HTMLDivElement | null>(null);
 
   // react-popper derived values
-  const { styles, attributes } = usePopper(referenceElement, popperElement, {
+  const { styles, attributes } = usePopper(referenceElement.current, popperElement.current, {
     placement: popperPosition,
     modifiers: [
       {
@@ -39,7 +40,7 @@ export const Popover = (props: TPopover) => {
 
   return (
     <HeadlessReactPopover className={cn("relative flex h-full w-full items-center justify-center", popoverClassName)}>
-      <div ref={setReferenceElement} className={cn("w-full", buttonRefClassName)}>
+      <div ref={referenceElement} className={cn("w-full", buttonRefClassName)}>
         <HeadlessReactPopover.Button
           ref={popoverButtonRef as Ref<HTMLButtonElement>}
           className={cn(
@@ -65,7 +66,7 @@ export const Popover = (props: TPopover) => {
         leaveTo="opacity-0 translate-y-1"
       >
         <HeadlessReactPopover.Panel
-          ref={setPopperElement}
+          ref={popperElement}
           style={styles.popper}
           {...attributes.popper}
           className={cn("absolute left-0 top-full z-20 w-screen max-w-xs mt-2", panelClassName)}

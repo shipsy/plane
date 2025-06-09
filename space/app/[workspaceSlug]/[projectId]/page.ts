@@ -7,18 +7,18 @@ import PublishService from "@/services/publish.service";
 const publishService = new PublishService();
 
 type Props = {
-  params: {
+  params: Promise<{
     workspaceSlug: string;
     projectId: string;
-  };
-  searchParams: any;
+  }>;
+  searchParams: Promise<any>;
 };
 
 export default async function IssuesPage(props: Props) {
   const { params, searchParams } = props;
-  // query params
-  const { workspaceSlug, projectId } = params;
-  const { board, peekId } = searchParams;
+  // query params - await the params
+  const { workspaceSlug, projectId } = await params;
+  const { board, peekId } = await searchParams;
 
   let response: TProjectPublishSettings | undefined = undefined;
   try {
@@ -31,10 +31,10 @@ export default async function IssuesPage(props: Props) {
   let url = "";
   if (response?.entity_name === "project") {
     url = `/issues/${response?.anchor}`;
-    const params = new URLSearchParams();
-    if (board) params.append("board", board);
-    if (peekId) params.append("peekId", peekId);
-    if (params.toString()) url += `?${params.toString()}`;
+    const urlParams = new URLSearchParams(); // Renamed to avoid conflict with params
+    if (board) urlParams.append("board", board);
+    if (peekId) urlParams.append("peekId", peekId);
+    if (urlParams.toString()) url += `?${urlParams.toString()}`;
     redirect(url);
   } else {
     notFound();

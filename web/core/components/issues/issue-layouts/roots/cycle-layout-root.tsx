@@ -63,7 +63,7 @@ export const CycleLayoutRoot: React.FC = observer(() => {
     { revalidateIfStale: false, revalidateOnFocus: false }
   );
 
-  const issueFilters = issuesFilter?.getIssueFilters(cycleId?.toString());
+  const issueFilters = issuesFilter?.getIssueFilters(cycleId!.toString());
   const activeLayout = issueFilters?.displayFilters?.layout;
 
   const cycleDetails = cycleId ? getCycleById(cycleId.toString()) : undefined;

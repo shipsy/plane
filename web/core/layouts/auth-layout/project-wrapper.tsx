@@ -56,7 +56,7 @@ export const ProjectAuthWrapper: FC<IProjectAuthWrapper> = observer((props) => {
   // router
   const { workspaceSlug, projectId } = useParams();
 
-  const projectMemberInfo = projectUserInfo?.[workspaceSlug?.toString()]?.[projectId?.toString()];
+  const projectMemberInfo = projectUserInfo?.[workspaceSlug!.toString()]?.[projectId!.toString()];
 
   // Initialize module timeline chart
   useEffect(() => {
@@ -142,8 +142,8 @@ export const ProjectAuthWrapper: FC<IProjectAuthWrapper> = observer((props) => {
   const hasPermissionToCurrentProject = allowPermissions(
     [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
     EUserPermissionsLevel.PROJECT,
-    workspaceSlug.toString(),
-    projectId?.toString()
+    workspaceSlug!.toString(),
+    projectId!.toString()
   );
 
   // check if the project member apis is loading

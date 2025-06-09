@@ -21,7 +21,7 @@ export const ProfileIssuesListLayout: FC = observer(() => {
     allowPermissions(
       [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
       EUserPermissionsLevel.PROJECT,
-      workspaceSlug.toString(),
+      workspaceSlug?.toString(),
       projectId
     );
 

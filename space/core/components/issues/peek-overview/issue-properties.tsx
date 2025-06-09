@@ -30,7 +30,7 @@ export const PeekOverviewIssueProperties: React.FC<Props> = observer(({ issueDet
 
   const { anchor } = useParams();
 
-  const { project_details } = usePublish(anchor?.toString());
+  const { project_details } = usePublish(anchor!.toString());
 
   const priority = issueDetails.priority ? issuePriorityFilter(issueDetails.priority) : null;
 

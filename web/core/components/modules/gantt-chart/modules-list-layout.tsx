@@ -44,7 +44,7 @@ export const ModulesListGanttChartView: React.FC = observer(() => {
     if (blockUpdate.start_date) payload.start_date = blockUpdate.start_date;
     if (blockUpdate.target_date) payload.target_date = blockUpdate.target_date;
 
-    await updateModuleDetails(workspaceSlug.toString(), projectId.toString(), blockUpdate.id, payload);
+    await updateModuleDetails(workspaceSlug!.toString(), projectId!.toString(), blockUpdate.id, payload);
   };
 
   const isAllowed = currentProjectDetails?.member_role === 20 || currentProjectDetails?.member_role === 15;

@@ -142,7 +142,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
   const projectId = watch("project_id");
   const activeAdditionalPropertiesLength = getActiveAdditionalPropertiesLength({
     projectId: projectId,
-    workspaceSlug: workspaceSlug?.toString(),
+    workspaceSlug: workspaceSlug!.toString(),
     watch: watch,
   });
 
@@ -201,7 +201,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
     if (
       !handlePropertyValuesValidation({
         projectId: projectId,
-        workspaceSlug: workspaceSlug?.toString(),
+        workspaceSlug: workspaceSlug!.toString(),
         watch: watch,
       })
     )
@@ -403,7 +403,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
                   editorRef={editorRef}
                   submitBtnRef={submitBtnRef}
                   gptAssistantModal={gptAssistantModal}
-                  workspaceSlug={workspaceSlug?.toString()}
+                  workspaceSlug={workspaceSlug!.toString()}
                   projectId={projectId}
                   handleFormChange={handleFormChange}
                   handleDescriptionHTMLDataChange={(description_html) =>
@@ -427,7 +427,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
                     issueId={data?.id ?? data?.sourceIssueId}
                     issueTypeId={watch("type_id")}
                     projectId={projectId}
-                    workspaceSlug={workspaceSlug?.toString()}
+                    workspaceSlug={workspaceSlug!.toString()}
                     isDraft={isDraft}
                   />
                 )}
@@ -439,7 +439,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
                   control={control}
                   id={data?.id}
                   projectId={projectId}
-                  workspaceSlug={workspaceSlug?.toString()}
+                  workspaceSlug={workspaceSlug!.toString()}
                   selectedParentIssue={selectedParentIssue}
                   startDate={watch("start_date")}
                   targetDate={watch("target_date")}
@@ -502,7 +502,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
                       loading={isSubmitting}
                       onClick={() => {
                         if (data?.id && data) {
-                          moveIssue(workspaceSlug.toString(), data?.id, {
+                          moveIssue(workspaceSlug!.toString(), data?.id, {
                             ...data,
                             ...getValues(),
                           } as TWorkspaceDraftIssue);
@@ -524,7 +524,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
             style={{ maxHeight: formRef?.current?.offsetHeight ? `${formRef.current.offsetHeight}px` : "436px" }}
           >
             <DuplicateModalRoot
-              workspaceSlug={workspaceSlug.toString()}
+              workspaceSlug={workspaceSlug!.toString()}
               issues={duplicateIssues}
               handleDuplicateIssueModal={handleDuplicateIssueModal}
             />

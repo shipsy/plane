@@ -21,7 +21,7 @@ export const MobileWorkspaceSettingsTabs = observer(() => {
       {WORKSPACE_SETTINGS_LINKS.map(
         (item, index) =>
           shouldRenderSettingLink(item.key) &&
-          allowPermissions(item.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug.toString()) && (
+          allowPermissions(item.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug!.toString()) && (
             <div
               className={`${
                 item.highlight(pathname, `/${workspaceSlug}`)

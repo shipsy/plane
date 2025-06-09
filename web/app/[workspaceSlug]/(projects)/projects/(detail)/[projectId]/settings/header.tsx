@@ -73,8 +73,8 @@ export const ProjectSettingHeader: FC = observer(() => {
               allowPermissions(
                 item.access,
                 EUserPermissionsLevel.PROJECT,
-                workspaceSlug.toString(),
-                projectId.toString()
+                workspaceSlug!.toString(),
+                projectId!.toString()
               ) && (
                 <CustomMenu.MenuItem
                   key={item.key}
