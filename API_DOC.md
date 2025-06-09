@@ -860,8 +860,7 @@ Supported image formats:
 
 Maximum file size limits:
 
-- Default: 5MB per file
-- Maximum: 10MB per file
+- Maximum: 5MB per file
 
 Note: The actual file upload is a two-step process:
 
