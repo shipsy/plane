@@ -17,7 +17,6 @@ import { useIssueFilter } from "@/hooks/store";
 // types
 import { TIssueQueryFilters } from "@/types/issue";
 
-
 type IssueFiltersDropdownProps = {
   anchor: string;
 };
