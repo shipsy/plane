@@ -132,68 +132,53 @@ class IssueTypeAPIEndpoint(BaseAPIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def patch(self, request, slug, project_id, issue_id, pk):
-        issue_type = IssueType.objects.get(
-            workspace__slug=slug,
-            pk=pk,
-        )
-        requested_data = json.dumps(self.request.data, cls=DjangoJSONEncoder)
-        current_instance = json.dumps(
-            IssueTypeSerializer(issue_comment).data,
-            cls=DjangoJSONEncoder,
-        )
+    def patch(self, request, slug, pk):
+        try:
+            issue_type = IssueType.objects.get(workspace__slug=slug, pk=pk)
+        except IssueType.DoesNotExist:
+            return Response({"error": "IssueType not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Validation check if the issue already exists
-        if (
-            IssueType.objects.filter(
-                workspace__slug=slug,
-                name=request.data.get('name')
-            ).exists()
-        ):
+        # Validation check if the issue type with the same name already exists
+        if 'name' in request.data and IssueType.objects.filter(
+            workspace__slug=slug,
+            name=request.data.get('name')
+        ).exclude(pk=pk).exists():
             return Response(
                 {
-                    "error": "Issue Comment with the same name already exists",
-                    "id": str(issue_type.id),
+                    "error": "IssueType with the same name already exists",
                 },
                 status=status.HTTP_409_CONFLICT,
             )
 
         serializer = IssueTypeSerializer(
-            issue_comment, data=request.data, partial=True
+            issue_type, data=request.data, partial=True
         )
         if serializer.is_valid():
             serializer.save()
             # issue_activity.delay(
             #     type="type.activity.updated",
-            #     requested_data=requested_data,
-            #     current_instance=current_instance,
+            #     requested_data=json.dumps(request.data, cls=DjangoJSONEncoder),
+            #     current_instance=json.dumps(IssueTypeSerializer(issue_type).data, cls=DjangoJSONEncoder), # Assuming you want to log the state before update
             #     epoch=int(timezone.now().timestamp()),
             # )
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # def delete(self, request, slug, project_id, issue_id, pk):
-    #     issue_comment = IssueComment.objects.get(
-    #         workspace__slug=slug,
-    #         project_id=project_id,
-    #         issue_id=issue_id,
-    #         pk=pk,
-    #     )
-    #     current_instance = json.dumps(
-    #         IssueCommentSerializer(issue_comment).data,
-    #         cls=DjangoJSONEncoder,
-    #     )
-    #     issue_comment.delete()
-    #     issue_activity.delay(
-    #         type="comment.activity.deleted",
-    #         requested_data=json.dumps({"comment_id": str(pk)}),
-    #         actor_id=str(request.user.id),
-    #         issue_id=str(issue_id),
-    #         project_id=str(project_id),
-    #         current_instance=current_instance,
-    #         epoch=int(timezone.now().timestamp()),
-    #     )
-    #     return Response(status=status.HTTP_204_NO_CONTENT)
+    def delete(self, request, slug, pk):
+        try:
+            issue_type = IssueType.objects.get(workspace__slug=slug, pk=pk)
+        except IssueType.DoesNotExist:
+            return Response({"error": "IssueType not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # issue_activity.delay(
+        #     type="type.activity.deleted",
+        #     requested_data=json.dumps({"issue_type_id": str(pk)}, cls=DjangoJSONEncoder),
+        #     actor_id=str(request.user.id),
+        #     current_instance=json.dumps(IssueTypeSerializer(issue_type).data, cls=DjangoJSONEncoder), # Log the state before delete
+        #     epoch=int(timezone.now().timestamp()),
+        # )
+        issue_type.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 class IssueTypeCustomPropertyAPIEndpoint(BaseAPIView):
     def get(self, request, slug, issue_type, pk=None):
@@ -209,6 +194,46 @@ class IssueTypeCustomPropertyAPIEndpoint(BaseAPIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         serializer = IssueTypeCustomPropertySerializer(properties, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def patch(self, request, slug, issue_type, pk):
+        try:
+            custom_property = IssueTypeCustomProperty.objects.get(
+                issue_type_id=issue_type,
+                pk=pk,
+                issue_type__workspace__slug=slug # ensure property belongs to type in workspace
+            )
+        except IssueTypeCustomProperty.DoesNotExist:
+            return Response({"error": "IssueTypeCustomProperty not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = IssueTypeCustomPropertySerializer(
+            custom_property, data=request.data, partial=True
+        )
+        if serializer.is_valid():
+            try:
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            except IntegrityError as e:
+                if "already exists" in str(e) or "unique constraint" in str(e).lower(): # Check for unique constraint violation
+                    return Response(
+                        {"name": "The Property Name is already taken for this Issue Type"}, # More specific error
+                        status=status.HTTP_409_CONFLICT, # Changed from 410 to 409
+                    )
+                else:
+                    return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST) # Generic integrity error
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, slug, issue_type, pk):
+        try:
+            custom_property = IssueTypeCustomProperty.objects.get(
+                issue_type_id=issue_type,
+                pk=pk,
+                issue_type__workspace__slug=slug  # ensure property belongs to type in workspace
+            )
+        except IssueTypeCustomProperty.DoesNotExist:
+            return Response({"error": "IssueTypeCustomProperty not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        custom_property.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def post(self, request, slug, issue_type):
         try:
