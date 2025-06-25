@@ -52,5 +52,15 @@ ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP = {
         "Return Invoice Amount",
         "Empty Return Freight Amount",
         "Total Amount",
+    ],
+    "heineken-br1-test": [
+        "Stays (in days)",
+        "Approved Cost (in BRL)",
+        "Invoice",
+    ],
+    "heineken-br1": [
+        "Stays (in days)",
+        "Approved Cost (in BRL)",
+        "Invoice",
     ]
 }
