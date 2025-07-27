@@ -29,7 +29,7 @@ export const FilterPriority: React.FC<Props> = observer((props) => {
   return (
     <>
       <FilterHeader
-        title={`Priority${appliedFiltersCount > 0 ? ` (${appliedFiltersCount})` : ""}`}
+        title={`${t("priority")}${appliedFiltersCount > 0 ? ` (${appliedFiltersCount})` : ""}`}
         isPreviewEnabled={previewEnabled}
         handleIsPreviewEnabled={() => setPreviewEnabled(!previewEnabled)}
       />
@@ -46,7 +46,7 @@ export const FilterPriority: React.FC<Props> = observer((props) => {
               />
             ))
           ) : (
-            <p className="text-xs italic text-custom-text-400">No matches found</p>
+            <p className="text-xs italic text-custom-text-400">{t("no_matches_found")}</p>
           )}
         </div>
       )}
