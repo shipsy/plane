@@ -104,7 +104,6 @@ def issue_on_results(issues, group_by, sub_group_by):
         "vendor_code",
         "worker_code",
         "worker_name",
-        "business_type",
         "custom_propertiess"
     ]
 

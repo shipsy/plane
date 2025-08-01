@@ -56,7 +56,7 @@ from plane.utils.grouper import (
     issue_on_results,
     issue_queryset_grouper,
 )
-from plane.utils.issue_filters import issue_filters, build_custom_property_q_objects
+from plane.utils.issue_filters import issue_filters
 from plane.utils.order_queryset import order_issue_queryset
 from plane.utils.constants import ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP
 from plane.utils.paginator import (
@@ -235,7 +235,6 @@ class IssueViewSet(BaseViewSet):
 
     def get_queryset(self, filters={}):
         custom_properties = filters.get("custom_properties", {})
-        custom_filters = build_custom_property_q_objects(custom_properties)
         return (
             Issue.issue_objects.filter(
                 project_id=self.kwargs.get("project_id")
@@ -290,7 +289,16 @@ class IssueViewSet(BaseViewSet):
                 )
             )
             .filter(
-                *custom_filters
+                *[
+                    Q(
+                        id__in=IssueCustomProperty.objects.filter(
+                            issue_id=OuterRef("id"),
+                            key=group_key,
+                            value__in=values
+                        ).values("issue_id")
+                    )
+                    for group_key, values in custom_properties.items()
+                ]
             )
         ).distinct()
 
@@ -485,7 +493,6 @@ class IssueViewSet(BaseViewSet):
                     "customer_name",
                     "vendor_name",
                     "worker_name",
-                    "business_type",
                     "priority",
                     "start_date",
                     "target_date",
@@ -1234,7 +1241,7 @@ class SearchAPIEndpoint(BaseAPIView):
     webhook_event = "issue"
     def get(self, request, slug):
         
-        allowed_fields = ["hub_code", "hub_name", "worker_code", "worker_name", "reference_number", "trip_reference_number", "customer_code", "customer_name", "vendor_code", "vendor_name", "business_type"]
+        allowed_fields = ["hub_code", "hub_name", "worker_code", "worker_name", "reference_number", "trip_reference_number", "customer_code", "customer_name", "vendor_code", "vendor_name"]
 
         field = request.GET.get("field")  # Get the single field value
         query = request.GET.get("query")
@@ -1278,7 +1285,7 @@ class SearchAPIEndpoint(BaseAPIView):
 
 class SearchSingleValueAPI(BaseAPIView):
     model = Issue
-    allowed_fields = ["hub_code", "trip_reference_number", "reference_number", "worker_code", "vendor_code", "customer_code", "business_type"]
+    allowed_fields = ["hub_code", "trip_reference_number", "reference_number", "worker_code", "vendor_code","customer_code"]
 
     def get(self, request, slug, project_id):
         # Extract query parameters (only one should be provided)

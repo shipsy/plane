@@ -317,5 +317,4 @@ export const getComputedDisplayProperties = (
   vendor_code: displayProperties?.vendor_code ?? true,
   worker_code: displayProperties?.worker_code ?? true,
   worker_name: displayProperties?.worker_name ?? true,
-  business_type: displayProperties?.business_type ?? true,
 });

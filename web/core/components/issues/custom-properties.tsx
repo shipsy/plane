@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Pencil } from "lucide-react";
 import axios from "axios";
-import { Input } from "@plane/ui";
 
 export type CustomProperty = {
   key: string;
@@ -10,8 +9,6 @@ export type CustomProperty = {
   is_required: boolean;
   name: string;
   id: string;
-  data_type: string;
-  is_active: boolean;
 };
 
 type CustomPropertiesProps = {
@@ -38,18 +35,19 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
     const getIssueTypeCustomProperties = async () => {
       try {
         const response = await axios.get(
-          `/api/v1/workspaces/${workspaceSlug}/issue-type/${issue_type_id}/custom-properties/`,
-          {
-            headers: {
-              'x-api-key': 'TEST_API_TOKEN',
-            }
-          }
+          `/api/workspaces/${workspaceSlug}/issue-type/${issue_type_id}/custom-properties/`,
         );
         setissueTypeCustomProperties(response.data);
+        setError(null);
       } catch (error) {
         setError("Failed to load custom properties.");
       }
     };
+
+    if (!issue_type_id) {
+      setError("Invalid Issue Type");
+      return;
+    }
 
     getIssueTypeCustomProperties();
   }, [workspaceSlug, issue_type_id]);
@@ -60,22 +58,20 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
     }
   }, [customProperties]);
 
-  const mergedCustomProperties = issueTypeCustomProperties
-    .filter((customProp) => customProp.is_active)
-    .map((customProp) => {
-      const customProperty = localCustomProperties?.find((prop) => prop.key === customProp.name);
+  const mergedCustomProperties = issueTypeCustomProperties.map((customProp) => {
+    const customProperty = localCustomProperties?.find(
+      (prop) => prop.key === customProp.name
+    );
 
-      return {
-        key: customProp.name,
-        value: customProperty ? customProperty.value : "",
-        issue_type_custom_property: customProp.id,
-        is_required: customProp.is_required,
-        id: customProperty ? customProperty.id : "",
-        name: customProp.name,
-        data_type: customProp.data_type,
-        is_active: customProp.is_active,
-      };
-    });
+    return {
+      key: customProp.name,
+      value: customProperty ? customProperty.value : "",
+      issue_type_custom_property: customProp.id,
+      is_required: customProp.is_required,
+      id: customProperty ? customProperty.id : "",
+      name: customProp.name,
+    };
+  });
 
   if (error) {
     return <div className="text-red-500 text-sm mt-1">{error}</div>;
@@ -131,49 +127,14 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
       setLocalError(null);
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       setValue(e.target.value);
       setLocalError(null);
     };
 
-    const inputComponents: Record<string, React.JSX.Element> = {
-      date: (
-        <Input
-          type="date"
-          value={value}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          autoFocus
-          placeholder={`Add ${property.key}`}
-          className="text-sm w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-custom-primary-100"
-        />
-      ),
-      boolean: (
-        <select
-          value={value}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          autoFocus
-          className="text-sm w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-custom-primary-100"
-        >
-          <option value="">Select {property.key}</option>
-          <option value="true">True</option>
-          <option value="false">False</option>
-        </select>
-      ),
-      number: (
-        <Input
-          type="number"
-          value={value}
-          onChange={handleChange}
-          onBlur={handleBlur}
-          autoFocus
-          placeholder={`Add ${property.key}`}
-          className="text-sm w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-custom-primary-100"
-        />
-      ),
-      text: (
-        <Input
+    return (
+      <div>
+        <input
           type="text"
           value={value}
           onChange={handleChange}
@@ -182,12 +143,6 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
           placeholder={`Add ${property.key}`}
           className="text-sm w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-custom-primary-100"
         />
-      ),
-    };
-    
-    return (
-      <div>
-        {inputComponents[property?.data_type as keyof typeof inputComponents] || inputComponents.text}
         {localError && (
           <div className="text-red-500 text-sm mt-1">{localError}</div>
         )}

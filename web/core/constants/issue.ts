@@ -121,7 +121,6 @@ const whileListedCustomProperties = [
   { key: "vendor_code", title: "Vendor Code" },
   { key: "worker_code", title: "Worker Code" },
   { key: "worker_name", title: "Worker Name" },
-  { key: "business_type", title: "Business Type" },
 ];
 
 export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = [
@@ -151,7 +150,6 @@ export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = 
   "vendor_code",
   "worker_code",
   "worker_name",
-  "business_type",
 ];
 
 export const ISSUE_DISPLAY_PROPERTIES: {
@@ -182,7 +180,6 @@ export const ISSUE_DISPLAY_PROPERTIES: {
   { key: "vendor_code", title: "Vendor Code" },
   { key: "worker_code", title: "Worker Code" },
   { key: "worker_name", title: "Worker Name" },
-  { key: "business_type", title: "Business Type" },
 ];
 
 export const ISSUE_EXTRA_OPTIONS: {
@@ -352,7 +349,6 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
         "worker_name",
         "vendor_code",
         "vendor_name",
-        "business_type",
         "trip_reference_number",
         "reference_number",
         "custom_properties",
@@ -411,7 +407,6 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
         "worker_name",
         "vendor_code",
         "vendor_name",
-        "business_type",
         "trip_reference_number",
         "reference_number",
         "custom_properties"
@@ -497,7 +492,6 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
         "worker_name",
         "vendor_code",
         "vendor_name",
-        "business_type",
         "trip_reference_number",
         "reference_number",
         "custom_properties"
@@ -581,6 +575,5 @@ export const ISSUE_ADDITIONAL_PROPERTIES: {
     { key: "vendor_code", title: "Vendor Code" },
     { key: "vendor_name", title: "Vendor Name" },
     { key: "worker_code", title: "Worker Code" },
-    { key: "worker_name", title: "Worker Name" },
-    { key: "business_type", title: "Business Type" },
+    { key: "worker_name", title: "Worker Name" }
   ];
