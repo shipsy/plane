@@ -250,7 +250,7 @@ class ProjectAPIEndpoint(BaseAPIView):
                 serializer.save()
                 self.create_project(
                     request.META.get("HTTP_ORIGIN"), 
-                    user, 
+                    request.user, 
                     serializer
                 ) 
                 project = (
