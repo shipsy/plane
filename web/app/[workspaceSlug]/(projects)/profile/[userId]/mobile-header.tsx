@@ -5,6 +5,7 @@ import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // icons
 import { ChevronDown } from "lucide-react";
+import { useTranslation } from "@plane/i18n";
 // types
 import { IIssueDisplayFilterOptions, IIssueDisplayProperties, IIssueFilterOptions, TIssueLayouts } from "@plane/types";
 // ui
@@ -23,7 +24,7 @@ import {
 import { isIssueFilterActive } from "@/helpers/filter.helper";
 // hooks
 import { useIssues, useLabel } from "@/hooks/store";
-import { useTranslation } from "@plane/i18n";
+
 
 export const ProfileIssuesMobileHeader = observer(() => {
   const { t } = useTranslation();

@@ -3,8 +3,9 @@
 import { useCallback, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-// types
 import { Layers } from "lucide-react";
+import { useTranslation } from "@plane/i18n";
+// types
 import { IIssueDisplayFilterOptions, IIssueDisplayProperties, IIssueFilterOptions } from "@plane/types";
 // ui
 import { Breadcrumbs, Button, Header } from "@plane/ui";
@@ -18,7 +19,6 @@ import { EIssueFilterType, EIssuesStoreType, ISSUE_DISPLAY_FILTERS_BY_LAYOUT } f
 import { isIssueFilterActive } from "@/helpers/filter.helper";
 // hooks
 import { useLabel, useMember, useIssues, useGlobalView } from "@/hooks/store";
-import { useTranslation } from "@plane/i18n";
 
 export const GlobalIssuesHeader = observer(() => {
   const { t } = useTranslation();
@@ -38,7 +38,7 @@ export const GlobalIssuesHeader = observer(() => {
 
   const issueFilters = globalViewId ? filters[globalViewId.toString()] : undefined;
 
-  const viewDetails = getViewDetailsById(globalViewId.toString());
+  const viewDetails = getViewDetailsById(globalViewId!.toString());
 
   const handleFiltersUpdate = useCallback(
     (key: keyof IIssueFilterOptions, value: string | string[]) => {

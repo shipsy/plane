@@ -73,9 +73,9 @@ export const ProjectIssueDetailsHeader = observer(() => {
       </Header.LeftItem>
       <Header.RightItem>
         <IssueDetailQuickActions
-          workspaceSlug={workspaceSlug.toString()}
-          projectId={projectId.toString()}
-          issueId={issueId.toString()}
+          workspaceSlug={workspaceSlug!.toString()}
+          projectId={projectId!.toString()}
+          issueId={issueId!.toString()}
         />
       </Header.RightItem>
     </Header>

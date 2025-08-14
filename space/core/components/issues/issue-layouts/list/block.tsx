@@ -30,7 +30,7 @@ export const IssueBlock = observer((props: IssueBlockProps) => {
   // ref
   const issueRef = useRef<HTMLDivElement | null>(null);
   // hooks
-  const { project_details } = usePublish(anchor.toString());
+  const { project_details } = usePublish(anchor!.toString());
   const { getIsIssuePeeked, setPeekId, getIssueById } = useIssueDetails();
 
   const handleIssuePeekOverview = () => {

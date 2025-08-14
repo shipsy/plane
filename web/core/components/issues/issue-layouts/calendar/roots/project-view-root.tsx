@@ -10,5 +10,5 @@ import { BaseCalendarRoot } from "../base-calendar-root";
 export const ProjectViewCalendarLayout: React.FC = observer(() => {
   const { viewId } = useParams();
 
-  return <BaseCalendarRoot QuickActions={ProjectIssueQuickActions} viewId={viewId.toString()} />;
+  return <BaseCalendarRoot QuickActions={ProjectIssueQuickActions} viewId={viewId?.toString()} />;
 });

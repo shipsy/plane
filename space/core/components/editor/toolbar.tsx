@@ -3,13 +3,14 @@
 import React, { useEffect, useState, useCallback } from "react";
 // editor
 import { EditorRefApi, TEditorCommands, TNonColorEditorCommands } from "@plane/editor";
+import { useTranslation } from "@plane/i18n";
 // ui
+import { useTranslation } from "@plane/i18n";
 import { Button, Tooltip } from "@plane/ui";
 // constants
 import { TOOLBAR_ITEMS } from "@/constants/editor";
 // helpers
 import { cn } from "@/helpers/common.helper";
-import { useTranslation } from "@plane/i18n";
 
 type Props = {
   executeCommand: (commandKey: TEditorCommands) => void;

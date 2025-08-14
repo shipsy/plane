@@ -34,7 +34,7 @@ export const WorkspaceInvitationsListItem: FC<Props> = observer((props) => {
   const { isMobile } = usePlatformOS();
   // derived values
   const invitationDetails = getWorkspaceInvitationDetails(invitationId);
-  const currentWorkspaceMemberInfo = workspaceInfoBySlug(workspaceSlug.toString());
+  const currentWorkspaceMemberInfo = workspaceInfoBySlug(workspaceSlug!.toString());
   const currentWorkspaceRole = currentWorkspaceMemberInfo?.role;
 
   const handleRemoveInvitation = async () => {

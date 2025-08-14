@@ -119,8 +119,8 @@ export const ProjectViewAppliedFiltersRoot: React.FC = observer(() => {
       <CreateUpdateProjectViewModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        workspaceSlug={workspaceSlug.toString()}
-        projectId={projectId.toString()}
+        workspaceSlug={workspaceSlug!.toString()}
+        projectId={projectId!.toString()}
         preLoadedData={{
           name: `${viewDetails?.name} 2`,
           description: viewDetails?.description,

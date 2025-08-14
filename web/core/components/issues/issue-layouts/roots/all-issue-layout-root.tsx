@@ -61,7 +61,7 @@ export const AllIssueLayoutRoot: React.FC<Props> = observer((props: Props) => {
 
   const { fetchAllGlobalViews, getViewDetailsById } = useGlobalView();
 
-  const viewDetails = getViewDetailsById(globalViewId?.toString());
+  const viewDetails = getViewDetailsById(globalViewId!.toString());
   // filter init from the query params
 
   const routerFilterParams = () => {
@@ -134,7 +134,7 @@ export const AllIssueLayoutRoot: React.FC<Props> = observer((props: Props) => {
       return allowPermissions(
         [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
         EUserPermissionsLevel.PROJECT,
-        workspaceSlug.toString(),
+        workspaceSlug!.toString(),
         projectId
       );
     },

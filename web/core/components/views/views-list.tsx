@@ -17,8 +17,8 @@ export const ProjectViewsList = observer(() => {
   const { toggleCreateViewModal } = useCommandPalette();
   const { getProjectViews, getFilteredProjectViews, loader } = useProjectView();
 
-  const projectViews = getProjectViews(projectId?.toString());
-  const filteredProjectViews = getFilteredProjectViews(projectId?.toString());
+  const projectViews = getProjectViews(projectId!.toString());
+  const filteredProjectViews = getFilteredProjectViews(projectId!.toString());
 
   if (loader || !projectViews || !filteredProjectViews) return <ViewListLoader />;
 

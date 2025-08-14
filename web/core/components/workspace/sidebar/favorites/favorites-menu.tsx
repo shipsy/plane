@@ -49,7 +49,7 @@ export const SidebarFavoritesMenu = observer(() => {
   const elementRef = useRef(null);
 
   const handleRemoveFromFavorites = (favorite: IFavorite) => {
-    deleteFavorite(workspaceSlug.toString(), favorite.id)
+    deleteFavorite(workspaceSlug!.toString(), favorite.id)
       .then(() => {
         setToast({
           type: TOAST_TYPE.SUCCESS,
@@ -66,7 +66,7 @@ export const SidebarFavoritesMenu = observer(() => {
       });
   };
   const handleRemoveFromFavoritesFolder = (favoriteId: string) => {
-    removeFromFavoriteFolder(workspaceSlug.toString(), favoriteId, {
+    removeFromFavoriteFolder(workspaceSlug!.toString(), favoriteId, {
       id: favoriteId,
       parent: null,
     })
@@ -201,7 +201,7 @@ export const SidebarFavoritesMenu = observer(() => {
                         />
                       ) : (
                         <FavoriteRoot
-                          workspaceSlug={workspaceSlug.toString()}
+                          workspaceSlug={workspaceSlug!.toString()}
                           favorite={fav}
                           handleRemoveFromFavorites={handleRemoveFromFavorites}
                           handleRemoveFromFavoritesFolder={handleRemoveFromFavoritesFolder}

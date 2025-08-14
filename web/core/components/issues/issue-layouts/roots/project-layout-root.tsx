@@ -55,7 +55,7 @@ export const ProjectLayoutRoot: FC = observer(() => {
     { revalidateIfStale: false, revalidateOnFocus: false }
   );
 
-  const issueFilters = issuesFilter?.getIssueFilters(projectId?.toString());
+  const issueFilters = issuesFilter?.getIssueFilters(projectId!.toString());
   const activeLayout = issueFilters?.displayFilters?.layout;
 
   if (!workspaceSlug || !projectId) return <></>;

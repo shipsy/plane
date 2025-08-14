@@ -9,14 +9,14 @@ import { IssuesLayoutsRoot } from "@/components/issues";
 import { usePublish, useLabel, useStates } from "@/hooks/store";
 
 type Props = {
-  params: {
+  params: Promise<{
     anchor: string;
-  };
+  }>;
 };
 
-const IssuesPage = observer((props: Props) => {
+const IssuesPage = observer(async (props: Props) => {
   const { params } = props;
-  const { anchor } = params;
+  const { anchor } = await params;
   // params
   const searchParams = useSearchParams();
   const peekId = searchParams.get("peekId") || undefined;

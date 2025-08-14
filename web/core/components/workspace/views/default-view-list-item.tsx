@@ -1,9 +1,9 @@
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useTranslation } from "@plane/i18n";
 // helpers
 import { truncateText } from "@/helpers/string.helper";
-import { useTranslation } from "@plane/i18n";
 
 type Props = { view: { key: string; label: string } };
 

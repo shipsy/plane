@@ -99,8 +99,8 @@ export const ModuleListItem: React.FC<Props> = observer((props) => {
           <ModuleQuickActions
             parentRef={parentRef}
             moduleId={moduleId}
-            projectId={projectId.toString()}
-            workspaceSlug={workspaceSlug.toString()}
+            projectId={projectId!.toString()}
+            workspaceSlug={workspaceSlug!.toString()}
           />
         </div>
       }
