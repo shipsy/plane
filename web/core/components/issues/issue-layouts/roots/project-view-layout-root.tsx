@@ -53,7 +53,7 @@ export const ProjectViewLayoutRoot: React.FC = observer(() => {
     { revalidateIfStale: false, revalidateOnFocus: false }
   );
 
-  const issueFilters = issuesFilter?.getIssueFilters(viewId?.toString());
+  const issueFilters = issuesFilter?.getIssueFilters(viewId!.toString());
   const activeLayout = issueFilters?.displayFilters?.layout;
 
   if (!workspaceSlug || !projectId || !viewId) return <></>;

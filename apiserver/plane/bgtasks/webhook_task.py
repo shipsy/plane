@@ -405,7 +405,9 @@ def webhook_activity(
             
         for webhook in webhooks:
             event_data = get_model_data(event=event, event_id=event_id)
+            print(event_data)
             actor_data = get_model_data(event="user", event_id=actor_id)
+            print(actor_data)
             webhook_send_task.delay(
                 webhook=webhook.id,
                 slug=slug,

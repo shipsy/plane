@@ -20,7 +20,7 @@ export const useProjectColumns = () => {
   const { allowPermissions, projectUserInfo } = useUserPermissions();
 
   const currentProjectRole =
-    (projectUserInfo?.[workspaceSlug.toString()]?.[projectId.toString()]?.role as unknown as EUserPermissions) ??
+    (projectUserInfo?.[workspaceSlug!.toString()]?.[projectId!.toString()]?.role as unknown as EUserPermissions) ??
     EUserPermissions.GUEST;
 
   const getFormattedDate = (dateStr: string) => {
@@ -33,8 +33,8 @@ export const useProjectColumns = () => {
   const isAdmin = allowPermissions(
     [EUserPermissions.ADMIN],
     EUserPermissionsLevel.PROJECT,
-    workspaceSlug.toString(),
-    projectId.toString()
+    workspaceSlug!.toString(),
+    projectId!.toString()
   );
 
   const columns = [

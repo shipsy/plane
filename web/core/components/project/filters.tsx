@@ -2,8 +2,9 @@ import { useCallback } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 import { ListFilter } from "lucide-react";
-// types
 import { cn } from "@plane/editor";
+import { useTranslation } from "@plane/i18n";
+// types
 import { TProjectFilters } from "@plane/types";
 // components
 import { FiltersDropdown } from "@/components/issues";
@@ -12,7 +13,6 @@ import { ProjectFiltersSelection, ProjectOrderByDropdown } from "@/components/pr
 import { calculateTotalFilters } from "@/helpers/filter.helper";
 // hooks
 import { useMember, useProjectFilter } from "@/hooks/store";
-import { useTranslation } from "@plane/i18n";
 
 type Props = {
   filterMenuButton?: React.ReactNode;

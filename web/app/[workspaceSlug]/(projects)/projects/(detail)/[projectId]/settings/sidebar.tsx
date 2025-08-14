@@ -21,7 +21,7 @@ export const ProjectSettingsSidebar = observer(() => {
   const { allowPermissions, projectUserInfo } = useUserPermissions();
 
   // derived values
-  const currentProjectRole = projectUserInfo?.[workspaceSlug?.toString()]?.[projectId?.toString()]?.role;
+  const currentProjectRole = projectUserInfo?.[workspaceSlug!.toString()]?.[projectId!.toString()]?.role;
 
   if (!currentProjectRole) {
     return (
@@ -48,8 +48,8 @@ export const ProjectSettingsSidebar = observer(() => {
               allowPermissions(
                 link.access,
                 EUserPermissionsLevel.PROJECT,
-                workspaceSlug.toString(),
-                projectId.toString()
+                workspaceSlug!.toString(),
+                projectId!.toString()
               ) && (
                 <Link key={link.key} href={`/${workspaceSlug}/projects/${projectId}${link.href}`}>
                   <SidebarNavItem

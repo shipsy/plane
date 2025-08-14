@@ -1,16 +1,17 @@
 import React from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
+import { useTranslation } from "@plane/i18n";
 // types
 import { IIssueDisplayProperties } from "@plane/types";
 // constants
 import { ISSUE_DISPLAY_PROPERTIES } from "@/constants/issue";
+import { useUserPermissions } from "@/hooks/store";
 // plane web helpers
 import { shouldRenderDisplayProperty } from "@/plane-web/helpers/issue-filter.helper";
 // components
 import { FilterHeader } from "../helpers/filter-header";
-import { useTranslation } from "@plane/i18n";
-import { useUserPermissions } from "@/hooks/store";
+
 
 type Props = {
   displayProperties: IIssueDisplayProperties;
@@ -43,7 +44,7 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
   const { workspaceUserInfo } = useUserPermissions();
 
   const customPropertiesForDisplay: IProperty[] = Object.keys(
-    workspaceUserInfo[workspaceSlug?.toString()]?.default_props?.display_properties?.custom_properties || {}
+    workspaceUserInfo[workspaceSlug!.toString()]?.default_props?.display_properties?.custom_properties || {}
   ).map((key) => ({
     key,
     title: key,
@@ -67,7 +68,7 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
       case "modules":
         return !moduleViewDisabled;
       default:
-        return shouldRenderDisplayProperty({ workspaceSlug: workspaceSlug?.toString(), projectId, key: property.key });
+        return shouldRenderDisplayProperty({ workspaceSlug: workspaceSlug!.toString(), projectId, key: property.key });
     }
   });
 

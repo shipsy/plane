@@ -31,9 +31,9 @@ const CycleDetailPage = observer(() => {
   const { setValue, storedValue } = useLocalStorage("cycle_sidebar_collapsed", "false");
 
   useCyclesDetails({
-    workspaceSlug: workspaceSlug.toString(),
-    projectId: projectId.toString(),
-    cycleId: cycleId.toString(),
+    workspaceSlug: workspaceSlug!.toString(),
+    projectId: projectId!.toString(),
+    cycleId: cycleId!.toString(),
   });
   // derived values
   const isSidebarCollapsed = storedValue ? (storedValue === "true" ? true : false) : false;

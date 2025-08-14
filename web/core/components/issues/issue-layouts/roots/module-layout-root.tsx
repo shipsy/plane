@@ -56,7 +56,7 @@ export const ModuleLayoutRoot: React.FC = observer(() => {
     { revalidateIfStale: false, revalidateOnFocus: false }
   );
 
-  const issueFilters = issuesFilter?.getIssueFilters(moduleId?.toString());
+  const issueFilters = issuesFilter?.getIssueFilters(moduleId!.toString());
 
   if (!workspaceSlug || !projectId || !moduleId) return <></>;
 

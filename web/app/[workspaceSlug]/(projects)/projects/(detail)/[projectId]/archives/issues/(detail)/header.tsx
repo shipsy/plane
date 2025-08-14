@@ -86,9 +86,9 @@ export const ProjectArchivedIssueDetailsHeader = observer(() => {
       </Header.LeftItem>
       <Header.RightItem>
         <IssueDetailQuickActions
-          workspaceSlug={workspaceSlug.toString()}
-          projectId={projectId.toString()}
-          issueId={archivedIssueId.toString()}
+          workspaceSlug={workspaceSlug!.toString()}
+          projectId={projectId!.toString()}
+          issueId={archivedIssueId!.toString()}
         />
       </Header.RightItem>
     </Header>

@@ -59,7 +59,7 @@ export const SendWorkspaceInvitationModal: React.FC<Props> = observer((props) =>
     name: "emails",
   });
 
-  const currentWorkspaceRole = workspaceInfoBySlug(workspaceSlug.toString())?.role;
+  const currentWorkspaceRole = workspaceInfoBySlug(workspaceSlug!.toString())?.role;
 
   const handleClose = () => {
     onClose();

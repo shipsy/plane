@@ -3,11 +3,11 @@
 import React, { useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { FilterHeader, FilterOption } from "@/components/issues";
-import { WorkspaceService } from "@/services/workspace.service";
-import { API_BASE_URL } from "@/helpers/common.helper";
-import { FilterSearch } from "./search-filters";
 import { useTranslation } from "@plane/i18n";
+import { FilterHeader, FilterOption } from "@/components/issues";
+import { API_BASE_URL } from "@/helpers/common.helper";
+import { WorkspaceService } from "@/services/workspace.service";
+import { FilterSearch } from "./search-filters";
 
 type AdditionalPropertyProps = {
   data: string[];
@@ -36,7 +36,7 @@ export const FilterAdditionalProperties: React.FC<Props> = observer((props) => {
 
   const fetchOptions = async (query = '', page = 1) => {
     try {
-      const response = await workspaceService.getIssueAdditionalProperties(workspaceSlug.toString(), additionalPropertyKey, query, page);
+      const response = await workspaceService.getIssueAdditionalProperties(workspaceSlug!.toString(), additionalPropertyKey, query, page);
       setOptions((options: any) => ({
         ...response,
         query,
@@ -88,9 +88,7 @@ export const FilterAdditionalProperties: React.FC<Props> = observer((props) => {
                 <button
                   onClick={() => fetchNextPage()}
                   className="ml-8 text-xs font-medium text-custom-primary-100 cursor-pointer"
-                >
-                  
-                </button>
+                 />
               )}
             </>
           ) : (
