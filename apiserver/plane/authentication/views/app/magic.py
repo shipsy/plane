@@ -62,6 +62,7 @@ class MagicGenerateEndpoint(BaseAPIView):
             )
 
         origin = request.META.get("HTTP_ORIGIN", "/")
+        print(origin)
         email = request.data.get("email", False)
         if not email:
             username = request.data.get("username", False)
@@ -290,6 +291,7 @@ class MagicSignUpEndpoint(APIView):
         code = request.POST.get("code", "").strip()
         email = request.POST.get("email", "").strip().lower()
         is_app = request.POST.get("is_app", False)
+        print(is_app)
         next_path = request.POST.get("next_path")
 
         if code == "" or email == "":
