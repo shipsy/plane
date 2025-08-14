@@ -27,7 +27,7 @@ export const ArchivedIssueLayoutRoot: React.FC = observer(() => {
     { revalidateIfStale: false, revalidateOnFocus: false }
   );
 
-  const issueFilters = issuesFilter?.getIssueFilters(projectId?.toString());
+  const issueFilters = issuesFilter?.getIssueFilters(projectId!.toString());
 
   if (!workspaceSlug || !projectId) return <></>;
 

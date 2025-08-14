@@ -41,7 +41,7 @@ export const DraftIssueLayoutRoot: React.FC = observer(() => {
     { revalidateIfStale: false, revalidateOnFocus: false }
   );
 
-  const issueFilters = issuesFilter?.getIssueFilters(projectId?.toString());
+  const issueFilters = issuesFilter?.getIssueFilters(projectId!.toString());
   const activeLayout = issueFilters?.displayFilters?.layout || undefined;
 
   if (!workspaceSlug || !projectId) return <></>;

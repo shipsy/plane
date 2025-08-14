@@ -183,13 +183,13 @@ export const SidebarProjectsList: FC = observer(() => {
                   position="right"
                   disabled={!isCollapsed}
                 >
-                  <>
+                  <div>
                     {isCollapsed ? (
                       <Briefcase className="flex-shrink-0 size-3" />
                     ) : (
                       <span className="text-xs font-semibold">{t("your_projects").toUpperCase()}</span>
                     )}
-                  </>
+                  </div>
                 </Tooltip>
               </Disclosure.Button>
               {!isCollapsed && (

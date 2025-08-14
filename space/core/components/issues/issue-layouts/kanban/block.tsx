@@ -37,7 +37,7 @@ const KanbanIssueDetailsBlock: React.FC<IssueDetailsBlockProps> = observer((prop
   const { issue, displayProperties } = props;
   const { anchor } = useParams();
   // hooks
-  const { project_details } = usePublish(anchor.toString());
+  const { project_details } = usePublish(anchor!.toString());
 
   return (
     <div className="space-y-2 px-3 py-2">

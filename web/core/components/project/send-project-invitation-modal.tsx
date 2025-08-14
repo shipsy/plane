@@ -68,7 +68,7 @@ export const SendProjectInvitationModal: React.FC<Props> = observer((props) => {
     name: "members",
   });
 
-  const currentProjectRole = projectUserInfo?.[workspaceSlug?.toString()]?.[projectId?.toString()]?.role;
+  const currentProjectRole = projectUserInfo?.[workspaceSlug!.toString()]?.[projectId!.toString()]?.role;
 
   const uninvitedPeople = workspaceMemberIds?.filter((userId) => {
     const isInvited = projectMemberIds?.find((u) => u === userId);

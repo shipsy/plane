@@ -162,7 +162,7 @@ export const SidebarWorkspaceMenu = observer(() => {
           >
             {SIDEBAR_WORKSPACE_MENU_ITEMS.map(
               (link) =>
-                allowPermissions(link.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug.toString()) && (
+                allowPermissions(link.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug!.toString()) && (
                   <Tooltip
                     key={link.key}
                     tooltipContent={t(link.key)}

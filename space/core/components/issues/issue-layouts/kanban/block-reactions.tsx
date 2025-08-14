@@ -13,7 +13,7 @@ type Props = {
 export const BlockReactions = observer((props: Props) => {
   const { issueId } = props;
   const { anchor } = useParams();
-  const { canVote, canReact } = usePublish(anchor.toString());
+  const { canVote, canReact } = usePublish(anchor!.toString());
 
   // if the user cannot vote or react then return empty
   if (!canVote && !canReact) return <></>;
@@ -31,12 +31,12 @@ export const BlockReactions = observer((props: Props) => {
               "after:h-6 after:ml-1 after:w-[1px] after:bg-custom-border-200": canReact,
             })}
           >
-            <IssueVotes anchor={anchor.toString()} issueIdFromProps={issueId} size="sm" />
+            <IssueVotes anchor={anchor!.toString()} issueIdFromProps={issueId} size="sm" />
           </div>
         )}
         {canReact && (
           <div className="flex flex-wrap items-center gap-2">
-            <IssueEmojiReactions anchor={anchor.toString()} issueIdFromProps={issueId} size="sm" />
+            <IssueEmojiReactions anchor={anchor!.toString()} issueIdFromProps={issueId} size="sm" />
           </div>
         )}
       </div>

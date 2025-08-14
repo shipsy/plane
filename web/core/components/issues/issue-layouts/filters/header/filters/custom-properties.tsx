@@ -3,11 +3,12 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
-import { WorkspaceService } from "@/services/workspace.service";
-import { API_BASE_URL } from "@/helpers/common.helper";
-import { FilterHeader, FilterOption } from "@/components/issues";
-import { FilterSearch } from "./search-filters";
 import { useTranslation } from "@plane/i18n";
+import { FilterHeader, FilterOption } from "@/components/issues";
+import { API_BASE_URL } from "@/helpers/common.helper";
+import { WorkspaceService } from "@/services/workspace.service";
+import { FilterSearch } from "./search-filters";
+
 
 type CustomPropertySection = {
   data: string[];
@@ -49,7 +50,7 @@ export const FilterCustomProperty: React.FC<Props> = observer((props) => {
         key: groupKey || '',
       };
 
-      const data = await workspaceService.getIssuesCustomProperties(workspaceSlug?.toString(), params) as any;
+      const data = await workspaceService.getIssuesCustomProperties(workspaceSlug!.toString(), params) as any;
 
       // If no specific section, initialize all sections
       if (!groupKey) {

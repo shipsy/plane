@@ -1,5 +1,6 @@
 import React, { useRef } from "react";
 import { observer } from "mobx-react";
+import { useParams } from "next/navigation";
 // types
 import { TIssue, IIssueDisplayFilterOptions, IIssueDisplayProperties } from "@plane/types";
 // components
@@ -10,7 +11,7 @@ import { QuickAddIssueRoot, SpreadsheetAddIssueButton } from "@/components/issue
 import { EIssueLayoutTypes } from "@/constants/issue";
 import { SPREADSHEET_PROPERTY_LIST, SPREADSHEET_SELECT_GROUP } from "@/constants/spreadsheet";
 // hooks
-import { useProject } from "@/hooks/store";
+import { useProject, useUserPermissions } from "@/hooks/store";
 // plane web components
 import { IssueBulkOperationsRoot } from "@/plane-web/components/issues";
 // plane web hooks
@@ -18,8 +19,6 @@ import { useBulkOperationStatus } from "@/plane-web/hooks/use-bulk-operation-sta
 // types
 import { TRenderQuickActions } from "../list/list-view-types";
 import { SpreadsheetTable } from "./spreadsheet-table";
-import { useParams } from "next/navigation";
-import { useUserPermissions } from "@/hooks/store";
 
 type Props = {
   displayProperties: IIssueDisplayProperties;
@@ -75,7 +74,7 @@ export const SpreadsheetView: React.FC<Props> = observer((props) => {
       });
 
   const customPropertiesForSpreadsheet = Object.keys(
-    workspaceUserInfo[workspaceSlug?.toString()]?.default_props?.display_properties?.custom_properties || {}
+    workspaceUserInfo[workspaceSlug!.toString()]?.default_props?.display_properties?.custom_properties || {}
   );
 
   const combinedSpreadsheetColumnsList = [...spreadsheetColumnsList, ...customPropertiesForSpreadsheet];

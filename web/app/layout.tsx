@@ -40,8 +40,19 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const isSessionRecorderEnabled = parseInt(process.env.NEXT_PUBLIC_ENABLE_SESSION_RECORDER || "0");
 
+  // Default theme - this will be overridden by the client-side theme provider
+  const theme = 'light';
+
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      data-theme={theme}
+      style={{
+        'color-scheme': theme,
+        '--color-scheme': theme,
+      } as React.CSSProperties}
+      suppressHydrationWarning
+    >
       <head>
         <meta name="theme-color" content="#fff" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png" />

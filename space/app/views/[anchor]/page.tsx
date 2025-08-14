@@ -8,14 +8,14 @@ import { usePublish } from "@/hooks/store";
 import { ViewLayoutsRoot } from "@/plane-web/components/issue-layouts/root";
 
 type Props = {
-  params: {
+  params: Promise<{
     anchor: string;
-  };
+  }>;
 };
 
-const IssuesPage = observer((props: Props) => {
+const IssuesPage = observer(async (props: Props) => {
   const { params } = props;
-  const { anchor } = params;
+  const { anchor } = await params;
   // params
   const searchParams = useSearchParams();
   const peekId = searchParams.get("peekId") || undefined;
