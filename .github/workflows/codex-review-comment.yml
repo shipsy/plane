@@ -1,0 +1,49 @@
+name: "Post @codex review on PR ready / new commits"
+
+on:
+  pull_request:
+    types: [opened, ready_for_review, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  post-codex-comment:
+    runs-on: ubuntu-latest
+    env:
+      COMMENT_BODY: "@codex review"
+    steps:
+      - name: Post @codex review (as PAT owner)
+        uses: actions/github-script@v6
+        with:
+          # Authenticate the injected `github` client with your PAT so comments come from that user
+          github-token: ${{ secrets.COMMENT_PAT_HIMANSHU }}
+          script: |
+            // Use injected globals: github, context, core
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              core.info("No pull_request in payload — exiting.");
+              return;
+            }
+
+            // If opened as draft -> skip
+            if (context.payload.action === 'opened' && pr.draft) {
+              core.info("PR opened as DRAFT — skipping comment.");
+              return;
+            }
+
+            // If PR is currently draft -> skip (covers synchronize on draft PRs)
+            if (pr.draft) {
+              core.info("PR is currently draft — skipping comment.");
+              return;
+            }
+
+            // Use injected `github` (already authenticated with github-token above)
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: process.env.COMMENT_BODY,
+            });
+
+            core.info("Posted comment: " + process.env.COMMENT_BODY);
