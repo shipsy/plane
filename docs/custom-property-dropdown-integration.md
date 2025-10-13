@@ -6,7 +6,7 @@ This document describes the end-to-end changes required to introduce a new `drop
 ## Goals
 - Persist dropdown configuration with each issue-type custom property.
 - Expose the configuration through the existing issue type custom property API.
-- Render dropdown inputs in `web/core/components/issues/custom-properties.tsx`, sourcing options either from the stored list or from an external API resolved from an identifier.
+- Render dropdown inputs in `web/core/components/issues/custom-properties.tsx`, sourcing options either from the stored list or from an external API resolved from an identifier. Remote requests must go through a Plane API proxy rather than calling ProjectX directly from the browser.
 - Ensure graceful fallback to a text input when remote dependencies cannot supply options (e.g., missing reference number).
 
 ## Non-Goals
@@ -34,6 +34,15 @@ The `IssueTypeCustomPropertySerializer` located in `apiserver/plane/api/serializ
 ### Views
 `IssueTypeCustomPropertyAPIEndpoint` (see `apiserver/plane/api/views/issue_type.py`) already delegates to the serializer. No behavioural changes are required beyond ensuring request bodies can include the new fields. Confirm the POST endpoint used by `${PLANE_URL}/api/v1/workspaces/${org_id}/issue-type/${issue_type_id}/custom-properties/` passes the data through intact.
 
+### Plane Proxy API for Entity Dropdowns
+Introduce a dedicated Plane REST endpoint that proxies entity dropdown lookups to ProjectX so the web client does not make cross-origin requests. The endpoint should:
+- Live under the workspace scope (e.g. `GET /api/v1/workspaces/{workspace_id}/issue-type/{issue_type_id}/dropdown-entities/{identifier}/`).
+- Validate the requesting user has access to the workspace/issue type before forwarding the request.
+- Call the corresponding ProjectX internal API using server-side credentials and return a normalised `{ options: string[] }` payload.
+- Surface errors with appropriate status codes so the frontend can fall back to text input when needed.
+
+Add serializer/response typing as required so the handler is easily reusable for new dropdown entities in the future.
+
 ### Payload Contract
 Clients can send the following shape when `data_type === "dropdown"`:
 ```json
@@ -59,7 +68,7 @@ Augment the `mergedCustomProperties` mapping so each property includes `dropdown
 ### Option Resolution
 Implement a helper (e.g., `useDropdownOptions(properties, dependencies)`) that constructs an options map:
 - **Custom Source**: when `dropdown_source_type === "custom"`, normalise `dropdown_source_field` into a string array and convert to `{ label, value }` pairs.
-- **Entity/API Source**: resolve `dropdown_source_field` to a single identifier string (e.g., `consignmentInvoiceNumber`), look it up inside a `customPropertyDropdownEntityAPIMap`, and call the corresponding async function. Provide the function with the issue context required by the API (issue `entityData`, `userId`, `organisationId`, `accessToken`, `source`). Cache the results to avoid duplicate requests.
+- **Entity/API Source**: resolve `dropdown_source_field` to a single identifier string (e.g., `consignmentInvoiceNumber`), look it up inside a `customPropertyDropdownEntityAPIMap`, and call the corresponding async function. Provide the function with the issue context required by the API (issue `entityData`, `userId`, `organisationId`, `accessToken`, `source`). Cache the results to avoid duplicate requests. Each fetcher must invoke the new Plane proxy API rather than contacting ProjectX directly from the browser.
 - **Error Handling**: if an identifier has no handler, or the handler rejects (for example because the issue lacks a `reference_number`), default the options array to `[]` and log a warning.
 
 ### Rendering
@@ -72,9 +81,9 @@ If the dropdown options array is empty (because the API could not supply values)
 ### Remote Option Fetcher Example
 Define `fetchConsignmentInvoice` inside an appropriate shared utilities module if not already present. The function should:
 - Verify that `entityData.reference_number` (consignment number) is populated.
-- POST to `${PX_BASE_URL}/api/internal/consignment-invoice/fetch` with headers containing `x-api-key`, `organisation-id`, and `application-type`.
+- Call the new Plane proxy endpoint (e.g., `GET ${PLANE_URL}/api/v1/workspaces/${workspace_id}/issue-type/${issue_type_id}/dropdown-entities/consignmentInvoiceNumber/`) with the user's auth token so the server performs the ProjectX lookup.
 - Return an array of invoice numbers (strings). On failure, return an empty array.
-- Extend the API in the ProjectX repository so `fetchConsignmentInvoice` is exposed through both the existing `vendor-portal-parts` route and a new `internal-api` route. This ensures internal consumers can reuse the same contract without proxying through the vendor portal.
+- Extend the API in the ProjectX repository so the Plane proxy can reach `${PX_BASE_URL}/api/internal/consignment-invoice/fetch` using server-side credentials. This ensures internal consumers can reuse the same contract without exposing PX credentials to the browser.
 
 Register this fetcher in `customPropertyDropdownEntityAPIMap` so the dropdown renderer can call it when encountering the `consignmentInvoiceNumber` identifier.
 
