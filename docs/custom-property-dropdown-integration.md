@@ -74,6 +74,7 @@ Define `fetchConsignmentInvoice` inside an appropriate shared utilities module i
 - Verify that `entityData.reference_number` (consignment number) is populated.
 - POST to `${API_BASE_URL}/TicketingTool/consignment-invoice/fetch` with headers containing `access-token`, `organisation-id`, `user-id`, and `application-type`.
 - Return an array of invoice numbers (strings). On failure, return an empty array.
+- Extend the API in the ProjectX repository so `fetchConsignmentInvoice` is exposed through both the existing `vendor-portal-parts` route and a new `internal-api` route. This ensures internal consumers can reuse the same contract without proxying through the vendor portal.
 
 Register this fetcher in `customPropertyDropdownEntityAPIMap` so the dropdown renderer can call it when encountering the `consignmentInvoiceNumber` identifier.
 
