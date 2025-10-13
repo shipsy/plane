@@ -72,7 +72,7 @@ If the dropdown options array is empty (because the API could not supply values)
 ### Remote Option Fetcher Example
 Define `fetchConsignmentInvoice` inside an appropriate shared utilities module if not already present. The function should:
 - Verify that `entityData.reference_number` (consignment number) is populated.
-- POST to `${API_BASE_URL}/TicketingTool/consignment-invoice/fetch` with headers containing `access-token`, `organisation-id`, `user-id`, and `application-type`.
+- POST to `${PX_BASE_URL}/api/internal/consignment-invoice/fetch` with headers containing `x-api-key`, `organisation-id`, and `application-type`.
 - Return an array of invoice numbers (strings). On failure, return an empty array.
 - Extend the API in the ProjectX repository so `fetchConsignmentInvoice` is exposed through both the existing `vendor-portal-parts` route and a new `internal-api` route. This ensures internal consumers can reuse the same contract without proxying through the vendor portal.
 
