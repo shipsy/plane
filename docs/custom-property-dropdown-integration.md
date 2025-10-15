@@ -55,6 +55,10 @@ Clients can send the following shape when `data_type === "dropdown"`:
 ```
 Responses will echo these values, enabling the web UI to determine option sourcing.
 
+## WB Updates
+In Create IssueTypeCustomProperties api called from ticket master workflows (create ticket master and update ticket master) - 
+Add dropdownSourceType and dropdownSourceField in the payload
+
 ## Frontend Updates
 All dropdown rendering logic lives inside `web/core/components/issues/custom-properties.tsx`. Current inputs are keyed by `data_type` and only cover `date`, `boolean`, `number`, and `text`. The component must:
 
