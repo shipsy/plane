@@ -77,7 +77,7 @@ const navigation = (workspaceSlug: string, projectId: string) => [
   {
     name: "Views",
     href: `/${workspaceSlug}/projects/${projectId}/views`,
-    Icon: LayersIcon, // or another icon if preferred
+    Icon: LayersIcon, 
     access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
   },
 ];
