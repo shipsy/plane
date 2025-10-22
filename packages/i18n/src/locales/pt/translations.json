@@ -554,5 +554,10 @@
   "Good morning": "Bom dia",
   "Good afternoon": "Boa tarde",
   "Good evening": "Boa noite",
-  "Workload": "Carga de trabalho"
+  "Workload": "Carga de trabalho",
+  "stay_days": "Estadias/Dias",
+  "return_freight_amount": "Valor Frete Retorno",
+  "return_invoice_amount": "Valor da Devolução",
+  "empty_return_freight_amount": "Valor do Frete - Retorno Vazio",
+  "total_amount": "Valor Total"
 }

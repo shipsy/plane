@@ -470,5 +470,10 @@
   "assigned_to": "Assigned to",
   "due_by": "Due by",
   "blocked_by": "Blocked by",
-  "sub_issues": "Sub-issues"
+  "sub_issues": "Sub-issues",
+  "stay_days": "Stay/Days",
+  "return_freight_amount": "Return Freight Amount",
+  "return_invoice_amount": "Return Invoice Amount",
+  "empty_return_freight_amount": "Empty Return Freight Amount",
+  "total_amount": "Total Amount"
 }
