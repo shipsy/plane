@@ -14,12 +14,24 @@ export type CustomProperty = {
   is_active: boolean;
 };
 
+type IssueTypeCustomProperty = {
+  id: string;
+  name: string;
+  data_type: string;
+  is_required: boolean;
+  is_active: boolean;
+  value: any;
+};
+
 type CustomPropertiesProps = {
   customProperties?: CustomProperty[];
   issue_type_id: string;
   workspaceSlug: string;
   updateCustomProperties: (updatedProperties: CustomProperty[]) => void;
   layout?: "quarter" | "two-fifths";
+  issueData?: {
+    reference_number?: string;
+  };
 };
 
 export const CustomProperties: React.FC<CustomPropertiesProps> = ({
@@ -28,11 +40,14 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
   workspaceSlug,
   updateCustomProperties,
   layout = "quarter",
+  issueData,
 }) => {
-  const [issueTypeCustomProperties, setissueTypeCustomProperties] = useState<CustomProperty[]>([]);
+  const [issueTypeCustomProperties, setissueTypeCustomProperties] = useState<IssueTypeCustomProperty[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editingPropertyKey, setEditingPropertyKey] = useState<string | null>(null);
   const [localCustomProperties, setLocalCustomProperties] = useState<CustomProperty[]>([]);
+  const [dropdownOptions, setDropdownOptions] = useState<Record<string, { value: string; label: string }[]>>({});
+  const [loadingDropdowns, setLoadingDropdowns] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const getIssueTypeCustomProperties = async () => {
@@ -60,6 +75,74 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
       setLocalCustomProperties(customProperties);
     }
   }, [customProperties]);
+
+  // Fetch dropdown options for dropdown type custom properties
+  useEffect(() => {
+    const fetchDropdownOptions = async () => {
+      if (!issueTypeCustomProperties || issueTypeCustomProperties.length === 0) {
+        return;
+      }
+
+      const dropdownProperties = issueTypeCustomProperties.filter(
+        (prop) => prop.data_type === "dropdown"
+      );
+
+      for (const prop of dropdownProperties) {
+        try {
+          // Parse dropdown configuration from value field
+          const dropdownConfig = prop.value;
+          if (!dropdownConfig || typeof dropdownConfig !== "object") {
+            continue;
+          }
+
+          const identifier = dropdownConfig.dropdown_source_field;
+          if (!identifier) {
+            continue;
+          }
+
+          // Set loading state
+          setLoadingDropdowns((prev) => ({ ...prev, [prop.id]: true }));
+
+          // Build query parameters
+          const params = new URLSearchParams({
+            issue_type_id: issue_type_id,
+            issue_type_custom_property_id: prop.id,
+            custom_property_id: prop.id,
+          });
+
+          // Add reference_number for system type dropdowns
+          if (
+            dropdownConfig.dropdown_source_type === "system" &&
+            issueData?.reference_number
+          ) {
+            params.append("reference_number", issueData.reference_number);
+          }
+
+          // Fetch dropdown options
+          const response = await axios.get(
+            `/api/workspaces/${workspaceSlug}/issue/dropdown-options/${identifier}/?${params.toString()}`
+          );
+
+          // Update dropdown options state
+          if (response.data && Array.isArray(response.data.options)) {
+            setDropdownOptions((prev) => ({
+              ...prev,
+              [prop.id]: response.data.options,
+            }));
+          }
+        } catch (error) {
+          console.error(`Failed to fetch dropdown options for ${prop.name}:`, error);
+          // On error, set empty options (will fall back to text input)
+          setDropdownOptions((prev) => ({ ...prev, [prop.id]: [] }));
+        } finally {
+          // Clear loading state
+          setLoadingDropdowns((prev) => ({ ...prev, [prop.id]: false }));
+        }
+      }
+    };
+
+    fetchDropdownOptions();
+  }, [issueTypeCustomProperties, workspaceSlug, issue_type_id, issueData?.reference_number]);
 
   const mergedCustomProperties = issueTypeCustomProperties
     .filter((customProp) => customProp.is_active)
@@ -184,6 +267,55 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
           className="text-sm w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-custom-primary-100"
         />
       ),
+      dropdown: (() => {
+        const isLoading = loadingDropdowns[property.issue_type_custom_property];
+        const options = dropdownOptions[property.issue_type_custom_property] || [];
+        
+        // Show loading state
+        if (isLoading) {
+          return (
+            <select
+              disabled
+              className="text-sm w-full border rounded px-2 py-1 bg-custom-background-80 cursor-not-allowed"
+            >
+              <option>Loading options...</option>
+            </select>
+          );
+        }
+        
+        // Show dropdown if options are available
+        if (options.length > 0) {
+          return (
+            <select
+              value={value}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              autoFocus
+              className="text-sm w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-custom-primary-100"
+            >
+              <option value="">Select {property.key}</option>
+              {options.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          );
+        }
+        
+        // Fallback to text input if no options available
+        return (
+          <Input
+            type="text"
+            value={value}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            autoFocus
+            placeholder={`Add ${property.key}`}
+            className="text-sm w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-custom-primary-100"
+          />
+        );
+      })(),
     };
     
     return (
