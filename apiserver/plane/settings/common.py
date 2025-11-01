@@ -396,8 +396,8 @@ HARD_DELETE_AFTER_DAYS = int(os.environ.get("HARD_DELETE_AFTER_DAYS", 60))
 
 # Instance Changelog URL
 INSTANCE_CHANGELOG_URL = os.environ.get("INSTANCE_CHANGELOG_URL", "")
-WB_API_URL = os.environ.get(
-    "WB_API_URL",
+WB_BASE_URL = os.environ.get(
+    "WB_BASE_URL",
     "https://wbdemo.shipsy.io/webhook",
 )
 ATTACHMENT_MIME_TYPES = [
