@@ -19,6 +19,7 @@ type CustomPropertiesProps = {
   issue_type_id: string;
   workspaceSlug: string;
   updateCustomProperties: (updatedProperties: CustomProperty[]) => void;
+  issueId: string;
   layout?: "quarter" | "two-fifths";
 };
 
@@ -27,6 +28,7 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
   issue_type_id,
   workspaceSlug,
   updateCustomProperties,
+  issueId,
   layout = "quarter",
 }) => {
   const [issueTypeCustomProperties, setissueTypeCustomProperties] = useState<CustomProperty[]>([]);
@@ -99,7 +101,7 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
         
         return updatedProperties;
       });
-      
+       
       await updateCustomProperties([updatedProperty]);
     } catch (error) {
       console.error("Failed to update custom property:", error);
@@ -109,6 +111,42 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
   const EditableProperty: React.FC<{ property: CustomProperty }> = React.memo(({ property }) => {
     const [value, setValue] = useState(property.value);
     const [localError, setLocalError] = useState<string | null>(null);
+    // Local state for dropdown editing
+    const [dropdownLoading, setDropdownLoading] = useState<boolean>(false);
+    const [dropdownError, setDropdownError] = useState<string | null>(null);
+    const [dropdownOptions, setDropdownOptions] = useState<string[]>([]);
+
+    // Sync value when property changes
+    useEffect(() => {
+      setValue(property.value);
+    }, [property.value]);
+
+    // Fetch dropdown options when component mounts for dropdown type (no caching)
+    useEffect(() => {
+      if (property.data_type !== "dropdown") return;
+
+      const fetchOptions = async () => {
+        setDropdownLoading(true);
+        setDropdownError(null);
+        
+        try {
+          const url = `/api/workspaces/${workspaceSlug}/issues/${issueId}/custom-properties/${property.issue_type_custom_property}/dropdown-options/`;
+          const res = await axios.get(url);
+          
+          const arr = Array.isArray(res?.data) ? res.data : res?.data?.data;
+          if (!Array.isArray(arr)) throw new Error("Invalid options response");
+          
+          setDropdownOptions(arr.map(String));
+        } catch (error) {
+          setDropdownError("Failed to load options.");
+          console.error("Failed to fetch dropdown options:", error);
+        } finally {
+          setDropdownLoading(false);
+        }
+      };
+
+      fetchOptions();
+    }, [property.data_type, property.issue_type_custom_property, workspaceSlug, issue_type_id]);
 
     const handleBlur = async () => {
       if (property.is_required && value.trim() === "") {
@@ -137,6 +175,30 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
     };
 
     const inputComponents: Record<string, React.JSX.Element> = {
+      dropdown: (
+        <div className="w-full">
+          {dropdownLoading ? (
+            <div className="text-sm text-custom-text-400 py-1">Loading options…</div>
+          ) : dropdownError ? (
+            <div className="text-red-500 text-sm mt-1">{dropdownError}</div>
+          ) : (
+            <select
+              value={value}
+              onChange={handleChange}
+              onBlur={handleBlur}
+              autoFocus
+              className="text-sm w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-custom-primary-100"
+            >
+              <option value="">{`Select ${property.key}`}</option>
+              {dropdownOptions.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      ),
       date: (
         <Input
           type="date"
