@@ -155,6 +155,14 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
         return;
       }
 
+      // If value is empty and property had a value, revert to previous value
+      if (value === "" && property.value !== "") {
+        setValue(property.value);
+        setEditingPropertyKey(null);
+        setLocalError(null);
+        return;
+      }
+
       if (value !== property.value) {
         try {
           const updatedProperty = { ...property, value };
@@ -183,13 +191,12 @@ export const CustomProperties: React.FC<CustomPropertiesProps> = ({
             <div className="text-red-500 text-sm mt-1">{dropdownError}</div>
           ) : (
             <select
-              value={value}
+              value={value || ""}
               onChange={handleChange}
               onBlur={handleBlur}
               autoFocus
               className="text-sm w-full border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-custom-primary-100"
             >
-              <option value="">{`Select ${property.key}`}</option>
               {dropdownOptions.map((opt) => (
                 <option key={opt} value={opt}>
                   {opt}
