@@ -270,7 +270,7 @@ class IssueCustomPropertyDropdownOptionsAPIView(BaseAPIView):
             }
             
             # WB API endpoint URL configured in settings
-            WB_API_BASE_URL = settings.WB_API_URL
+            WB_API_BASE_URL = settings.WB_BASE_URL
             WB_API_URL = f"{WB_API_BASE_URL}/wb/sample-dropdowns"
             
             # Make request to WB API using POST
