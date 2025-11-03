@@ -134,7 +134,7 @@ export const FilterCustomProperty: React.FC<Props> = observer((props) => {
   return (
     <>
       <FilterHeader
-        title={`Custom Properties${appliedFiltersCount > 0 ? ` (${appliedFiltersCount})` : ""}`}
+        title={`${t("Custom Properties")}${appliedFiltersCount > 0 ? ` (${appliedFiltersCount})` : ""}`}
         isPreviewEnabled={mainPreviewEnabled}
         handleIsPreviewEnabled={() => setMainPreviewEnabled(!mainPreviewEnabled)}
       />
