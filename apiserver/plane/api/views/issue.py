@@ -408,7 +408,7 @@ class IssueAPIEndpoint(BaseAPIView):
                     existing_serializer = IssueSerializer(existing_issue)
                     return Response(
                         existing_serializer.data,
-                        status=status.HTTP_201_CREATED,
+                        status=status.HTTP_200_OK,
                     )
             serializer.save()
             # Refetch the issue
