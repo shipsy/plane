@@ -142,42 +142,39 @@ class OffsetPaginator:
         page = cursor.offset
         # The offset
         offset = cursor.offset * cursor.value
-        stop = offset + (cursor.value or limit) + 1
+        # Fetch N+1 records to determine if there's a next page
+        fetch_limit = limit + 1
 
         if self.max_offset is not None and offset >= self.max_offset:
             raise BadPaginationError("Pagination offset too large")
         if offset < 0:
             raise BadPaginationError("Pagination offset cannot be negative")
 
-        results = queryset[offset:stop]
-        if cursor.value != limit:
-            results = results[-(limit + 1) :]
+        # Fetch N+1 records and convert to list to avoid multiple queries
+        results = list(queryset[offset : offset + fetch_limit])
+
+        # Determine if there are more results (N+1 approach)
+        has_next = len(results) > limit
+
+        # Trim to limit (return only N records)
+        results = results[:limit]
 
         # Adjust cursors based on the results for pagination
-        next_cursor = Cursor(limit, page + 1, False, results.count() > limit)
+        next_cursor = Cursor(limit, page + 1, False, has_next)
         # If the page is greater than 0, then set the previous cursor
         prev_cursor = Cursor(limit, page - 1, True, page > 0)
-
-        # Process the results
-        results = results[:limit]
 
         # Process the results
         if self.on_results:
             results = self.on_results(results)
 
-        # Count the queryset
-        count = queryset.count()
-
-        # Optionally, calculate the total count and max_hits if needed
-        max_hits = math.ceil(count / limit)
-
-        # Return the cursor results
+        # Return the cursor results (skip expensive count queries)
         return CursorResult(
             results=results,
             next=next_cursor,
             prev=prev_cursor,
-            hits=count,
-            max_hits=max_hits,
+            hits=None,
+            max_hits=None,
         )
 
     def process_results(self, results):
@@ -225,6 +222,7 @@ class GroupedOffsetPaginator(OffsetPaginator):
 
         page = cursor.offset
         offset = cursor.offset * cursor.value
+        # Fetch N+1 to determine if there's a next page
         stop = offset + (cursor.value or limit) + 1
 
         # Check if the offset is greater than the max offset
@@ -235,8 +233,6 @@ class GroupedOffsetPaginator(OffsetPaginator):
         if offset < 0:
             raise BadPaginationError("Pagination offset cannot be negative")
 
-        # Compute the results
-        results = {}
         # Create window for all the groups
         queryset = queryset.annotate(
             row_number=Window(
@@ -268,12 +264,15 @@ class GroupedOffsetPaginator(OffsetPaginator):
             F("created_at").desc(),
         )
 
+        # Use EXISTS check for next page (efficient - no full count)
+        has_next = queryset.filter(row_number__gte=stop).exists()
+
         # Adjust cursors based on the grouped results for pagination
         next_cursor = Cursor(
             limit,
             page + 1,
             False,
-            queryset.filter(row_number__gte=stop).exists(),
+            has_next,
         )
 
         # Add previous cursors
@@ -284,32 +283,13 @@ class GroupedOffsetPaginator(OffsetPaginator):
             page > 0,
         )
 
-        # Count the queryset
-        count = queryset.count()
-
-        # Optionally, calculate the total count and max_hits if needed
-        # This might require adjustments based on specific use cases
-        if results:
-            max_hits = math.ceil(
-                queryset.values(self.group_by_field_name)
-                .annotate(
-                    count=Count(
-                        "id",
-                        filter=self.count_filter,
-                        distinct=True,
-                    )
-                )
-                .order_by("-count")[0]["count"]
-                / limit
-            )
-        else:
-            max_hits = 0
+        # Skip expensive count queries - return None for hits and max_hits
         return CursorResult(
             results=results,
             next=next_cursor,
             prev=prev_cursor,
-            hits=count,
-            max_hits=max_hits,
+            hits=None,
+            max_hits=None,
         )
 
     def __get_total_queryset(self):
@@ -468,16 +448,13 @@ class SubGroupedOffsetPaginator(OffsetPaginator):
         # the offset
         offset = cursor.offset * cursor.value
 
-        # the stop
+        # Fetch N+1 to determine if there's a next page
         stop = offset + (cursor.value or limit) + 1
 
         if self.max_offset is not None and offset >= self.max_offset:
             raise BadPaginationError("Pagination offset too large")
         if offset < 0:
             raise BadPaginationError("Pagination offset cannot be negative")
-
-        # Compute the results
-        results = {}
 
         # Create windows for group and sub group field name
         queryset = queryset.annotate(
@@ -510,12 +487,15 @@ class SubGroupedOffsetPaginator(OffsetPaginator):
             F("created_at").desc(),
         )
 
+        # Use EXISTS check for next page (efficient - no full count)
+        has_next = queryset.filter(row_number__gte=stop).exists()
+
         # Adjust cursors based on the grouped results for pagination
         next_cursor = Cursor(
             limit,
             page + 1,
             False,
-            queryset.filter(row_number__gte=stop).exists(),
+            has_next,
         )
 
         # Add previous cursors
@@ -526,32 +506,13 @@ class SubGroupedOffsetPaginator(OffsetPaginator):
             page > 0,
         )
 
-        # Count the queryset
-        count = queryset.count()
-
-        # Optionally, calculate the total count and max_hits if needed
-        # This might require adjustments based on specific use cases
-        if results:
-            max_hits = math.ceil(
-                queryset.values(self.group_by_field_name)
-                .annotate(
-                    count=Count(
-                        "id",
-                        filter=self.count_filter,
-                        distinct=True,
-                    )
-                )
-                .order_by("-count")[0]["count"]
-                / limit
-            )
-        else:
-            max_hits = 0
+        # Skip expensive count queries - return None for hits and max_hits
         return CursorResult(
             results=results,
             next=next_cursor,
             prev=prev_cursor,
-            hits=count,
-            max_hits=max_hits,
+            hits=None,
+            max_hits=None,
         )
 
     def __get_group_total_queryset(self):

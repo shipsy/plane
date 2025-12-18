@@ -1,6 +1,3 @@
-# python imports
-from math import ceil
-
 # constants
 PAGINATOR_MAX_LIMIT = 1000
 
@@ -35,41 +32,37 @@ def paginate(base_queryset, queryset, cursor, on_result):
     else:
         cursor_object = PaginateCursor.from_string(cursor)
 
-    # getting the issues count
-    total_results = base_queryset.count()
     page_size = min(cursor_object.current_page_size, PAGINATOR_MAX_LIMIT)
 
-    # getting the total pages available based on the page size
-    total_pages = ceil(total_results / page_size)
-
-    # Calculate the start and end index for the paginated data
+    # Calculate the start index for the paginated data
     start_index = 0
     if cursor_object.current_page > 0:
         start_index = cursor_object.current_page * page_size
-    end_index = min(start_index + page_size, total_results)
 
-    # Get the paginated data
-    paginated_data = queryset[start_index:end_index]
+    # Fetch N+1 records to determine if there's a next page (avoid COUNT query)
+    fetch_limit = page_size + 1
+    paginated_data = list(queryset[start_index : start_index + fetch_limit])
+
+    # Determine if there are more results (N+1 approach)
+    has_next = len(paginated_data) > page_size
+
+    # Trim to page_size (return only N records)
+    paginated_data = paginated_data[:page_size]
 
     # Create the pagination info object
     prev_cursor = f"{page_size}:{cursor_object.current_page-1}:0"
     cursor = f"{page_size}:{cursor_object.current_page}:0"
     next_cursor = None
-    if end_index < total_results:
+    if has_next:
         next_cursor = f"{page_size}:{cursor_object.current_page+1}:0"
 
-    prev_page_results = False
-    if cursor_object.current_page > 0:
-        prev_page_results = True
-
-    next_page_results = False
-    if next_cursor:
-        next_page_results = True
+    prev_page_results = cursor_object.current_page > 0
+    next_page_results = has_next
 
     if on_result:
         paginated_data = on_result(paginated_data)
 
-    # returning the result
+    # returning the result (skip expensive count queries - return None for totals)
     paginated_data = {
         "prev_cursor": prev_cursor,
         "cursor": cursor,
@@ -77,8 +70,8 @@ def paginate(base_queryset, queryset, cursor, on_result):
         "prev_page_results": prev_page_results,
         "next_page_results": next_page_results,
         "page_count": len(paginated_data),
-        "total_results": total_results,
-        "total_pages": total_pages,
+        "total_results": None,
+        "total_pages": None,
         "results": paginated_data,
     }
 
