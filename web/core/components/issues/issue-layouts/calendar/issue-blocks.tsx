@@ -12,7 +12,7 @@ type Props = {
   date: Date;
   loadMoreIssues: (dateString: string) => void;
   getPaginationData: (groupId: string | undefined) => TPaginationData | undefined;
-  getGroupIssueCount: (groupId: string | undefined) => number | undefined;
+  getGroupIssueCount: (groupId: string | undefined) => number | null | undefined;
   issueIdList: string[];
   quickActions: TRenderQuickActions;
   isDragDisabled?: boolean;
@@ -51,7 +51,7 @@ export const CalendarIssueBlocks: React.FC<Props> = observer((props) => {
   const isPaginating = !!getIssueLoader(formattedDatePayload);
 
   const shouldLoadMore =
-    nextPageResults === undefined && dayIssueCount !== undefined
+    nextPageResults === undefined && dayIssueCount !== null && dayIssueCount !== undefined
       ? issueIdList?.length < dayIssueCount
       : !!nextPageResults;
 

@@ -353,6 +353,15 @@ class GroupedOffsetPaginator(OffsetPaginator):
             for field in self.group_by_fields
         }
 
+    def __get_field_dict_no_counts(self):
+        return {
+            str(field): {
+                "results": [],
+                "total_results": None,
+            }
+            for field in self.group_by_fields
+        }
+
     def __result_already_added(self, result, group):
         # Check if the result is already added then add it
         for existing_issue in group:
@@ -400,6 +409,37 @@ class GroupedOffsetPaginator(OffsetPaginator):
 
         return processed_results
 
+    def __query_multi_grouper_no_counts(self, results):
+        result_group_mapping = defaultdict(set)
+        grouped_by_field_name = defaultdict(list)
+
+        for result in results:
+            result_id = result["id"]
+            group_id = result[self.group_by_field_name]
+            result_group_mapping[str(result_id)].add(str(group_id))
+
+        for result in results:
+            result_id = result["id"]
+            group_ids = list(result_group_mapping[str(result_id)])
+            result[self.FIELD_MAPPER.get(self.group_by_field_name)] = (
+                [] if "None" in group_ids else group_ids
+            )
+            for group_id in group_ids:
+                if not self.__result_already_added(
+                    result, grouped_by_field_name[group_id]
+                ):
+                    grouped_by_field_name[group_id].append(result)
+
+        processed_results = {
+            str(group_id): {
+                "results": issues,
+                "total_results": None,
+            }
+            for group_id, issues in grouped_by_field_name.items()
+        }
+
+        return processed_results
+
     def __query_grouper(self, results):
         # Grouping for values that are not m2m
         processed_results = self.__get_field_dict()
@@ -409,13 +449,27 @@ class GroupedOffsetPaginator(OffsetPaginator):
                 processed_results[str(group_value)]["results"].append(result)
         return processed_results
 
+    def __query_grouper_no_counts(self, results):
+        processed_results = self.__get_field_dict_no_counts()
+        for result in results:
+            group_value = str(result.get(self.group_by_field_name))
+            if group_value in processed_results:
+                processed_results[str(group_value)]["results"].append(result)
+        return processed_results
+
     def process_results(self, results):
         # Process results
         if results:
-            if self.group_by_field_name in self.FIELD_MAPPER:
-                processed_results = self.__query_multi_grouper(results=results)
+            if self.skip_count:
+                if self.group_by_field_name in self.FIELD_MAPPER:
+                    processed_results = self.__query_multi_grouper_no_counts(results=results)
+                else:
+                    processed_results = self.__query_grouper_no_counts(results=results)
             else:
-                processed_results = self.__query_grouper(results=results)
+                if self.group_by_field_name in self.FIELD_MAPPER:
+                    processed_results = self.__query_multi_grouper(results=results)
+                else:
+                    processed_results = self.__query_grouper(results=results)
         else:
             processed_results = {}
         return processed_results
@@ -641,6 +695,15 @@ class SubGroupedOffsetPaginator(OffsetPaginator):
             for group in self.group_by_fields
         }
 
+    def __get_field_dict_no_counts(self):
+        return {
+            str(group): {
+                "results": {},
+                "total_results": None,
+            }
+            for group in self.group_by_fields
+        }
+
     def __query_multi_grouper(self, results):
         # Multi grouper
         processed_results = self.__get_field_dict()
@@ -696,6 +759,61 @@ class SubGroupedOffsetPaginator(OffsetPaginator):
 
         return processed_results
 
+    def __query_multi_grouper_no_counts(self, results):
+        processed_results = self.__get_field_dict_no_counts()
+        result_group_mapping = defaultdict(set)
+        result_sub_group_mapping = defaultdict(set)
+        if self.group_by_field_name in self.FIELD_MAPPER:
+            for result in results:
+                result_id = result["id"]
+                group_id = result[self.group_by_field_name]
+                result_group_mapping[str(result_id)].add(str(group_id))
+        if self.sub_group_by_field_name in self.FIELD_MAPPER:
+            for result in results:
+                result_id = result["id"]
+                sub_group_id = result[self.sub_group_by_field_name]
+                result_sub_group_mapping[str(result_id)].add(str(sub_group_id))
+
+        for result in results:
+            group_value = str(result.get(self.group_by_field_name))
+            sub_group_value = str(result.get(self.sub_group_by_field_name))
+            result_id = result["id"]
+
+            if group_value not in processed_results:
+                processed_results[group_value] = {
+                    "results": {},
+                    "total_results": None,
+                }
+
+            if sub_group_value not in processed_results[group_value]["results"]:
+                processed_results[group_value]["results"][sub_group_value] = {
+                    "results": [],
+                    "total_results": None,
+                }
+
+            if (
+                group_value in processed_results
+                and sub_group_value
+                in processed_results[str(group_value)]["results"]
+            ):
+                if self.group_by_field_name in self.FIELD_MAPPER:
+                    group_ids = list(result_group_mapping[str(result_id)])
+                    result[self.FIELD_MAPPER.get(self.group_by_field_name)] = (
+                        [] if "None" in group_ids else group_ids
+                    )
+                if self.sub_group_by_field_name in self.FIELD_MAPPER:
+                    sub_group_ids = list(
+                        result_sub_group_mapping[str(result_id)]
+                    )
+                    result[
+                        self.FIELD_MAPPER.get(self.sub_group_by_field_name)
+                    ] = ([] if "None" in sub_group_ids else sub_group_ids)
+                processed_results[str(group_value)]["results"][
+                    str(sub_group_value)
+                ]["results"].append(result)
+
+        return processed_results
+
     def __query_grouper(self, results):
         # Single grouper
         processed_results = self.__get_field_dict()
@@ -708,17 +826,50 @@ class SubGroupedOffsetPaginator(OffsetPaginator):
 
         return processed_results
 
+    def __query_grouper_no_counts(self, results):
+        processed_results = self.__get_field_dict_no_counts()
+        for result in results:
+            group_value = str(result.get(self.group_by_field_name))
+            sub_group_value = str(result.get(self.sub_group_by_field_name))
+
+            if group_value not in processed_results:
+                processed_results[group_value] = {
+                    "results": {},
+                    "total_results": None,
+                }
+
+            if sub_group_value not in processed_results[group_value]["results"]:
+                processed_results[group_value]["results"][sub_group_value] = {
+                    "results": [],
+                    "total_results": None,
+                }
+
+            processed_results[group_value]["results"][sub_group_value][
+                "results"
+            ].append(result)
+
+        return processed_results
+
     def process_results(self, results):
         if results:
-            if (
-                self.group_by_field_name in self.FIELD_MAPPER
-                or self.sub_group_by_field_name in self.FIELD_MAPPER
-            ):
-                # if the grouping is done through m2m then
-                processed_results = self.__query_multi_grouper(results=results)
+            if self.skip_count:
+                if (
+                    self.group_by_field_name in self.FIELD_MAPPER
+                    or self.sub_group_by_field_name in self.FIELD_MAPPER
+                ):
+                    processed_results = self.__query_multi_grouper_no_counts(results=results)
+                else:
+                    processed_results = self.__query_grouper_no_counts(results=results)
             else:
-                # group it directly
-                processed_results = self.__query_grouper(results=results)
+                if (
+                    self.group_by_field_name in self.FIELD_MAPPER
+                    or self.sub_group_by_field_name in self.FIELD_MAPPER
+                ):
+                    # if the grouping is done through m2m then
+                    processed_results = self.__query_multi_grouper(results=results)
+                else:
+                    # group it directly
+                    processed_results = self.__query_grouper(results=results)
         else:
             processed_results = {}
         return processed_results

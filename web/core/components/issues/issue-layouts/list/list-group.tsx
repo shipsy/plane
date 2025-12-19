@@ -248,6 +248,7 @@ export const ListGroup = observer((props: Props) => {
           icon={group.icon}
           title={group.name || ""}
           count={groupIssueCount}
+          hasMore={nextPageResults}
           issuePayload={group.payload}
           canEditProperties={canEditProperties}
           disableIssueCreation={disableIssueCreation || isGroupByCreatedBy || isCompletedCycle}

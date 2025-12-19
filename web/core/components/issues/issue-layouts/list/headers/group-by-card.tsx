@@ -23,7 +23,8 @@ interface IHeaderGroupByCard {
   groupID: string;
   icon?: React.ReactNode;
   title: string;
-  count: number;
+  count: number | null | undefined;
+  hasMore?: boolean;
   issuePayload: Partial<TIssue>;
   canEditProperties: (projectId: string | undefined) => boolean;
   disableIssueCreation?: boolean;
@@ -38,6 +39,7 @@ export const HeaderGroupByCard = observer((props: IHeaderGroupByCard) => {
     icon,
     title,
     count,
+    hasMore,
     issuePayload,
     canEditProperties,
     disableIssueCreation,
@@ -111,7 +113,13 @@ export const HeaderGroupByCard = observer((props: IHeaderGroupByCard) => {
           onClick={() => handleCollapsedGroups(groupID)}
         >
           <div className="inline-block line-clamp-1 truncate font-medium text-custom-text-100">{title}</div>
-          <div className="pl-2 text-sm font-medium text-custom-text-300">{count || 0}</div>
+          <div className="pl-2 text-sm font-medium text-custom-text-300">
+            {count !== null && count !== undefined
+              ? count
+              : hasMore
+              ? "100+"
+              : 0}
+          </div>
         </div>
 
         {!disableIssueCreation &&

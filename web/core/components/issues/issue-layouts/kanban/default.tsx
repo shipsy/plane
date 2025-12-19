@@ -19,7 +19,7 @@ import RenderIfVisible from "@/components/core/render-if-visible-HOC";
 import { KanbanColumnLoader } from "@/components/ui";
 // hooks
 import { useCycle, useKanbanView, useLabel, useMember, useModule, useProject, useProjectState } from "@/hooks/store";
-import { useIssueStoreType } from "@/hooks/use-issue-layout-store";
+import { useIssueStoreType, useIssuesStore } from "@/hooks/use-issue-layout-store";
 // types
 // parent components
 import { TRenderQuickActions } from "../list/list-view-types";
@@ -98,6 +98,10 @@ export const KanBan: React.FC<IKanBan> = observer((props) => {
   const projectState = useProjectState();
   const issueKanBanView = useKanbanView();
 
+  const {
+    issues: { getPaginationData },
+  } = useIssuesStore();
+
   const isDragDisabled = !issueKanBanView?.getCanUserDragDrop(group_by, sub_group_by);
 
   const list = getGroupByColumns(
@@ -172,7 +176,8 @@ export const KanBan: React.FC<IKanBan> = observer((props) => {
                     column_id={subList.id}
                     icon={subList.icon}
                     title={subList.name}
-                    count={getGroupIssueCount(subList.id, undefined, false) ?? 0}
+                    count={getGroupIssueCount(subList.id, undefined, false)}
+                    hasMore={getPaginationData(subList.id, undefined)?.nextPageResults}
                     issuePayload={subList.payload}
                     disableIssueCreation={disableIssueCreation || isGroupByCreatedBy}
                     addIssuesToView={addIssuesToView}

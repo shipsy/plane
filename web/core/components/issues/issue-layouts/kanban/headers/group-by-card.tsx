@@ -23,7 +23,8 @@ interface IHeaderGroupByCard {
   column_id: string;
   icon?: React.ReactNode;
   title: string;
-  count: number;
+  count: number | null | undefined;
+  hasMore?: boolean;
   collapsedGroups: TIssueKanbanFilters;
   handleCollapsedGroups: (toggle: "group_by" | "sub_group_by", value: string) => void;
   issuePayload: Partial<TIssue>;
@@ -38,6 +39,7 @@ export const HeaderGroupByCard: FC<IHeaderGroupByCard> = observer((props) => {
     icon,
     title,
     count,
+    hasMore,
     collapsedGroups,
     handleCollapsedGroups,
     issuePayload,
@@ -126,7 +128,11 @@ export const HeaderGroupByCard: FC<IHeaderGroupByCard> = observer((props) => {
           <div
             className={`flex-shrink-0 text-sm font-medium text-custom-text-300 ${verticalAlignPosition ? `pr-0.5` : `pl-2`}`}
           >
-            {count || 0}
+            {count !== null && count !== undefined
+              ? count
+              : hasMore
+              ? "100+"
+              : 0}
           </div>
         </div>
 
