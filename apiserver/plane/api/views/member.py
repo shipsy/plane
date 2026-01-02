@@ -42,6 +42,34 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # Priority 1: Check for email query parameter (highest priority)
+        email = request.query_params.get("email")
+        if email:
+            try:
+                # Look up user by email
+                user = User.objects.get(email=email.lower())
+                
+                # Verify user is a member of the project in the workspace
+                if not ProjectMember.objects.filter(
+                    project_id=project_id,
+                    workspace__slug=slug,
+                    member=user
+                ).exists():
+                    return Response(
+                        {"error": "User is not a member of this project"},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+                
+                # Return user details
+                serialized_user = UserLiteSerializer(user).data
+                return Response(serialized_user, status=status.HTTP_200_OK)
+            except User.DoesNotExist:
+                return Response(
+                    {"error": "User does not exist"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        # Priority 2: Check for member_id path parameter (fallback)
         if member_id:
             # Check if the user is a member of the project in the workspace
             if not ProjectMember.objects.filter(
@@ -65,6 +93,7 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
         else:
+            # Priority 3: List all members (default)
             # Get the workspace members that are present inside the workspace
             project_members = ProjectMember.objects.filter(
                 project_id=project_id, workspace__slug=slug
@@ -249,9 +278,20 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        ProjectMember.objects.filter(project=project, member=user).delete()
-        WorkspaceMember.objects.filter(workspace=workspace, member=user).delete()
-        user.delete()
+        # Check if user is a member of the project
+        project_member = ProjectMember.objects.filter(
+            project=project, member=user, workspace=workspace, is_active=True
+        ).first()
+
+        if not project_member:
+            return Response(
+                {"error": "User is not a member of this project"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Deactivate the user from the project
+        project_member.is_active = False
+        project_member.save()
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
