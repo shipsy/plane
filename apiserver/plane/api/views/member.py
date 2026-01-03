@@ -309,14 +309,14 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
         )
         return user
 
-        # Create a workspace member for the user if not already a member
     def create_workspace_member(self, workspace_id, user, role=15):
-            workspace_member = WorkspaceMember.objects.create(
-                workspace_id=workspace_id,
-                member=user,
-                role=role
-            )
-            workspace_member.save()
+        # Create a workspace member for the user if not already a member
+        workspace_member = WorkspaceMember.objects.create(
+            workspace_id=workspace_id,
+            member=user,
+            role=role
+        )
+        workspace_member.save()
 
     def create_project_member(self, project_id, user, role=15):
         # Create a project member for the user if not already a member
@@ -326,3 +326,60 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
             role=role
         )
         project_member.save()
+
+
+class ProjectMemberActivateEndpoint(BaseAPIView):
+    permission_classes = [
+        ProjectMemberPermission,
+    ]
+
+    def post(self, request, slug, project_id, member_id):
+        workspace = Workspace.objects.filter(slug=slug).first()
+        project = Project.objects.filter(pk=project_id, workspace=workspace).first()
+
+        if not workspace or not project:
+            return Response(
+                {"error": "Provided workspace or project does not exist"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            user = User.objects.get(id=member_id)
+        except User.DoesNotExist:
+            return Response(
+                {"error": "User does not exist"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Check if user has a ProjectMember record (active or inactive)
+        project_member = ProjectMember.objects.filter(
+            project=project, member=user, workspace=workspace
+        ).first()
+
+        if not project_member:
+            return Response(
+                {"error": "User is not a member of this project"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if project_member.is_active:
+            return Response(
+                {"error": "User is already active in this project"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Activate the user in the project
+        project_member.is_active = True
+        project_member.save()
+
+        # Activate in workspace if not already active
+        workspace_member = WorkspaceMember.objects.filter(
+            workspace=workspace, member=user
+        ).first()
+        
+        if workspace_member and not workspace_member.is_active:
+            workspace_member.is_active = True
+            workspace_member.save()
+
+        serialized_user = UserLiteSerializer(user).data
+        return Response(serialized_user, status=status.HTTP_200_OK)
