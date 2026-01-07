@@ -122,8 +122,6 @@ const whileListedCustomProperties = [
   { key: "worker_code", title: "Worker Code" },
   { key: "worker_name", title: "Worker Name" },
   { key: "business_type", title: "Business Type" },
-  { key: "return_type", title: "Return Type" },
-  { key: "return_detail", title: "Return Detail" },
 ];
 
 export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = [
@@ -154,8 +152,6 @@ export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = 
   "worker_code",
   "worker_name",
   "business_type",
-  "return_type",
-  "return_detail",
 ];
 
 export const ISSUE_DISPLAY_PROPERTIES: {
@@ -187,8 +183,6 @@ export const ISSUE_DISPLAY_PROPERTIES: {
   { key: "worker_code", title: "Worker Code" },
   { key: "worker_name", title: "Worker Name" },
   { key: "business_type", title: "Business Type" },
-  { key: "return_type", title: "Return Type" },
-  { key: "return_detail", title: "Return Detail" },
 ];
 
 export const ISSUE_EXTRA_OPTIONS: {
@@ -589,6 +583,4 @@ export const ISSUE_ADDITIONAL_PROPERTIES: {
     { key: "worker_code", title: "Worker Code" },
     { key: "worker_name", title: "Worker Name" },
     { key: "business_type", title: "Business Type" },
-    { key: "return_type", title: "Return Type" },
-    { key: "return_detail", title: "Return Detail" },
   ];

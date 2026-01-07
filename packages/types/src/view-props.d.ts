@@ -115,8 +115,6 @@ export type TIssueParams =
   | "hub_code"
   | "hub_name"
   | "business_type"
-  | "return_type"
-  | "return_detail"
 
 export type TCalendarLayouts = "month" | "week";
 
@@ -190,8 +188,6 @@ export interface IIssueDisplayProperties {
   worker_code?: boolean;
   worker_name?: boolean;
   business_type?: boolean;
-  return_type?: boolean;
-  return_detail?: boolean;
   custom_properties?: Record<string, boolean>;
   [key: string]: boolean;
 }
