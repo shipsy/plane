@@ -239,7 +239,7 @@ export class Storage {
 
     activeSpan?.setAttributes({
       projectId: projectId,
-      count: response.total_count,
+      count: response.total_count ?? undefined,
     });
   };
 
