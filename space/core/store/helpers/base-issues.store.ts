@@ -213,7 +213,8 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
         return subGroupCumulativeCount;
       }
 
-      return get(this.groupedIssueCount, [this.getGroupKey(groupId, subGroupId)]);
+      const count = get(this.groupedIssueCount, [this.getGroupKey(groupId, subGroupId)]);
+      return count === null ? undefined : count;
     }
   );
 
