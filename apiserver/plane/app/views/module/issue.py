@@ -39,9 +39,10 @@ from plane.utils.paginator import (
 
 # Module imports
 from .. import BaseViewSet
+from ..mixins.scoped_issue_filter import ScopedIssueFilterMixin
 
 
-class ModuleIssueViewSet(BaseViewSet):
+class ModuleIssueViewSet(ScopedIssueFilterMixin, BaseViewSet):
     serializer_class = ModuleIssueSerializer
     model = ModuleIssue
     webhook_event = "module_issue"
