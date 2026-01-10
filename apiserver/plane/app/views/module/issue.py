@@ -39,9 +39,10 @@ from plane.utils.paginator import (
 
 # Module imports
 from .. import BaseViewSet
+from ..mixins.scoped_issue_filter import ScopedIssueFilterMixin
 
 
-class ModuleIssueViewSet(BaseViewSet):
+class ModuleIssueViewSet(ScopedIssueFilterMixin, BaseViewSet):
     serializer_class = ModuleIssueSerializer
     model = ModuleIssue
     webhook_event = "module_issue"
@@ -53,7 +54,7 @@ class ModuleIssueViewSet(BaseViewSet):
     ]
 
     def get_queryset(self):
-        return (
+        queryset = (
             Issue.issue_objects.filter(
                 project_id=self.kwargs.get("project_id"),
                 workspace__slug=self.kwargs.get("slug"),
