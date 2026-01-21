@@ -94,13 +94,13 @@ class StateAPIEndpoint(BaseAPIView):
             )
             return Response(serializer.data, status=status.HTTP_200_OK)
         
-        # Filter by name if provided
+        # Filter by names if provided
         queryset = self.get_queryset()
-        state_name = request.GET.get('name', None)
+        state_names_param = request.GET.get('names', None)
         
-        if state_name:
+        if state_names_param:
             # Support multiple names separated by comma
-            state_names = [name.strip() for name in state_name.split(',')]
+            state_names = [name.strip() for name in state_names_param.split(',')]
             queryset = queryset.filter(name__in=state_names)
         
         return self.paginate(
