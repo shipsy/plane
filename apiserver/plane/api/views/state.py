@@ -93,9 +93,19 @@ class StateAPIEndpoint(BaseAPIView):
                 expand=self.expand,
             )
             return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        # Filter by name if provided
+        queryset = self.get_queryset()
+        state_name = request.GET.get('name', None)
+        
+        if state_name:
+            # Support multiple names separated by comma
+            state_names = [name.strip() for name in state_name.split(',')]
+            queryset = queryset.filter(name__in=state_names)
+        
         return self.paginate(
             request=request,
-            queryset=(self.get_queryset()),
+            queryset=queryset,
             on_results=lambda states: StateSerializer(
                 states,
                 many=True,
@@ -111,6 +121,12 @@ class StateAPIEndpoint(BaseAPIView):
             project_id=project_id,
             workspace__slug=slug,
         )
+
+        if state.is_protected:
+            return Response(
+                {"error": "Protected states cannot be deleted"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if state.default:
             return Response(
