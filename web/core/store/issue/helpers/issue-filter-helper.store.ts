@@ -252,7 +252,7 @@ export class IssueFilterHelperStore implements IIssueFilterHelperStore {
     // Remove codes that are no longer in user's hub_codes
     // Keep codes that are either locked OR user-added (not in locked but in existing)
     const userAddedCodes = existingCodes.filter((code) => !lockedCodes.includes(code));
-    const syncedCodes = [...new Set([...lockedCodes, ...userAddedCodes])];
+    const syncedCodes = Array.from(new Set([...lockedCodes, ...userAddedCodes]));
 
     return {
       lockedCodes,
