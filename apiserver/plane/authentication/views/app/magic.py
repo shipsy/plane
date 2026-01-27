@@ -192,6 +192,30 @@ class MagicSignInEndpoint(BaseAPIView):
         workspace = request.POST.get("workspace", "").strip().lower()
         language = request.POST.get("language", "en").strip()  # Get language, default to 'en'
         next_path = request.POST.get("next_path")
+        hub_list_str = request.POST.get("hub_list")
+        is_super_admin_str = request.POST.get("is_super_admin", "false").strip().lower()
+        employee_permissions_str = request.POST.get("employee_permissions")
+        
+        hub_codes = None
+        hub_names = None
+        is_super_admin = None
+        employee_permissions = None
+        
+        if hub_list_str is not None:
+            hub_codes = self.extract_hub_codes_from_hub_list(hub_list_str)
+            hub_names = self.extract_hub_names_from_hub_list(hub_list_str)
+        
+        if is_super_admin_str:
+            is_super_admin = is_super_admin_str == "true"
+        
+        if employee_permissions_str:
+            try:
+                employee_permissions = json.loads(employee_permissions_str)
+                if not isinstance(employee_permissions, list):
+                    employee_permissions = []
+            except (json.JSONDecodeError, TypeError, ValueError) as e:
+                print(f"Error parsing employee_permissions: {e}")
+                employee_permissions = []
         if code == "" or email == "":
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES[
@@ -222,6 +246,21 @@ class MagicSignInEndpoint(BaseAPIView):
                 profile, _ = Profile.objects.get_or_create(user=user)
                 profile.language = language
                 profile.save()
+                update_fields = []
+                if hub_codes is not None:
+                    user.hub_codes = hub_codes
+                    update_fields.append("hub_codes")
+                if hub_names is not None:
+                    user.hub_names = hub_names
+                    update_fields.append("hub_names")
+                if is_super_admin is not None:
+                    user.is_super_admin = is_super_admin
+                    update_fields.append("is_super_admin")
+                if employee_permissions is not None:
+                    user.employee_permissions = employee_permissions
+                    update_fields.append("employee_permissions")
+                if update_fields:
+                    user.save(update_fields=update_fields)
                 # Login the user and record his device info
                 user_login(request=request, user=user, is_app=True)
                 self.add_user_to_workspace(user, workspace)
@@ -246,6 +285,21 @@ class MagicSignInEndpoint(BaseAPIView):
                 profile, _ = Profile.objects.get_or_create(user=user)
                 profile.language = language
                 profile.save()
+                update_fields = []
+                if hub_codes is not None:
+                    user.hub_codes = hub_codes
+                    update_fields.append("hub_codes")
+                if hub_names is not None:
+                    user.hub_names = hub_names
+                    update_fields.append("hub_names")
+                if is_super_admin is not None:
+                    user.is_super_admin = is_super_admin
+                    update_fields.append("is_super_admin")
+                if employee_permissions is not None:
+                    user.employee_permissions = employee_permissions
+                    update_fields.append("employee_permissions")
+                if update_fields:
+                    user.save(update_fields=update_fields)
                 # Login the user and record his device info
                 self.add_user_to_workspace(user, workspace)
                 user_login(request=request, user=user, is_app=True)

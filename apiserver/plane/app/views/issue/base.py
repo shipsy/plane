@@ -1263,8 +1263,32 @@ class SearchAPIEndpoint(BaseAPIView):
 
         values = Issue.objects.filter(
             Q(workspace__slug=slug) & Q(**filter_criteria)
+        )
+        
+        values_queryset = apply_user_hub_filters(values_queryset, request.user)
+        
+        if field in ["hub_code", "hub_name"]:
+            if getattr(request.user, 'is_super_admin', False):
+                # User can see all options - no additional filtering needed
+                pass
+            else:
+                # Filter to only show user's accessible hub_codes or hub_names
+                if field == "hub_code":
+                    user_hubs = request.user.hub_codes or []
+                    if user_hubs:
+                        values_queryset = values_queryset.filter(hub_code__in=user_hubs)
+                    else:
+                        # If user has no hub_codes, return empty list
+                        values_queryset = values_queryset.none()
+                elif field == "hub_name":
+                    user_hubs = request.user.hub_names or []
+                    if user_hubs:
+                        values_queryset = values_queryset.filter(hub_name__in=user_hubs)
+                    else:
+                        # If user has no hub_names, return empty list
+                        values_queryset = values_queryset.none()
 
-        ).values_list(field, flat=True)
+        values = values_queryset.values_list(field, flat=True)
 
         unique_values = list(set(filter(None, values)))  # Remove duplicates and nulls
 
