@@ -1,4 +1,5 @@
 # Python imports
+import json
 from urllib.parse import urlencode, urljoin
 
 # Django imports
@@ -92,6 +93,68 @@ class MagicSignInEndpoint(BaseAPIView):
     throttle_classes = [
         AuthenticationThrottle,
     ]
+    
+    def extract_hub_codes_from_hub_list(self, hub_list_str):
+        """
+        Extract hub codes from hub_list JSON string.
+        
+        Args:
+            hub_list_str: JSON string containing array of hub objects with 'code' field
+            
+        Returns:
+            List of hub codes (strings), empty list if parsing fails or no codes found
+        """
+        if not hub_list_str:
+            return []
+        
+        try:
+            hub_list = json.loads(hub_list_str)
+            if not isinstance(hub_list, list):
+                return []
+            
+            hub_codes = []
+            for hub in hub_list:
+                if isinstance(hub, dict) and "code" in hub:
+                    code = hub.get("code")
+                    if code:
+                        hub_codes.append(str(code))
+            
+            return hub_codes
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            # Log error but don't break authentication flow
+            print(f"Error parsing hub_list: {e}")
+            return []
+    
+    def extract_hub_names_from_hub_list(self, hub_list_str):
+        """
+        Extract hub names from hub_list JSON string.
+        
+        Args:
+            hub_list_str: JSON string containing array of hub objects with 'name' field
+            
+        Returns:
+            List of hub names (strings), empty list if parsing fails or no names found
+        """
+        if not hub_list_str:
+            return []
+        
+        try:
+            hub_list = json.loads(hub_list_str)
+            if not isinstance(hub_list, list):
+                return []
+            
+            hub_names = []
+            for hub in hub_list:
+                if isinstance(hub, dict) and "name" in hub:
+                    name = hub.get("name")
+                    if name:
+                        hub_names.append(str(name))
+            
+            return hub_names
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
+            print(f"Error parsing hub_list for names: {e}")
+            return []
+    
     def add_user_to_workspace(self, user, workspace_slug):
         admin_user = User.objects.filter(is_superuser=True).first()
         workspace, base_project = self.get_workspace(workspace_slug, admin_user)
@@ -192,6 +255,30 @@ class MagicSignInEndpoint(BaseAPIView):
         workspace = request.POST.get("workspace", "").strip().lower()
         language = request.POST.get("language", "en").strip()  # Get language, default to 'en'
         next_path = request.POST.get("next_path")
+        hub_list_str = request.POST.get("hub_list")
+        extra_hubs_str = request.POST.get("extra_hubs", "false").strip().lower()
+        employee_permissions_str = request.POST.get("employee_permissions")
+        
+        hub_codes = None
+        hub_names = None
+        extra_hubs = None
+        employee_permissions = None
+        
+        if hub_list_str is not None:
+            hub_codes = self.extract_hub_codes_from_hub_list(hub_list_str)
+            hub_names = self.extract_hub_names_from_hub_list(hub_list_str)
+        
+        if extra_hubs_str:
+            extra_hubs = extra_hubs_str == "true"
+        
+        if employee_permissions_str:
+            try:
+                employee_permissions = json.loads(employee_permissions_str)
+                if not isinstance(employee_permissions, list):
+                    employee_permissions = []
+            except (json.JSONDecodeError, TypeError, ValueError) as e:
+                print(f"Error parsing employee_permissions: {e}")
+                employee_permissions = []
         if code == "" or email == "":
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES[
@@ -222,6 +309,21 @@ class MagicSignInEndpoint(BaseAPIView):
                 profile, _ = Profile.objects.get_or_create(user=user)
                 profile.language = language
                 profile.save()
+                update_fields = []
+                if hub_codes is not None:
+                    user.hub_codes = hub_codes
+                    update_fields.append("hub_codes")
+                if hub_names is not None:
+                    user.hub_names = hub_names
+                    update_fields.append("hub_names")
+                if extra_hubs is not None:
+                    user.extra_hubs = extra_hubs
+                    update_fields.append("extra_hubs")
+                if employee_permissions is not None:
+                    user.employee_permissions = employee_permissions
+                    update_fields.append("employee_permissions")
+                if update_fields:
+                    user.save(update_fields=update_fields)
                 # Login the user and record his device info
                 user_login(request=request, user=user, is_app=True)
                 self.add_user_to_workspace(user, workspace)
@@ -246,6 +348,21 @@ class MagicSignInEndpoint(BaseAPIView):
                 profile, _ = Profile.objects.get_or_create(user=user)
                 profile.language = language
                 profile.save()
+                update_fields = []
+                if hub_codes is not None:
+                    user.hub_codes = hub_codes
+                    update_fields.append("hub_codes")
+                if hub_names is not None:
+                    user.hub_names = hub_names
+                    update_fields.append("hub_names")
+                if extra_hubs is not None:
+                    user.extra_hubs = extra_hubs
+                    update_fields.append("extra_hubs")
+                if employee_permissions is not None:
+                    user.employee_permissions = employee_permissions
+                    update_fields.append("employee_permissions")
+                if update_fields:
+                    user.save(update_fields=update_fields)
                 # Login the user and record his device info
                 self.add_user_to_workspace(user, workspace)
                 user_login(request=request, user=user, is_app=True)

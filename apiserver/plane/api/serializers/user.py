@@ -15,6 +15,9 @@ class UserLiteSerializer(BaseSerializer):
             "avatar",
             "avatar_url",
             "display_name",
-            "email",
+            "hub_codes",
+            "hub_names",
+            "extra_hubs",
+            "employee_permissions",
         ]
         read_only_fields = fields
