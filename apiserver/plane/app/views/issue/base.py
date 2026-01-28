@@ -236,7 +236,7 @@ class IssueViewSet(BaseViewSet):
     def get_queryset(self, filters={}):
         custom_properties = filters.get("custom_properties", {})
         custom_filters = build_custom_property_q_objects(custom_properties)
-        queryset = (
+        return (
             Issue.issue_objects.filter(
                 project_id=self.kwargs.get("project_id")
             )
@@ -293,8 +293,6 @@ class IssueViewSet(BaseViewSet):
                 *custom_filters
             )
         ).distinct()
-
-        return queryset
 
     @method_decorator(gzip_page)
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
@@ -878,7 +876,7 @@ class IssuePaginatedViewSet(BaseViewSet):
             workspace__slug=workspace_slug, project_id=project_id
         )
 
-        queryset = (
+        return (
             issue_queryset.select_related(
                 "workspace", "project", "state", "parent"
             )
@@ -914,8 +912,6 @@ class IssuePaginatedViewSet(BaseViewSet):
                 .values("count")
             )
         ).distinct()
-
-        return queryset
 
     def process_paginated_result(self, fields, results, timezone):
         paginated_data = results.values(*fields)

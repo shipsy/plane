@@ -53,7 +53,7 @@ class ModuleIssueViewSet(BaseViewSet):
     ]
 
     def get_queryset(self):
-        queryset = (
+        return (
             Issue.issue_objects.filter(
                 project_id=self.kwargs.get("project_id"),
                 workspace__slug=self.kwargs.get("slug"),
@@ -93,8 +93,6 @@ class ModuleIssueViewSet(BaseViewSet):
                 .values("count")
             )
         ).distinct()
-
-        return queryset
 
     @method_decorator(gzip_page)
     @allow_permission(
