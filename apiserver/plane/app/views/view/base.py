@@ -58,7 +58,6 @@ from plane.utils.paginator import (
 )
 from plane.bgtasks.recent_visited_task import recent_visited_task
 from .. import BaseViewSet
-from ..mixins.scoped_issue_filter import ScopedIssueFilterMixin
 from plane.db.models import (
     UserFavorite,
 )
@@ -208,7 +207,7 @@ class WorkspaceViewViewSet(BaseViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-class WorkspaceViewIssuesViewSet(ScopedIssueFilterMixin, BaseViewSet):
+class WorkspaceViewIssuesViewSet(BaseViewSet):
     def get_queryset(self, filters):
         custom_properties = filters.get("custom_properties", {})
         custom_filters = build_custom_property_q_objects(custom_properties)
