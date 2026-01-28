@@ -148,7 +148,6 @@ class Workspace(BaseModel):
     timezone = models.CharField(
         max_length=255, default="UTC", choices=TIMEZONE_CHOICES
     )
-    scoped_issue_access = models.BooleanField(default=False)
 
     def __str__(self):
         """Return name of the Workspace"""

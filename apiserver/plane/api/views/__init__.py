@@ -40,5 +40,3 @@ from .webhook import (
     WebhookEndpoint, WebhookLogsEndpoint,
     WebhookSecretRegenerateEndpoint
 )
-
-from .workspace import WorkspaceScopedIssueAccessAPIEndpoint
