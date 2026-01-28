@@ -127,7 +127,7 @@ export class ProjectViewIssuesFilter extends IssueFilterHelperStore implements I
     try {
       const _filters = await this.issueFilterService.getViewDetails(workspaceSlug, projectId, viewId);
 
-      const filters: IIssueFilterOptions = this.computedFilters(_filters?.filters);
+      let filters: IIssueFilterOptions = this.computedFilters(_filters?.filters);
       const displayFilters: IIssueDisplayFilterOptions = this.computedDisplayFilters(_filters?.display_filters);
       const displayProperties: IIssueDisplayProperties = this.computedDisplayProperties(_filters?.display_properties);
 

@@ -56,7 +56,7 @@ from plane.utils.grouper import (
     issue_on_results,
     issue_queryset_grouper,
 )
-from plane.utils.issue_filters import issue_filters, build_custom_property_q_objects
+from plane.utils.issue_filters import issue_filters, build_custom_property_q_objects, apply_user_hub_filters
 from plane.utils.order_queryset import order_issue_queryset
 from plane.utils.constants import ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP
 from plane.utils.paginator import (
@@ -110,6 +110,10 @@ class IssueListEndpoint(BaseAPIView):
             .filter(workspace__slug=self.kwargs.get("slug"))
             .select_related("workspace", "project", "state", "parent")
             .prefetch_related("assignees", "labels", "issue_module__module")
+        )
+        queryset = apply_user_hub_filters(queryset, request.user)
+        queryset = (
+            queryset.annotate(
         )
         queryset = apply_user_hub_filters(queryset, request.user)
         queryset = (
@@ -297,6 +301,14 @@ class IssueViewSet(BaseViewSet):
                 *custom_filters
             )
         ).distinct()
+    
+    def get_queryset_with_hub_filters(self, filters={}):
+        """
+        Get queryset with hub filters applied.
+        This is a wrapper around get_queryset that applies user hub filtering.
+        """
+        queryset = self.get_queryset(filters)
+        return apply_user_hub_filters(queryset, self.request.user)
 
     @method_decorator(gzip_page)
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
@@ -313,7 +325,7 @@ class IssueViewSet(BaseViewSet):
         filtersWithoutCustomProperties.pop('custom_properties', None)
         order_by_param = request.GET.get("order_by", "-created_at")
 
-        issue_queryset = self.get_queryset(filters).filter(**filtersWithoutCustomProperties, **extra_filters)
+        issue_queryset = self.get_queryset_with_hub_filters(filters).filter(**filtersWithoutCustomProperties, **extra_filters)
         # Custom ordering for priority and state
 
         # Issue queryset
@@ -880,7 +892,7 @@ class IssuePaginatedViewSet(BaseViewSet):
             workspace__slug=workspace_slug, project_id=project_id
         )
 
-        return (
+        queryset = (
             issue_queryset.select_related(
                 "workspace", "project", "state", "parent"
             )
@@ -916,6 +928,7 @@ class IssuePaginatedViewSet(BaseViewSet):
                 .values("count")
             )
         ).distinct()
+        return apply_user_hub_filters(queryset, self.request.user)
 
     def process_paginated_result(self, fields, results, timezone):
         paginated_data = results.values(*fields)
@@ -1261,7 +1274,7 @@ class SearchAPIEndpoint(BaseAPIView):
         # Fetch values dynamically based on the requested field
         filter_criteria = {f"{field}__icontains": query} if query else {}
 
-        values = Issue.objects.filter(
+        values_queryset = Issue.objects.filter(
             Q(workspace__slug=slug) & Q(**filter_criteria)
         )
         
