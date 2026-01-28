@@ -114,10 +114,6 @@ class IssueListEndpoint(BaseAPIView):
         queryset = apply_user_hub_filters(queryset, request.user)
         queryset = (
             queryset.annotate(
-        )
-        queryset = apply_user_hub_filters(queryset, request.user)
-        queryset = (
-            queryset.annotate(
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(
                         issue=OuterRef("id"), deleted_at__isnull=True
