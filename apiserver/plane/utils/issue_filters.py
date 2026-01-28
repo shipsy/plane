@@ -912,17 +912,17 @@ def issue_filters(query_params, method, prefix=""):
 
 def apply_user_hub_filters(issue_queryset, user):
     """
-    Apply hub filtering based on user's extra_hubs flag and hub_codes/hub_names.
+    Apply hub filtering based on user's is_super_admin flag and hub_codes/hub_names.
     
     Args:
         issue_queryset: Django queryset of Issue objects
-        user: User instance with hub_codes, hub_names, extra_hubs, employee_permissions fields
+        user: User instance with hub_codes, hub_names, is_super_admin, employee_permissions fields
         
     Returns:
         Filtered queryset based on user's hub access
     """
-    # If extra_hubs is True, user can see all tickets - no filtering needed
-    if user.extra_hubs:
+    # If is_super_admin is True, user can see all tickets - no filtering needed
+    if getattr(user, 'is_super_admin', False):
         return issue_queryset
     
     # Get user's hub_codes and hub_names (can be empty lists)
@@ -949,11 +949,11 @@ def apply_user_hub_filters(issue_queryset, user):
     
     # Check if user has permission to view tickets with null hub_code/hub_name
     employee_permissions = user.employee_permissions or []
-    has_no_hubs_permission = "VIEW_NO_HUBS_TICKETS_PLANE" in employee_permissions
+    has_view_no_hub_issues_permission = "VIEW_NO_HUB_TICKETS_IN_PLANE" in employee_permissions
     
-    if has_no_hubs_permission:
-        # Include tickets with null hub_code or hub_name
-        null_hub_filter = Q(hub_code__isnull=True) | Q(hub_name__isnull=True)
+    if has_view_no_hub_issues_permission:
+        # Include tickets with null hub_code AND hub_name
+        null_hub_filter = Q(hub_code__isnull=True) & Q(hub_name__isnull=True)
         hub_filter = hub_filter | null_hub_filter
     
     # Apply the filter to queryset
