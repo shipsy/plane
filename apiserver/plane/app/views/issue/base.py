@@ -1063,7 +1063,8 @@ class IssueDetailEndpoint(BaseAPIView):
             .prefetch_related("assignees", "labels", "issue_module__module")
         )
         issue = apply_user_hub_filters(issue, request.user)
-            .annotate(
+        issue = (
+            issue.annotate(
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(
                         issue=OuterRef("id"), deleted_at__isnull=True
