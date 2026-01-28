@@ -64,7 +64,6 @@ from plane.utils.paginator import (
     SubGroupedOffsetPaginator,
 )
 from .. import BaseAPIView, BaseViewSet
-from ..mixins.scoped_issue_filter import ScopedIssueFilterMixin
 from plane.utils.user_timezone_converter import user_timezone_converter
 from plane.bgtasks.recent_visited_task import recent_visited_task
 from plane.utils.global_paginator import paginate
@@ -213,7 +212,7 @@ class IssueListEndpoint(BaseAPIView):
         return Response(issues, status=status.HTTP_200_OK)
 
 
-class IssueViewSet(ScopedIssueFilterMixin, BaseViewSet):
+class IssueViewSet(BaseViewSet):
     def get_serializer_class(self):
         return (
             IssueCreateSerializer
@@ -294,8 +293,8 @@ class IssueViewSet(ScopedIssueFilterMixin, BaseViewSet):
                 *custom_filters
             )
         ).distinct()
-        
-        return self.apply_scoped_issue_filters(queryset)
+
+        return queryset
 
     @method_decorator(gzip_page)
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
@@ -870,7 +869,7 @@ class DeletedIssuesListViewSet(BaseAPIView):
         return Response(deleted_issues, status=status.HTTP_200_OK)
 
 
-class IssuePaginatedViewSet(ScopedIssueFilterMixin, BaseViewSet):
+class IssuePaginatedViewSet(BaseViewSet):
     def get_queryset(self):
         workspace_slug = self.kwargs.get("slug")
         project_id = self.kwargs.get("project_id")
@@ -915,8 +914,8 @@ class IssuePaginatedViewSet(ScopedIssueFilterMixin, BaseViewSet):
                 .values("count")
             )
         ).distinct()
-        
-        return self.apply_scoped_issue_filters(queryset)
+
+        return queryset
 
     def process_paginated_result(self, fields, results, timezone):
         paginated_data = results.values(*fields)
@@ -971,9 +970,7 @@ class IssuePaginatedViewSet(ScopedIssueFilterMixin, BaseViewSet):
         # querying issues
         base_queryset = Issue.issue_objects.filter(
             workspace__slug=slug, project_id=project_id
-        )
-        base_queryset = self.apply_scoped_issue_filters(base_queryset)
-        base_queryset = base_queryset.order_by("updated_at")
+        ).order_by("updated_at")
         queryset = self.get_queryset().order_by("updated_at")
 
         # validation for guest user

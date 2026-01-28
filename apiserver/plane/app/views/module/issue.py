@@ -39,10 +39,9 @@ from plane.utils.paginator import (
 
 # Module imports
 from .. import BaseViewSet
-from ..mixins.scoped_issue_filter import ScopedIssueFilterMixin
 
 
-class ModuleIssueViewSet(ScopedIssueFilterMixin, BaseViewSet):
+class ModuleIssueViewSet(BaseViewSet):
     serializer_class = ModuleIssueSerializer
     model = ModuleIssue
     webhook_event = "module_issue"
@@ -94,8 +93,8 @@ class ModuleIssueViewSet(ScopedIssueFilterMixin, BaseViewSet):
                 .values("count")
             )
         ).distinct()
-        
-        return self.apply_scoped_issue_filters(queryset)
+
+        return queryset
 
     @method_decorator(gzip_page)
     @allow_permission(
