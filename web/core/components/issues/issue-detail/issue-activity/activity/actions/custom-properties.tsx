@@ -26,6 +26,7 @@ export const IssueCustomPropertyActivity: FC<TIssueCustomPropertyActivity> = obs
 
   const isNewProperty = !activity.old_value;
   const customPropertyKey = activity?.field?.replace("Custom Property ", "");
+  if (!customPropertyKey) return <></>;
   const newValue = activity.new_value;
   const oldValue = activity.old_value;
 

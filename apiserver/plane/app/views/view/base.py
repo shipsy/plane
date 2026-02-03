@@ -49,7 +49,7 @@ from plane.utils.grouper import (
     issue_on_results,
     issue_queryset_grouper,
 )
-from plane.utils.issue_filters import issue_filters, build_custom_property_q_objects
+from plane.utils.issue_filters import issue_filters, build_custom_property_q_objects, apply_user_hub_filters
 from plane.utils.constants import ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP
 from plane.utils.order_queryset import order_issue_queryset
 from plane.utils.paginator import (
@@ -211,7 +211,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
     def get_queryset(self, filters):
         custom_properties = filters.get("custom_properties", {})
         custom_filters = build_custom_property_q_objects(custom_properties)
-        return (
+        queryset = (
             Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(
                     parent=OuterRef("id")
@@ -244,14 +244,6 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                 attachment_count=FileAsset.objects.filter(
                     issue_id=OuterRef("id"),
                     entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
-                )
-                .order_by()
-                .annotate(count=Func(F("id"), function="Count"))
-                .values("count")
-            )
-            .annotate(
-                sub_issues_count=Issue.issue_objects.filter(
-                    parent=OuterRef("id")
                 )
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
@@ -312,6 +304,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                 *custom_filters
             )
         )
+        return apply_user_hub_filters(queryset, self.request.user, workspace_slug=self.kwargs.get("slug"))
 
     @method_decorator(gzip_page)
     @allow_permission(
@@ -403,13 +396,6 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
         issue_queryset = (
             self.get_queryset(filters)
             .filter(**filtersWithoutCustomProperties)
-            .annotate(
-                cycle_id=Subquery(
-                    CycleIssue.objects.filter(
-                        issue=OuterRef("id"), deleted_at__isnull=True
-                    ).values("cycle_id")[:1]
-                )
-            )
         )
 
         # check for the project member role, if the role is 5 then check for the guest_view_all_features if it is true then show all the issues else show only the issues created by the user
@@ -492,6 +478,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                             archived_at__isnull=True,
                             is_draft=False,
                         ),
+                        skip_count=True,
                     )
             # Group Paginate
             else:
@@ -521,6 +508,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                         archived_at__isnull=True,
                         is_draft=False,
                     ),
+                    skip_count=True,
                 )
         else:
             # List Paginate
@@ -531,6 +519,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
                 on_results=lambda issues: issue_on_results(
                     group_by=group_by, issues=issues, sub_group_by=sub_group_by
                 ),
+                skip_count=True,
             )
 
 

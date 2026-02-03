@@ -82,7 +82,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
         return self.kwargs.get("project__identifier", None)
 
     def get_queryset(self):
-        return (
+        queryset = (
             Issue.issue_objects.annotate(
                 sub_issues_count=Issue.issue_objects.filter(
                     parent=OuterRef("id")
@@ -101,6 +101,7 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))
         ).distinct()
+        return queryset
 
     def get(
         self, request, slug, project__identifier=None, issue__identifier=None
@@ -165,7 +166,7 @@ class IssueAPIEndpoint(BaseAPIView):
             if custom_filters:
                 query = query.filter(*custom_filters)
 
-        return (query
+        queryset = (query
             .filter(**filters)
             .select_related("project")
             .select_related("workspace")
@@ -174,6 +175,7 @@ class IssueAPIEndpoint(BaseAPIView):
             .prefetch_related("assignees")
             .prefetch_related("labels")
             .order_by(self.kwargs.get("order_by", "-created_at"))).distinct()
+        return queryset
         
 
     def get(self, request, slug, project_id, pk=None):
@@ -1249,13 +1251,21 @@ class IssueCustomPropertyUpdateAPIView(BaseAPIView):
         current_instance = json.dumps(serializer.data, cls=DjangoJSONEncoder)
         actor_id = str(request.user.id) if request.user else "Unknown"
         issue_id_str = str(issue_id) if issue_id else "Unknown issue ID"
-        slug = slug=self.kwargs.get("slug")
+        slug = self.kwargs.get("slug")
         workspace = Workspace.objects.get(slug=slug)
         try:
-            project = Project.objects.get(workspace=workspace)
-            project_id_str = project.id
-        except Project.DoesNotExist:
-            return Response({"error": "Project not found."}, status=status.HTTP_404_NOT_FOUND)
+            issue = Issue.objects.get(id=issue_id)
+        except Issue.DoesNotExist:
+            return Response(
+                {"error": "The provided issue does not exist."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        if not issue.project:
+            return Response(
+                {"error": "The issue must be associated with a project."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        project_id_str = str(issue.project.id)
         epoch_timestamp = int(timezone.now().timestamp())
 
         custom_property.value = new_value
