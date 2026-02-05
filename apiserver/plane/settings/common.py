@@ -90,6 +90,7 @@ MIDDLEWARE = [
     "crum.CurrentRequestUserMiddleware",
     "django.middleware.gzip.GZipMiddleware",
     "plane.middleware.api_log_middleware.APITokenLogMiddleware",
+    "plane.app.middleware.api_logging_middleware.APILoggingMiddleware",
 ]
 
 # Rest Framework settings
@@ -462,3 +463,21 @@ ATTACHMENT_MIME_TYPES = [
     "text/csv",
     "application/xml",
 ]
+
+# Opensearch setting
+OPENSEARCH_HOST = os.environ.get('OPENSEARCH_HOST', 'host.docker.internal')
+OPENSEARCH_PORT = os.environ.get('OPENSEARCH_PORT', 443)
+OPENSEARCH_SCHEME = os.environ.get('OPENSEARCH_SCHEME', 'https')
+OPENSEARCH_USERNAME = os.environ.get('OPENSEARCH_USERNAME', None)
+OPENSEARCH_PASSWORD = os.environ.get('OPENSEARCH_PASSWORD', None)
+APP_LOGS_CAPACITY = int(os.environ.get('APP_LOGS_CAPACITY', 50))
+
+OPENSEARCH_PUSH_METHOD = os.environ.get('OPENSEARCH_PUSH_METHOD', 'opensearch') #options are opensearch, firehose
+OPENSEARCH_AUTH_METHOD = os.environ.get('OPENSEARCH_AUTH_METHOD', 'basic') #options are basic, iam
+OPENSEARCH_APPLOG_INDEX = os.environ.get('OPENSEARCH_APPLOG_INDEX','plane-application-demo')
+
+FIREHOSE_REGION_NAME = os.environ.get('FIREHOSE_REGION_NAME', 'us-west-2')
+FIREHOSE_ACCESS_KEY_ID = os.environ.get('FIREHOSE_ACCESS_KEY_ID', '')
+FIREHOSE_SECRET_ACCESS_KEY = os.environ.get('FIREHOSE_SECRET_ACCESS_KEY', '')
+FIREHOSE_RETRY_COUNT = int(os.environ.get('FIREHOSE_RETRY_COUNT', 3))
+FIREHOSE_RETRY_DELAY = int(os.environ.get('FIREHOSE_RETRY_DELAY', 1))
