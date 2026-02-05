@@ -213,7 +213,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
     if (typeId) {
       const issueType = getIssueTypeById(typeId);
       if (issueType) {
-        formData.name = prependIssueTypeToTitle(formData.name, issueType.name);
+        formData.name = prependIssueTypeToTitle(formData.name ?? "", issueType.name);
       }
     }
 
