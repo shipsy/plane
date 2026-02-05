@@ -96,7 +96,6 @@ export const PeekOverviewProperties: FC<IPeekOverviewProperties> = observer((pro
             },
             {
               headers: {
-                'x-api-key': 'TEST_API_TOKEN',
                 'Content-Type': 'application/json'
               }
             }
