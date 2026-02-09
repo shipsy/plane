@@ -10,8 +10,7 @@ from .issue import (
     IssueActivitySerializer,
     IssueExpandSerializer,
     IssueLiteSerializer,
-    IssueCustomPropertySerializer,
-    IssueBulkUpdateSerializer,
+    IssueCustomPropertySerializer
 )
 from .issue_type import IssueTypeSerializer, IssueTypeCustomPropertySerializer
 from .state import StateLiteSerializer, StateSerializer
