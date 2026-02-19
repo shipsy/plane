@@ -13,7 +13,8 @@ from .issue import (
     IssueCommentAPIEndpoint,
     IssueActivityAPIEndpoint,
     IssueAttachmentEndpoint,
-    IssueCustomPropertyUpdateAPIView
+    IssueCustomPropertyUpdateAPIView,
+    IssueBulkUpdateAPIEndpoint,
 )
 from .issue_type import IssueTypeAPIEndpoint,IssueTypeCustomPropertyAPIEndpoint
 from .attachment import IssueAttachmentV2Endpoint
@@ -30,7 +31,7 @@ from .module import (
     ModuleArchiveUnarchiveAPIEndpoint,
 )
 
-from .member import ProjectMemberAPIEndpoint
+from .member import ProjectMemberAPIEndpoint, ProjectMemberActivateEndpoint
 
 from .inbox import InboxIssueAPIEndpoint
 

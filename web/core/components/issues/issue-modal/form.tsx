@@ -29,12 +29,12 @@ import { getChangedIssuefields } from "@/helpers/issue.helper";
 import { getTabIndex } from "@/helpers/tab-indices.helper";
 // hooks
 import { useIssueModal } from "@/hooks/context/use-issue-modal";
-import { useIssueDetail, useProject, useProjectState, useWorkspaceDraftIssues } from "@/hooks/store";
+import { useIssueDetail, useProject, useProjectState, useWorkspaceDraftIssues, useIssueType } from "@/hooks/store";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import { useProjectIssueProperties } from "@/hooks/use-project-issue-properties";
 // plane web components
 import { DeDupeIssueButtonLabel, DuplicateModalRoot } from "@/plane-web/components/de-dupe";
-import { IssueAdditionalProperties, IssueTypeSelect } from "@/plane-web/components/issues/issue-modal";
+import { IssueAdditionalProperties } from "@/plane-web/components/issues/issue-modal";
 import { useDebouncedDuplicateIssues } from "@/plane-web/hooks/use-debounced-duplicate-issues";
 
 const defaultValues: Partial<TIssue> = {
@@ -118,6 +118,7 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
     useIssueModal();
   const { isMobile } = usePlatformOS();
   const { moveIssue } = useWorkspaceDraftIssues();
+  const { getIssueTypeById } = useIssueType();
 
   const {
     issue: { getIssueById },
@@ -185,6 +186,20 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, projectId]);
+
+  // Populate title with issue type name when type changes and title is empty
+  const typeId = watch("type_id");
+  useEffect(() => {
+    const currentName = watch("name");
+    if (!typeId || currentName) return;
+
+    const issueType = getIssueTypeById(typeId);
+    if (issueType?.name) {
+      setValue("name", issueType.name, { shouldValidate: true });
+      handleFormChange();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeId]);
 
   const handleFormSubmit = async (formData: Partial<TIssue>, is_draft_issue = false) => {
     // Check if the editor is ready to discard
@@ -342,15 +357,6 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
                     disabled={!!data?.id || !!data?.sourceIssueId}
                     handleFormChange={handleFormChange}
                   />
-                  {projectId && (
-                    <IssueTypeSelect
-                      control={control}
-                      projectId={projectId}
-                      disabled={!!data?.sourceIssueId}
-                      handleFormChange={handleFormChange}
-                      renderChevron
-                    />
-                  )}
                 </div>
                 {duplicateIssues.length > 0 && (
                   <button
