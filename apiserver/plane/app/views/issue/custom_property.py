@@ -88,14 +88,22 @@ class IssueCustomPropertyUpdateAPIView(BaseAPIView):
         custom_property = get_object_or_404(IssueCustomProperty, pk=pk, issue_id=issue_id)
         new_value = request.data.get('value')
         
+        print(f"[DEBUG] OLD value from DB (before mutation): {custom_property.value}")
+
         # Process the property value using the helper method
         custom_property, error_response = self._process_property_value(custom_property, new_value)
         if error_response:
             return error_response
-            
+
+        print(f"[DEBUG] NEW value after _process_property_value (in-memory mutation): {custom_property.value}")
+
         serializer = self.serializer_class(custom_property)
         requested_data = json.dumps(request.data, cls=DjangoJSONEncoder)
         current_instance = json.dumps(serializer.data, cls=DjangoJSONEncoder)
+
+        print(f"[DEBUG] current_instance['value'] passed to activity task: {serializer.data.get('value')}")
+        print(f"[DEBUG] requested_data['value'] passed to activity task: {request.data.get('value')}")
+        print(f"[DEBUG] Are they equal? {serializer.data.get('value') == request.data.get('value')} → activity will {'NOT ' if serializer.data.get('value') == request.data.get('value') else ''}be created")
         actor_id = str(request.user.id) if request.user else "Unknown"
         issue_id_str = str(issue_id) if issue_id else "Unknown issue ID"
         slug = self.kwargs.get("slug")
