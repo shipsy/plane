@@ -758,7 +758,7 @@ class LabelAPIEndpoint(BaseAPIView):
         serializer = LabelSerializer(label, data=request.data, partial=True)
         if serializer.is_valid():
             if (
-                str(request.data.get("external_id"))
+                request.data.get("external_id")
                 and (label.external_id != str(request.data.get("external_id")))
                 and Label.objects.filter(
                     project_id=project_id,
