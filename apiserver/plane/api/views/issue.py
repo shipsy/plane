@@ -665,7 +665,7 @@ class LabelAPIEndpoint(BaseAPIView):
     ]
 
     def get_queryset(self):
-        return (
+        queryset = (
             Label.objects.filter(workspace__slug=self.kwargs.get("slug"))
             .filter(project_id=self.kwargs.get("project_id"))
             .filter(
@@ -679,6 +679,10 @@ class LabelAPIEndpoint(BaseAPIView):
             .distinct()
             .order_by(self.kwargs.get("order_by", "-created_at"))
         )
+        search_name = self.request.query_params.get("search_name")
+        if search_name:
+            queryset = queryset.filter(name__icontains=search_name)
+        return queryset
 
     def post(self, request, slug, project_id):
         try:
