@@ -7,6 +7,9 @@ import { Download } from "lucide-react";
 import { IIssueDisplayProperties, TIssue, TIssueMap } from "@plane/types";
 // ui
 import { Button, setToast, TOAST_TYPE } from "@plane/ui";
+// router + permissions store for discovering workspace-level custom fields
+import { useParams } from "next/navigation";
+import { useUserPermissions } from "@/hooks/store";
 
 type Props = {
   // Accepts either a flat list of issue IDs, or the grouped/sub-grouped issue map from the issues store.
@@ -57,25 +60,62 @@ const stringify = (val: any): string => {
   return String(val);
 };
 
-// Pulls the value for a display-property key off an issue, trying the common shapes
-// Plane uses without enumerating any specific property name.
+// Translates displayProperty keys to the underlying TIssue field name when they differ.
+// Pure data — no inclusion logic, no per-column branches. Added only so the dynamic
+// lookup actually finds the right field; Plane's schema names don't match every UI toggle.
+const FIELD_ALIAS: Record<string, string> = {
+  due_date: "target_date",
+  created_on: "created_at",
+  updated_on: "updated_at",
+  estimate: "estimate_point",
+  link: "link_count",
+  labels: "label_ids",
+  modules: "module_ids",
+  assignee: "assignee_ids",
+  state: "state_id",
+  cycle: "cycle_id",
+  issue_type: "type_id",
+  sub_issue_count: "sub_issues_count",
+};
+
+// Pulls the value for a display-property key off an issue: alias → raw key →
+// common suffix variants → custom_property_values. No property is hardcoded for inclusion.
 const getIssueValueForKey = (issue: TIssue, key: string): any => {
-  // 1. custom_property_values: Array<{ [name]: value }>
+  // 1. Custom property values: Array<{ [name]: value }>
   const cpv: Array<Record<string, any>> = (issue as any)?.custom_property_values ?? [];
   const found = cpv.find((item) => item && Object.prototype.hasOwnProperty.call(item, key));
   if (found && found[key] !== undefined && found[key] !== null && found[key] !== "") return found[key];
 
-  // 2. Direct field on the issue, then common variants used across the schema.
-  const variants = [key, `${key}_id`, `${key}_ids`, `${key}_count`, `${key}s_count`, `${key}_at`, `${key}_date`];
+  // 2. Field lookup: aliased field first, then raw key, then common suffix variants.
+  const aliased = FIELD_ALIAS[key];
+  const variants = [
+    ...(aliased ? [aliased] : []),
+    key,
+    `${key}_id`,
+    `${key}_ids`,
+    `${key}_count`,
+    `${key}s_count`,
+    `${key}_at`,
+    `${key}_date`,
+  ];
   for (const v of variants) {
     const val = (issue as any)?.[v];
     if (val !== undefined && val !== null && val !== "") return val;
   }
+
+  // 3. The `key` toggle represents the "PROJ-123" ID column, which is derived from sequence_id.
+  if (key === "key") {
+    const seq = (issue as any)?.sequence_id;
+    return seq !== undefined && seq !== null ? String(seq) : "";
+  }
+
   return "";
 };
 
 export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
   const { issueIds, issueMap, displayProperties, fileName = "issues" } = props;
+  const { workspaceUserInfo } = useUserPermissions();
+  const { workspaceSlug } = useParams();
 
   const handleDownload = () => {
     const flatIds = flattenIds(issueIds);
@@ -96,17 +136,22 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
       { header: "Title", get: (i) => i.name ?? "" },
     ];
 
-    // Everything else is driven entirely by what's toggled ON in displayProperties.
-    // Insertion order of the source object becomes the column order in the CSV.
+    // Workspace-level custom fields (same source the spreadsheet uses to discover new ones).
+    const wsCustom =
+      (workspaceUserInfo as any)?.[workspaceSlug?.toString() ?? ""]?.default_props?.display_properties
+        ?.custom_properties || {};
+
+    // Everything else is driven entirely by what's toggled ON across the three sources.
+    // Insertion order of these sources becomes the column order in the CSV.
     const visited = new Set<string>();
     const pushColumn = (key: string) => {
       if (!key || visited.has(key) || key === "custom_properties") return;
       const directOn = dp[key];
       const nestedOn = dp?.custom_properties?.[key];
-      // A column is shown unless either toggle is explicitly false.
-      if (directOn === false || nestedOn === false) return;
-      // If the key is absent from both toggle sources, skip it.
-      if (directOn === undefined && nestedOn === undefined) return;
+      const wsOn = wsCustom[key];
+      // Hidden if any source says false; included only if some source says it's on.
+      if (directOn === false || nestedOn === false || wsOn === false) return;
+      if (directOn === undefined && nestedOn === undefined && wsOn === undefined) return;
       visited.add(key);
       columns.push({
         header: humanize(key),
@@ -115,6 +160,7 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
     };
     Object.keys(dp).forEach(pushColumn);
     Object.keys(dp.custom_properties || {}).forEach(pushColumn);
+    Object.keys(wsCustom).forEach(pushColumn);
 
     const lines: string[] = [];
     lines.push(columns.map((c) => csvEscape(c.header)).join(","));
