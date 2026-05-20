@@ -141,6 +141,11 @@ const HeaderFilters = observer(({ currentProjectDetails, projectId, workspaceSlu
         issueMap={issueMap}
         displayProperties={issueFilters?.displayProperties ?? {}}
         fileName={currentProjectDetails?.identifier ? `${currentProjectDetails.identifier}-issues` : "issues"}
+        // Mirror the spreadsheet's project-level filter: hide cycle/modules if disabled on the project.
+        hiddenColumns={[
+          ...(!currentProjectDetails?.cycle_view ? ["cycle"] : []),
+          ...(!currentProjectDetails?.module_view ? ["modules"] : []),
+        ]}
       />
       {canUserCreateIssue ? (
         <Button className="hidden md:block" onClick={() => setAnalyticsModal(true)} variant="neutral-primary" size="sm">

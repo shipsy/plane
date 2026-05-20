@@ -19,6 +19,10 @@ type Props = {
   issueMap: TIssueMap;
   displayProperties: IIssueDisplayProperties;
   fileName?: string;
+  // Keys the on-screen spreadsheet hides regardless of displayProperties — passed in so the CSV
+  // mirrors the screen exactly. Workspace-level passes ["modules","cycle","estimate"]; project-level
+  // passes whichever of cycle/modules are disabled on the project.
+  hiddenColumns?: string[];
 };
 
 const MAX_ROWS = 1000;
@@ -115,7 +119,7 @@ const getIssueValueForKey = (issue: TIssue, key: string): any => {
 };
 
 export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
-  const { issueIds, issueMap, displayProperties, fileName = "issues" } = props;
+  const { issueIds, issueMap, displayProperties, fileName = "issues", hiddenColumns = [] } = props;
   const { workspaceUserInfo } = useUserPermissions();
   const { workspaceSlug } = useParams();
   // Resolver stores — used to turn raw foreign-key IDs into human names. Keyed dynamically below.
@@ -176,9 +180,11 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
     // Same predicate the spreadsheet uses: include the column only if displayProperties[key] is truthy.
     // (See header-column.tsx — `if (!displayProperties?.[property]) return null;`.) For custom fields
     // we additionally allow the toggle to live under displayProperties.custom_properties[key].
+    const hiddenSet = new Set(hiddenColumns);
     const visited = new Set<string>();
     const pushColumn = (key: string) => {
       if (!key || visited.has(key) || key === "custom_properties") return;
+      if (hiddenSet.has(key)) return;
       const on = dp[key] || dp?.custom_properties?.[key];
       if (!on) return;
       visited.add(key);
@@ -199,14 +205,15 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
       });
     };
 
-    // Standard columns first, in canonical spreadsheet order, then custom columns from any source.
+    // Standard columns first, in canonical spreadsheet order, then custom columns.
     SPREADSHEET_PROPERTY_LIST.forEach(pushColumn);
     // `key` (the PROJ-123 ID column) isn't in SPREADSHEET_PROPERTY_LIST but is a real toggle — try it too.
     pushColumn("key");
+    // Custom properties: view-level toggles first, then workspace-level catalog. Do NOT use a
+    // generic `Object.keys(dp)` catch-all — it sweeps in standard toggles like `issue_type` that
+    // the on-screen spreadsheet intentionally doesn't render.
     Object.keys(dp.custom_properties || {}).forEach(pushColumn);
     Object.keys(wsCustom).forEach(pushColumn);
-    // Catch any extra dynamic keys that appear directly on displayProperties but in none of the above.
-    Object.keys(dp).forEach(pushColumn);
 
     const lines: string[] = [];
     lines.push(columns.map((c) => csvEscape(c.header)).join(","));

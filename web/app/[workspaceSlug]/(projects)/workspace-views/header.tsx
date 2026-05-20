@@ -152,6 +152,8 @@ export const GlobalIssuesHeader = observer(() => {
             issueMap={issueMap}
             displayProperties={issueFilters?.displayProperties ?? {}}
             fileName={`${viewDetails?.name || globalViewId?.toString() || "issues"}`}
+            // Matches WORKSPACE_HIDDEN_COLUMNS in spreadsheet-view.tsx — workspace API doesn't return these.
+            hiddenColumns={["modules", "cycle", "estimate"]}
           />
 
           <Button variant="primary" size="sm" onClick={() => setCreateViewModal(true)}>
