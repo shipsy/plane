@@ -7,8 +7,6 @@ import { Download } from "lucide-react";
 import { IIssueDisplayProperties, TIssue, TIssueMap } from "@plane/types";
 // ui
 import { Button, setToast, TOAST_TYPE } from "@plane/ui";
-// hooks
-import { useLabel, useMember, useProject, useProjectState } from "@/hooks/store";
 
 type Props = {
   // Accepts either a flat list of issue IDs, or the grouped/sub-grouped issue map from the issues store.
@@ -42,17 +40,42 @@ const csvEscape = (val: any): string => {
   return str;
 };
 
-const formatDate = (val: string | null | undefined) => (val ? new Date(val).toISOString().split("T")[0] : "");
+const humanize = (key: string) => key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+const stringify = (val: any): string => {
+  if (val === null || val === undefined) return "";
+  if (Array.isArray(val)) return val.filter((v) => v !== null && v !== undefined && v !== "").map(stringify).join(", ");
+  if (typeof val === "object") {
+    // ISO-ish date detection
+    if (val instanceof Date) return val.toISOString();
+    try {
+      return JSON.stringify(val);
+    } catch {
+      return "";
+    }
+  }
+  return String(val);
+};
+
+// Pulls the value for a display-property key off an issue, trying the common shapes
+// Plane uses without enumerating any specific property name.
+const getIssueValueForKey = (issue: TIssue, key: string): any => {
+  // 1. custom_property_values: Array<{ [name]: value }>
+  const cpv: Array<Record<string, any>> = (issue as any)?.custom_property_values ?? [];
+  const found = cpv.find((item) => item && Object.prototype.hasOwnProperty.call(item, key));
+  if (found && found[key] !== undefined && found[key] !== null && found[key] !== "") return found[key];
+
+  // 2. Direct field on the issue, then common variants used across the schema.
+  const variants = [key, `${key}_id`, `${key}_ids`, `${key}_count`, `${key}s_count`, `${key}_at`, `${key}_date`];
+  for (const v of variants) {
+    const val = (issue as any)?.[v];
+    if (val !== undefined && val !== null && val !== "") return val;
+  }
+  return "";
+};
 
 export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
   const { issueIds, issueMap, displayProperties, fileName = "issues" } = props;
-  // store hooks
-  const { getStateById } = useProjectState();
-  const { getLabelById } = useLabel();
-  const {
-    getUserDetails,
-  } = useMember();
-  const { getProjectIdentifierById, getProjectById } = useProject();
 
   const handleDownload = () => {
     const flatIds = flattenIds(issueIds);
@@ -66,57 +89,32 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
     const truncated = allIssues.length > MAX_ROWS;
     const issues = truncated ? allIssues.slice(0, MAX_ROWS) : allIssues;
 
-    const dp = displayProperties || {};
+    const dp: Record<string, any> = (displayProperties as any) || {};
 
-    const columns: { header: string; get: (issue: TIssue) => string }[] = [];
+    // Title is the only fixed column — it's the leftmost "Issues" cell and never appears in displayProperties.
+    const columns: { header: string; get: (issue: TIssue) => string }[] = [
+      { header: "Title", get: (i) => i.name ?? "" },
+    ];
 
-    if (dp.key !== false)
+    // Everything else is driven entirely by what's toggled ON in displayProperties.
+    // Insertion order of the source object becomes the column order in the CSV.
+    const visited = new Set<string>();
+    const pushColumn = (key: string) => {
+      if (!key || visited.has(key) || key === "custom_properties") return;
+      const directOn = dp[key];
+      const nestedOn = dp?.custom_properties?.[key];
+      // A column is shown unless either toggle is explicitly false.
+      if (directOn === false || nestedOn === false) return;
+      // If the key is absent from both toggle sources, skip it.
+      if (directOn === undefined && nestedOn === undefined) return;
+      visited.add(key);
       columns.push({
-        header: "ID",
-        get: (i) => {
-          const ident = getProjectIdentifierById(i.project_id);
-          return ident ? `${ident}-${i.sequence_id}` : `${i.sequence_id ?? ""}`;
-        },
+        header: humanize(key),
+        get: (issue) => stringify(getIssueValueForKey(issue, key)),
       });
-
-    columns.push({ header: "Title", get: (i) => i.name ?? "" });
-
-    columns.push({ header: "Project", get: (i) => getProjectById(i.project_id)?.name ?? "" });
-
-    if (dp.state !== false)
-      columns.push({ header: "State", get: (i) => getStateById(i.state_id)?.name ?? "" });
-
-    if (dp.priority !== false) columns.push({ header: "Priority", get: (i) => i.priority ?? "" });
-
-    if (dp.assignee !== false)
-      columns.push({
-        header: "Assignees",
-        get: (i) =>
-          (i.assignee_ids ?? [])
-            .map((uid) => getUserDetails(uid)?.display_name || getUserDetails(uid)?.email || "")
-            .filter(Boolean)
-            .join(", "),
-      });
-
-    if (dp.labels !== false)
-      columns.push({
-        header: "Labels",
-        get: (i) =>
-          (i.label_ids ?? [])
-            .map((lid) => getLabelById(lid)?.name || "")
-            .filter(Boolean)
-            .join(", "),
-      });
-
-    if (dp.start_date !== false) columns.push({ header: "Start Date", get: (i) => formatDate(i.start_date) });
-    if (dp.due_date !== false) columns.push({ header: "Due Date", get: (i) => formatDate(i.target_date) });
-
-    if (dp.estimate) columns.push({ header: "Estimate", get: (i) => i.estimate_point ?? "" });
-    if (dp.sub_issue_count) columns.push({ header: "Sub-Issues", get: (i) => String(i.sub_issues_count ?? 0) });
-    if (dp.attachment_count) columns.push({ header: "Attachments", get: (i) => String(i.attachment_count ?? 0) });
-    if (dp.link) columns.push({ header: "Links", get: (i) => String(i.link_count ?? 0) });
-    if (dp.created_on) columns.push({ header: "Created On", get: (i) => formatDate(i.created_at) });
-    if (dp.updated_on) columns.push({ header: "Updated On", get: (i) => formatDate(i.updated_at) });
+    };
+    Object.keys(dp).forEach(pushColumn);
+    Object.keys(dp.custom_properties || {}).forEach(pushColumn);
 
     const lines: string[] = [];
     lines.push(columns.map((c) => csvEscape(c.header)).join(","));
@@ -146,7 +144,12 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
   };
 
   return (
-    <Button variant="neutral-primary" size="sm" prependIcon={<Download className="h-3.5 w-3.5" />} onClick={handleDownload}>
+    <Button
+      variant="neutral-primary"
+      size="sm"
+      prependIcon={<Download className="h-3.5 w-3.5" />}
+      onClick={handleDownload}
+    >
       Download
     </Button>
   );
