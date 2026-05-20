@@ -9,7 +9,9 @@ import { IIssueDisplayProperties, TIssue, TIssueMap } from "@plane/types";
 import { Button, setToast, TOAST_TYPE } from "@plane/ui";
 // router + permissions store for discovering workspace-level custom fields
 import { useParams } from "next/navigation";
-import { useCycle, useLabel, useMember, useModule, useProjectState, useUserPermissions } from "@/hooks/store";
+import { useCycle, useLabel, useMember, useModule, useProject, useProjectState, useUserPermissions } from "@/hooks/store";
+// Canonical column order used by the on-screen spreadsheet — reused here so the CSV matches it exactly.
+import { SPREADSHEET_PROPERTY_LIST } from "@/constants/spreadsheet";
 
 type Props = {
   // Accepts either a flat list of issue IDs, or the grouped/sub-grouped issue map from the issues store.
@@ -122,6 +124,7 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
   const { getUserDetails } = useMember();
   const { getModuleById } = useModule();
   const { getCycleById } = useCycle();
+  const { getProjectIdentifierById } = useProject();
 
   // Resolver registry — maps a displayProperty key to a function that turns a raw value (typically
   // an ID or array of IDs) into a human-readable string. Keys that don't appear here fall back to
@@ -165,35 +168,45 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
       { header: "Title", get: (i) => i.name ?? "" },
     ];
 
-    // Workspace-level custom fields (same source the spreadsheet uses to discover new ones).
+    // Workspace-level custom field catalog (the spreadsheet appends these after the standard columns).
     const wsCustom =
       (workspaceUserInfo as any)?.[workspaceSlug?.toString() ?? ""]?.default_props?.display_properties
         ?.custom_properties || {};
 
-    // Everything else is driven entirely by what's toggled ON across the three sources.
-    // Insertion order of these sources becomes the column order in the CSV.
+    // Same predicate the spreadsheet uses: include the column only if displayProperties[key] is truthy.
+    // (See header-column.tsx — `if (!displayProperties?.[property]) return null;`.) For custom fields
+    // we additionally allow the toggle to live under displayProperties.custom_properties[key].
     const visited = new Set<string>();
     const pushColumn = (key: string) => {
       if (!key || visited.has(key) || key === "custom_properties") return;
-      const directOn = dp[key];
-      const nestedOn = dp?.custom_properties?.[key];
-      const wsOn = wsCustom[key];
-      // Hidden if any source says false; included only if some source says it's on.
-      if (directOn === false || nestedOn === false || wsOn === false) return;
-      if (directOn === undefined && nestedOn === undefined && wsOn === undefined) return;
+      const on = dp[key] || dp?.custom_properties?.[key];
+      if (!on) return;
       visited.add(key);
       const resolver = RESOLVERS[key];
       columns.push({
         header: humanize(key),
         get: (issue) => {
+          // `key` is the "PROJ-123" ID column — needs project identifier + sequence_id.
+          if (key === "key") {
+            const ident = getProjectIdentifierById((issue as any).project_id);
+            const seq = (issue as any)?.sequence_id;
+            if (seq === undefined || seq === null) return "";
+            return ident ? `${ident}-${seq}` : String(seq);
+          }
           const raw = getIssueValueForKey(issue, key);
           return resolver ? resolver(raw) : stringify(raw);
         },
       });
     };
-    Object.keys(dp).forEach(pushColumn);
+
+    // Standard columns first, in canonical spreadsheet order, then custom columns from any source.
+    SPREADSHEET_PROPERTY_LIST.forEach(pushColumn);
+    // `key` (the PROJ-123 ID column) isn't in SPREADSHEET_PROPERTY_LIST but is a real toggle — try it too.
+    pushColumn("key");
     Object.keys(dp.custom_properties || {}).forEach(pushColumn);
     Object.keys(wsCustom).forEach(pushColumn);
+    // Catch any extra dynamic keys that appear directly on displayProperties but in none of the above.
+    Object.keys(dp).forEach(pushColumn);
 
     const lines: string[] = [];
     lines.push(columns.map((c) => csvEscape(c.header)).join(","));
