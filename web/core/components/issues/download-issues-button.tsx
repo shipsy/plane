@@ -9,7 +9,7 @@ import { IIssueDisplayProperties, TIssue, TIssueMap } from "@plane/types";
 import { Button, setToast, TOAST_TYPE } from "@plane/ui";
 // router + permissions store for discovering workspace-level custom fields
 import { useParams } from "next/navigation";
-import { useUserPermissions } from "@/hooks/store";
+import { useCycle, useLabel, useMember, useModule, useProjectState, useUserPermissions } from "@/hooks/store";
 
 type Props = {
   // Accepts either a flat list of issue IDs, or the grouped/sub-grouped issue map from the issues store.
@@ -116,6 +116,35 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
   const { issueIds, issueMap, displayProperties, fileName = "issues" } = props;
   const { workspaceUserInfo } = useUserPermissions();
   const { workspaceSlug } = useParams();
+  // Resolver stores — used to turn raw foreign-key IDs into human names. Keyed dynamically below.
+  const { getStateById } = useProjectState();
+  const { getLabelById } = useLabel();
+  const { getUserDetails } = useMember();
+  const { getModuleById } = useModule();
+  const { getCycleById } = useCycle();
+
+  // Resolver registry — maps a displayProperty key to a function that turns a raw value (typically
+  // an ID or array of IDs) into a human-readable string. Keys that don't appear here fall back to
+  // the dynamic stringifier. This is a value-translation table, not a column inclusion list.
+  const RESOLVERS: Record<string, (val: any) => string> = {
+    state: (v) => (typeof v === "string" ? getStateById(v)?.name ?? v : "") as string,
+    assignee: (v) => {
+      const ids = Array.isArray(v) ? v : v ? [v] : [];
+      return ids
+        .map((id: string) => getUserDetails(id)?.display_name || getUserDetails(id)?.email || id)
+        .filter(Boolean)
+        .join(", ");
+    },
+    labels: (v) => {
+      const ids = Array.isArray(v) ? v : v ? [v] : [];
+      return ids.map((id: string) => getLabelById(id)?.name || id).filter(Boolean).join(", ");
+    },
+    modules: (v) => {
+      const ids = Array.isArray(v) ? v : v ? [v] : [];
+      return ids.map((id: string) => getModuleById(id)?.name || id).filter(Boolean).join(", ");
+    },
+    cycle: (v) => (typeof v === "string" ? getCycleById(v)?.name ?? v : "") as string,
+  };
 
   const handleDownload = () => {
     const flatIds = flattenIds(issueIds);
@@ -153,9 +182,13 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
       if (directOn === false || nestedOn === false || wsOn === false) return;
       if (directOn === undefined && nestedOn === undefined && wsOn === undefined) return;
       visited.add(key);
+      const resolver = RESOLVERS[key];
       columns.push({
         header: humanize(key),
-        get: (issue) => stringify(getIssueValueForKey(issue, key)),
+        get: (issue) => {
+          const raw = getIssueValueForKey(issue, key);
+          return resolver ? resolver(raw) : stringify(raw);
+        },
       });
     };
     Object.keys(dp).forEach(pushColumn);
