@@ -8,7 +8,7 @@ import { IIssueDisplayFilterOptions, IIssueDisplayProperties, IIssueFilterOption
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/ui";
 
-import { DisplayFiltersSelection, FiltersDropdown, FilterSelection, LayoutSelection } from "@/components/issues";
+import { DisplayFiltersSelection, DownloadIssuesButton, FiltersDropdown, FilterSelection, LayoutSelection } from "@/components/issues";
 // constants
 import {
   EIssueFilterType,
@@ -41,6 +41,8 @@ const HeaderFilters = observer(({ currentProjectDetails, projectId, workspaceSlu
   } = useMember();
   const {
     issuesFilter: { issueFilters, updateFilters },
+    issues: { groupedIssueIds },
+    issueMap,
   } = useIssues(EIssuesStoreType.PROJECT);
 
   const { projectStates } = useProjectState();
@@ -134,6 +136,12 @@ const HeaderFilters = observer(({ currentProjectDetails, projectId, workspaceSlu
           moduleViewDisabled={!currentProjectDetails?.module_view}
         />
       </FiltersDropdown>
+      <DownloadIssuesButton
+        issueIds={(groupedIssueIds as any) ?? []}
+        issueMap={issueMap}
+        displayProperties={issueFilters?.displayProperties ?? {}}
+        fileName={currentProjectDetails?.identifier ? `${currentProjectDetails.identifier}-issues` : "issues"}
+      />
       {canUserCreateIssue ? (
         <Button className="hidden md:block" onClick={() => setAnalyticsModal(true)} variant="neutral-primary" size="sm">
           {t("analytics")}

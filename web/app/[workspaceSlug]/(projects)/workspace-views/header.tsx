@@ -11,7 +11,8 @@ import { useTranslation } from "@plane/i18n";
 import { Breadcrumbs, Button, Header } from "@plane/ui";
 // components
 import { BreadcrumbLink } from "@/components/common";
-import { DisplayFiltersSelection, FiltersDropdown, FilterSelection } from "@/components/issues";
+import { ALL_ISSUES } from "@plane/constants";
+import { DisplayFiltersSelection, DownloadIssuesButton, FiltersDropdown, FilterSelection } from "@/components/issues";
 import { CreateUpdateWorkspaceViewModal } from "@/components/workspace";
 // constants
 import { EIssueFilterType, EIssuesStoreType, ISSUE_DISPLAY_FILTERS_BY_LAYOUT } from "@/constants/issue";
@@ -29,6 +30,8 @@ export const GlobalIssuesHeader = observer(() => {
   // store hooks
   const {
     issuesFilter: { filters, updateFilters },
+    issues: { groupedIssueIds },
+    issueMap,
   } = useIssues(EIssuesStoreType.GLOBAL);
   const { getViewDetailsById } = useGlobalView();
   const { workspaceLabels } = useLabel();
@@ -141,6 +144,15 @@ export const GlobalIssuesHeader = observer(() => {
           ) : (
             <></>
           )}
+
+          <DownloadIssuesButton
+            issueIds={
+              (globalViewId && groupedIssueIds && (groupedIssueIds as any)[ALL_ISSUES]) || []
+            }
+            issueMap={issueMap}
+            displayProperties={issueFilters?.displayProperties ?? {}}
+            fileName={`${viewDetails?.name || globalViewId?.toString() || "issues"}`}
+          />
 
           <Button variant="primary" size="sm" onClick={() => setCreateViewModal(true)}>
           {t("add_view")}
