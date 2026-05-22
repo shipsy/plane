@@ -135,11 +135,11 @@ export const ISSUE_DISPLAY_PROPERTIES_KEYS: (keyof IIssueDisplayProperties)[] = 
   "sub_issue_count",
   "link",
   "attachment_count",
-  "estimate",
+ // "estimate",
   "created_on",
   "updated_on",
-  "modules",
-  "cycle",
+ // "modules",
+ // "cycle",
   "issue_type",
   "trip_reference_number",
   "reference_number",
@@ -357,11 +357,7 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
         "reference_number",
         "custom_properties",
       ],
-      // Workspace-level views don't load modules / cycles / estimates from the API, so don't surface
-      // those toggles in the Display panel.
-      display_properties: ISSUE_DISPLAY_PROPERTIES_KEYS.filter(
-        (key) => key !== "modules" && key !== "cycle" && key !== "estimate"
-      ),
+      display_properties: ISSUE_DISPLAY_PROPERTIES_KEYS,
       display_filters: {
         order_by: [],
         type: [null, "active", "backlog"],
