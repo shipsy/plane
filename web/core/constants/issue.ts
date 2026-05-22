@@ -357,7 +357,11 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
         "reference_number",
         "custom_properties",
       ],
-      display_properties: ISSUE_DISPLAY_PROPERTIES_KEYS,
+      // Workspace-level views don't load modules / cycles / estimates from the API, so don't surface
+      // those toggles in the Display panel.
+      display_properties: ISSUE_DISPLAY_PROPERTIES_KEYS.filter(
+        (key) => key !== "modules" && key !== "cycle" && key !== "estimate"
+      ),
       display_filters: {
         order_by: [],
         type: [null, "active", "backlog"],
