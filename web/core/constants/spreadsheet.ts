@@ -280,7 +280,7 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     Column: SpreadsheetStandardPropertyColumn,
   },
   start_date_time: {
-    title: "start_date_time",
+    title: "Start date time",
     ascendingOrderKey: "-start_date_time",
     ascendingOrderTitle: "New",
     descendingOrderKey: "start_date_time",
@@ -289,7 +289,7 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     Column: SpreadsheetDateTimePropertyColumn,
   },
   target_date_time: {
-    title: "target_date_time",
+    title: "Due date time",
     ascendingOrderKey: "-target_date_time",
     ascendingOrderTitle: "New",
     descendingOrderKey: "target_date_time",
