@@ -164,6 +164,8 @@ export interface IIssueDisplayProperties {
   assignee?: boolean;
   start_date?: boolean;
   due_date?: boolean;
+  start_date_time?: boolean;
+  target_date_time?: boolean;
   labels?: boolean;
   key?: boolean;
   priority?: boolean;
