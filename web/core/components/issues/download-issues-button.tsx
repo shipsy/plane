@@ -6,10 +6,10 @@ import { Download } from "lucide-react";
 // types
 import { IIssueDisplayProperties, TIssue, TIssueMap } from "@plane/types";
 // ui
-import { Button, setToast, TOAST_TYPE } from "@plane/ui";
+import { Button, setToast, TOAST_TYPE, Tooltip } from "@plane/ui";
 // router + permissions store for discovering workspace-level custom fields
 import { useParams } from "next/navigation";
-import { useCycle, useLabel, useMember, useModule, useProject, useProjectState, useUserPermissions } from "@/hooks/store";
+import { useLabel, useMember, useProject, useProjectState, useUserPermissions } from "@/hooks/store";
 // Canonical column order used by the on-screen spreadsheet — reused here so the CSV matches it exactly.
 import { SPREADSHEET_PROPERTY_LIST } from "@/constants/spreadsheet";
 
@@ -122,9 +122,12 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
   const { getStateById } = useProjectState();
   const { getLabelById } = useLabel();
   const { getUserDetails } = useMember();
-  const { getModuleById } = useModule();
-  const { getCycleById } = useCycle();
   const { getProjectIdentifierById } = useProject();
+
+  // How many rows would this download try to export? Used to disable the button when the limit
+  // is exceeded so users apply filters before downloading instead of silently getting a partial file.
+  const totalRows = flattenIds(issueIds).length;
+  const overLimit = totalRows > MAX_ROWS;
 
   // Resolver registry — maps a displayProperty key to a function that turns a raw value (typically
   // an ID or array of IDs) into a human-readable string. Keys that don't appear here fall back to
@@ -142,11 +145,6 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
       const ids = Array.isArray(v) ? v : v ? [v] : [];
       return ids.map((id: string) => getLabelById(id)?.name || id).filter(Boolean).join(", ");
     },
-    modules: (v) => {
-      const ids = Array.isArray(v) ? v : v ? [v] : [];
-      return ids.map((id: string) => getModuleById(id)?.name || id).filter(Boolean).join(", ");
-    },
-    cycle: (v) => (typeof v === "string" ? getCycleById(v)?.name ?? v : "") as string,
   };
 
   const handleDownload = () => {
@@ -164,8 +162,22 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
     const dp: Record<string, any> = (displayProperties as any) || {};
 
     // Title is the only fixed column — it's the leftmost "Issues" cell and never appears in displayProperties.
+    // When the `key` toggle is on, the cell is prefixed with the PROJ-123 identifier (matches the
+    // on-screen "KEY > Title" rendering inside the Issues cell).
+    const showKey = !!dp.key;
     const columns: { header: string; get: (issue: TIssue) => string }[] = [
-      { header: "Title", get: (i) => i.name ?? "" },
+      {
+        header: "Title",
+        get: (i) => {
+          const name = i.name ?? "";
+          if (!showKey) return name;
+          const ident = getProjectIdentifierById((i as any).project_id);
+          const seq = (i as any)?.sequence_id;
+          if (seq === undefined || seq === null) return name;
+          const idStr = ident ? `${ident}-${seq}` : String(seq);
+          return `${idStr} ${name}`;
+        },
+      },
     ];
 
     // Workspace-level custom field catalog (the spreadsheet appends these after the standard columns).
@@ -176,7 +188,7 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
     // Same predicate the spreadsheet uses: include the column only if displayProperties[key] is truthy.
     // (See header-column.tsx — `if (!displayProperties?.[property]) return null;`.) For custom fields
     // we additionally allow the toggle to live under displayProperties.custom_properties[key].
-    const visited = new Set<string>();
+    const visited = new Set<string>(["key"]); // `key` is folded into the Title column above
     const pushColumn = (key: string) => {
       if (!key || visited.has(key) || key === "custom_properties") return;
       const on = dp[key] || dp?.custom_properties?.[key];
@@ -186,13 +198,6 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
       columns.push({
         header: humanize(key),
         get: (issue) => {
-          // `key` is the "PROJ-123" ID column — needs project identifier + sequence_id.
-          if (key === "key") {
-            const ident = getProjectIdentifierById((issue as any).project_id);
-            const seq = (issue as any)?.sequence_id;
-            if (seq === undefined || seq === null) return "";
-            return ident ? `${ident}-${seq}` : String(seq);
-          }
           const raw = getIssueValueForKey(issue, key);
           return resolver ? resolver(raw) : stringify(raw);
         },
@@ -201,8 +206,6 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
 
     // Standard columns first, in canonical spreadsheet order, then custom columns.
     SPREADSHEET_PROPERTY_LIST.forEach(pushColumn);
-    // `key` (the PROJ-123 ID column) isn't in SPREADSHEET_PROPERTY_LIST but is a real toggle — try it too.
-    pushColumn("key");
     // Custom properties: view-level toggles first, then workspace-level catalog. Do NOT use a
     // generic `Object.keys(dp)` catch-all — it sweeps in standard toggles like `issue_type` that
     // the on-screen spreadsheet intentionally doesn't render.
@@ -236,14 +239,23 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
     });
   };
 
+  const tooltipMessage = overLimit
+    ? `Too many issues to download (${totalRows}). The download is limited to ${MAX_ROWS} rows — apply filters to narrow the list.`
+    : "";
+
   return (
-    <Button
-      variant="neutral-primary"
-      size="sm"
-      prependIcon={<Download className="h-3.5 w-3.5" />}
-      onClick={handleDownload}
-    >
-      Download
-    </Button>
+    <Tooltip tooltipContent={tooltipMessage} disabled={!overLimit}>
+      <span>
+        <Button
+          variant="neutral-primary"
+          size="sm"
+          prependIcon={<Download className="h-3.5 w-3.5" />}
+          onClick={handleDownload}
+          disabled={overLimit}
+        >
+          Download
+        </Button>
+      </span>
+    </Tooltip>
   );
 });
