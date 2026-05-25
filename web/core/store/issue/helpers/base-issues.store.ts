@@ -1840,6 +1840,32 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
           )
         );
 
+      case "start_date_time":
+        return getIssueIds(
+          orderBy(array, [getSortOrderToFilterEmptyValues.bind(null, "start_date_time"), "start_date_time"])
+        );
+      case "-start_date_time":
+        return getIssueIds(
+          orderBy(
+            array,
+            [getSortOrderToFilterEmptyValues.bind(null, "start_date_time"), "start_date_time"],
+            ["asc", "desc"]
+          )
+        );
+
+      case "target_date_time":
+        return getIssueIds(
+          orderBy(array, [getSortOrderToFilterEmptyValues.bind(null, "target_date_time"), "target_date_time"])
+        );
+      case "-target_date_time":
+        return getIssueIds(
+          orderBy(
+            array,
+            [getSortOrderToFilterEmptyValues.bind(null, "target_date_time"), "target_date_time"],
+            ["asc", "desc"]
+          )
+        );
+
       // custom
       case "-priority": {
         const sortArray = ISSUE_PRIORITIES.map((i) => i.key);
