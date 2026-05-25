@@ -19,7 +19,7 @@ import { ButtonAvatars } from "@/components/dropdowns/member/avatar";
 import { IssueCycleSelect, IssueLabel, IssueModuleSelect, IssueParentSelect, CustomProperties } from "@/components/issues";
 // helpers
 import { cn } from "@/helpers/common.helper";
-import { getDate, renderFormattedPayloadDate } from "@/helpers/date-time.helper";
+import { getDate, renderFormattedPayloadDate, toDateTimeLocalInputValue } from "@/helpers/date-time.helper";
 import { shouldHighlightIssueDueDate } from "@/helpers/issue.helper";
 // hooks
 import { useProjectEstimates, useIssueDetail, useProject, useProjectState, useMember } from "@/hooks/store";
@@ -253,7 +253,7 @@ export const IssueDetailsSidebar: React.FC<Props> = observer((props) => {
               <input
                 type="datetime-local"
                 disabled={!isEditable}
-                value={issue.start_date_time ? issue.start_date_time.slice(0, 16) : ""}
+                value={toDateTimeLocalInputValue(issue.start_date_time)}
                 onChange={(e) => {
                   const val = e.target.value;
                   issueOperations.update(workspaceSlug, projectId, issueId, {
@@ -275,7 +275,7 @@ export const IssueDetailsSidebar: React.FC<Props> = observer((props) => {
               <input
                 type="datetime-local"
                 disabled={!isEditable}
-                value={issue.target_date_time ? issue.target_date_time.slice(0, 16) : ""}
+                value={toDateTimeLocalInputValue(issue.target_date_time)}
                 onChange={(e) => {
                   const val = e.target.value;
                   issueOperations.update(workspaceSlug, projectId, issueId, {

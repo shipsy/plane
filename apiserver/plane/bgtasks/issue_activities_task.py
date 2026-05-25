@@ -297,6 +297,28 @@ def track_start_date(
 
 
 # Track changes in issue target date time
+def _normalize_datetime_value(value):
+    """
+    Normalize a datetime string/object to a stable ISO 8601 representation
+    so that values produced by `str(datetime)` ("YYYY-MM-DD HH:MM:SS+TZ") and
+    values produced by DRF/JS (`YYYY-MM-DDTHH:MM:SS.sssZ`) compare equal when
+    they represent the same instant. Returns None for falsy/unparseable input.
+    """
+    from django.utils.dateparse import parse_datetime
+
+    if value in (None, "", "None"):
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    try:
+        parsed = parse_datetime(str(value))
+        if parsed is not None:
+            return parsed.isoformat()
+    except (TypeError, ValueError):
+        pass
+    return str(value)
+
+
 def track_target_date_time(
     requested_data,
     current_instance,
@@ -307,24 +329,16 @@ def track_target_date_time(
     issue_activities,
     epoch,
 ):
-    if current_instance.get("target_date_time") != requested_data.get(
-        "target_date_time"
-    ):
+    old_value = _normalize_datetime_value(current_instance.get("target_date_time"))
+    new_value = _normalize_datetime_value(requested_data.get("target_date_time"))
+    if old_value != new_value:
         issue_activities.append(
             IssueActivity(
                 issue_id=issue_id,
                 actor_id=actor_id,
                 verb="updated",
-                old_value=(
-                    current_instance.get("target_date_time")
-                    if current_instance.get("target_date_time") is not None
-                    else ""
-                ),
-                new_value=(
-                    requested_data.get("target_date_time")
-                    if requested_data.get("target_date_time") is not None
-                    else ""
-                ),
+                old_value=old_value if old_value is not None else "",
+                new_value=new_value if new_value is not None else "",
                 field="target_date_time",
                 project_id=project_id,
                 workspace_id=workspace_id,
@@ -345,24 +359,16 @@ def track_start_date_time(
     issue_activities,
     epoch,
 ):
-    if current_instance.get("start_date_time") != requested_data.get(
-        "start_date_time"
-    ):
+    old_value = _normalize_datetime_value(current_instance.get("start_date_time"))
+    new_value = _normalize_datetime_value(requested_data.get("start_date_time"))
+    if old_value != new_value:
         issue_activities.append(
             IssueActivity(
                 issue_id=issue_id,
                 actor_id=actor_id,
                 verb="updated",
-                old_value=(
-                    current_instance.get("start_date_time")
-                    if current_instance.get("start_date_time") is not None
-                    else ""
-                ),
-                new_value=(
-                    requested_data.get("start_date_time")
-                    if requested_data.get("start_date_time") is not None
-                    else ""
-                ),
+                old_value=old_value if old_value is not None else "",
+                new_value=new_value if new_value is not None else "",
                 field="start_date_time",
                 project_id=project_id,
                 workspace_id=workspace_id,
