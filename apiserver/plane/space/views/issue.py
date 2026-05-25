@@ -875,6 +875,8 @@ class IssueRetrievePublicEndpoint(BaseAPIView):
                 "priority",
                 "start_date",
                 "target_date",
+                "start_date_time",
+                "target_date_time",
                 "sequence_id",
                 "project_id",
                 "parent_id",
