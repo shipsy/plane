@@ -41,8 +41,13 @@ export const GlobalIssuesHeader = observer(() => {
 
   // Paginate the workspace issues endpoint with the current global-view filters
   // so the CSV reflects the full filtered set rather than what's in memory.
-  const fetchAllGlobalIssues = useCallback(async (): Promise<TIssue[]> => {
-    if (!slug || !viewId) return [];
+  // Returns `hitHardCap = true` when we stopped at the page cap while the server
+  // still had more results, so the UI can warn the user that the export is partial.
+  const fetchAllGlobalIssues = useCallback(async (): Promise<{
+    issues: TIssue[];
+    hitHardCap: boolean;
+  }> => {
+    if (!slug || !viewId) return { issues: [], hitHardCap: false };
     const workspaceService = new WorkspaceService();
     const appliedFilters = (getAppliedFilters?.(viewId) as Record<string, any>) || {};
     const baseParams: Record<string, any> = { ...appliedFilters };
@@ -50,9 +55,10 @@ export const GlobalIssuesHeader = observer(() => {
     delete baseParams.sub_group_by;
 
     const PER_PAGE = 500;
-    const HARD_CAP_PAGES = 50;
+    const HARD_CAP_PAGES = 50; // 25,000 issues max
     const all: TIssue[] = [];
     let cursor = `${PER_PAGE}:0:0`;
+    let hitHardCap = false;
     for (let page = 0; page < HARD_CAP_PAGES; page++) {
       const response = await workspaceService.getViewIssues(slug, {
         ...baseParams,
@@ -61,10 +67,18 @@ export const GlobalIssuesHeader = observer(() => {
       });
       const results = response?.results;
       if (Array.isArray(results)) all.push(...(results as TIssue[]));
+
+      // Natural end: server has no more pages.
       if (!response?.next_page_results || !response?.next_cursor) break;
+
+      // Last allowed iteration but server still has more → cap hit, flag it.
+      if (page === HARD_CAP_PAGES - 1) {
+        hitHardCap = true;
+        break;
+      }
       cursor = response.next_cursor;
     }
-    return all;
+    return { issues: all, hitHardCap };
   }, [slug, viewId, getAppliedFilters]);
   const { getViewDetailsById } = useGlobalView();
   const { workspaceLabels } = useLabel();

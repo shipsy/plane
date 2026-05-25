@@ -21,12 +21,18 @@ type Props = {
   displayProperties: IIssueDisplayProperties;
   fileName?: string;
   // When provided, the button fetches the full filtered issue set from the server
-  // (paginated) instead of relying on what's loaded in memory. Returned issues
-  // are used directly to build the CSV.
-  fetchAllIssues?: () => Promise<TIssue[]>;
+  // (paginated) instead of relying on what's loaded in memory. Returns the issues
+  // along with a `hitHardCap` flag indicating the server had more results than the
+  // fetcher was allowed to retrieve.
+  fetchAllIssues?: () => Promise<{ issues: TIssue[]; hitHardCap: boolean }>;
 };
 
-const MAX_ROWS = 1000;
+// Maximum issues the server-side fetcher will pull (mirrors PER_PAGE * HARD_CAP_PAGES
+// in the project/workspace fetchers). Used in the toast message when the cap is hit.
+const HARD_CAP = 25000;
+// In-memory fallback cap — used only when `fetchAllIssues` is not provided and we're
+// reading whatever is currently loaded in the store.
+const MAX_MEMORY_ROWS = 1000;
 
 const flattenIds = (ids: any): string[] => {
   if (!ids) return [];
@@ -131,10 +137,10 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
   const { getUserDetails } = useMember();
   const { getProjectIdentifierById } = useProject();
 
-  // How many rows would this download try to export? Used to disable the button when the limit
-  // is exceeded so users apply filters before downloading instead of silently getting a partial file.
+  // How many rows would the in-memory fallback path try to export? Used only for the
+  // tooltip warning when `fetchAllIssues` is not wired and we're reading from the store.
   const totalRows = flattenIds(issueIds).length;
-  const overLimit = totalRows > MAX_ROWS;
+  const overLimit = totalRows > MAX_MEMORY_ROWS;
 
   // Resolver registry — maps a displayProperty key to a function that turns a raw value (typically
   // an ID or array of IDs) into a human-readable string. Keys that don't appear here fall back to
@@ -156,131 +162,154 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
 
   const handleDownload = async () => {
     if (isDownloading) return;
+    setIsDownloading(true);
 
     let allIssues: TIssue[] = [];
+    let hitHardCap = false;
+    // Only the in-memory fallback path truncates — the server fetcher already caps at HARD_CAP.
+    let memoryTruncated = false;
 
-    if (fetchAllIssues) {
-      // Fetch the full filtered set from the server. The CSV reflects the active
-      // filters/sort regardless of what the on-screen layout has paginated in.
-      setIsDownloading(true);
-      try {
-        allIssues = await fetchAllIssues();
-      } catch {
-        setIsDownloading(false);
+    try {
+      if (fetchAllIssues) {
+        // Fetch the full filtered set from the server. The CSV reflects the active
+        // filters/sort regardless of what the on-screen layout has paginated in.
+        try {
+          const result = await fetchAllIssues();
+          allIssues = result.issues;
+          hitHardCap = result.hitHardCap;
+        } catch (e) {
+          console.error("Download fetch failed:", e);
+          setToast({
+            type: TOAST_TYPE.ERROR,
+            title: "Download failed",
+            message: "Couldn't fetch issues from the server. Try again.",
+          });
+          return;
+        }
+      } else {
+        // Fallback: use whatever is currently loaded in the issues store.
+        const flatIds = flattenIds(issueIds);
+        allIssues = flatIds.map((id) => issueMap?.[id]).filter(Boolean) as TIssue[];
+        if (allIssues.length > MAX_MEMORY_ROWS) {
+          memoryTruncated = true;
+          allIssues = allIssues.slice(0, MAX_MEMORY_ROWS);
+        }
+      }
+
+      if (allIssues.length === 0) {
         setToast({
-          type: TOAST_TYPE.ERROR,
-          title: "Download failed",
-          message: "Couldn't fetch issues from the server. Try again.",
+          type: TOAST_TYPE.WARNING,
+          title: "Nothing to download",
+          message: "No issues matched the current filters.",
         });
         return;
       }
-    } else {
-      // Fallback: use whatever is currently loaded in the issues store.
-      const flatIds = flattenIds(issueIds);
-      allIssues = flatIds.map((id) => issueMap?.[id]).filter(Boolean) as TIssue[];
-    }
 
-    if (allIssues.length === 0) {
-      setIsDownloading(false);
+      const issues = allIssues;
+
+      const dp: Record<string, any> = (displayProperties as any) || {};
+
+      // Title is the only fixed column — it's the leftmost "Issues" cell and never appears in displayProperties.
+      // When the `key` toggle is on, the cell is prefixed with the PROJ-123 identifier (matches the
+      // on-screen "KEY > Title" rendering inside the Issues cell).
+      const showKey = !!dp.key;
+      const columns: { header: string; get: (issue: TIssue) => string }[] = [
+        {
+          header: "Title",
+          get: (i) => {
+            const name = i.name ?? "";
+            if (!showKey) return name;
+            const ident = getProjectIdentifierById((i as any).project_id);
+            const seq = (i as any)?.sequence_id;
+            if (seq === undefined || seq === null) return name;
+            const idStr = ident ? `${ident}-${seq}` : String(seq);
+            return `${idStr} ${name}`;
+          },
+        },
+      ];
+
+      // Workspace-level custom field catalog (the spreadsheet appends these after the standard columns).
+      const wsCustom =
+        (workspaceUserInfo as any)?.[workspaceSlug ?? ""]?.default_props?.display_properties
+          ?.custom_properties || {};
+
+      // Same predicate the spreadsheet uses: include the column only if displayProperties[key] is truthy.
+      // (See header-column.tsx — `if (!displayProperties?.[property]) return null;`.) For custom fields
+      // we additionally allow the toggle to live under displayProperties.custom_properties[key].
+      const visited = new Set<string>(["key"]); // `key` is folded into the Title column above
+      const pushColumn = (key: string) => {
+        if (!key || visited.has(key) || key === "custom_properties") return;
+        const on = dp[key] || dp?.custom_properties?.[key];
+        if (!on) return;
+        visited.add(key);
+        const resolver = RESOLVERS[key];
+        columns.push({
+          header: humanize(key),
+          get: (issue) => {
+            const raw = getIssueValueForKey(issue, key);
+            return resolver ? resolver(raw) : stringify(raw);
+          },
+        });
+      };
+
+      // Standard columns first, in canonical spreadsheet order, then custom columns.
+      SPREADSHEET_PROPERTY_LIST.forEach(pushColumn);
+      // Custom properties: view-level toggles first, then workspace-level catalog. Do NOT use a
+      // generic `Object.keys(dp)` catch-all — it sweeps in standard toggles like `issue_type` that
+      // the on-screen spreadsheet intentionally doesn't render.
+      Object.keys(dp.custom_properties || {}).forEach(pushColumn);
+      Object.keys(wsCustom).forEach(pushColumn);
+
+      const lines: string[] = [];
+      lines.push(columns.map((c) => csvEscape(c.header)).join(","));
+      for (const issue of issues) {
+        lines.push(columns.map((c) => csvEscape(c.get(issue))).join(","));
+      }
+
+      const csv = "﻿" + lines.join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      const safeName = (fileName || "issues").replace(/[^\w.\-]+/g, "_");
+      link.href = url;
+      link.download = `${safeName}-${ts}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      // Revoke after a tick so some browsers (Safari) don't cancel the in-flight download.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+
+      // Pick the right toast: hard-cap hit on server fetch, memory-truncation on fallback,
+      // or a clean success when everything fit.
+      const partial = hitHardCap || memoryTruncated;
+      let message: string;
+      if (hitHardCap) {
+        message = `Your view has more than ${HARD_CAP.toLocaleString()} issues. Only the first ${HARD_CAP.toLocaleString()} were exported. Apply filters to narrow your results.`;
+      } else if (memoryTruncated) {
+        message = `Exported the first ${MAX_MEMORY_ROWS} issues loaded in memory. Apply filters to narrow the list.`;
+      } else {
+        message = `Exported ${issues.length} issue${issues.length === 1 ? "" : "s"} to CSV.`;
+      }
+
       setToast({
-        type: TOAST_TYPE.WARNING,
-        title: "Nothing to download",
-        message: "No issues matched the current filters.",
+        type: partial ? TOAST_TYPE.WARNING : TOAST_TYPE.SUCCESS,
+        title: partial ? "Partial download" : "Download complete",
+        message,
       });
-      return;
+    } finally {
+      // Always reset the button state — covers happy path, early returns, and any
+      // exception thrown during column build / CSV write.
+      setIsDownloading(false);
     }
-
-    const truncated = allIssues.length > MAX_ROWS;
-    const issues = truncated ? allIssues.slice(0, MAX_ROWS) : allIssues;
-
-    const dp: Record<string, any> = (displayProperties as any) || {};
-
-    // Title is the only fixed column — it's the leftmost "Issues" cell and never appears in displayProperties.
-    // When the `key` toggle is on, the cell is prefixed with the PROJ-123 identifier (matches the
-    // on-screen "KEY > Title" rendering inside the Issues cell).
-    const showKey = !!dp.key;
-    const columns: { header: string; get: (issue: TIssue) => string }[] = [
-      {
-        header: "Title",
-        get: (i) => {
-          const name = i.name ?? "";
-          if (!showKey) return name;
-          const ident = getProjectIdentifierById((i as any).project_id);
-          const seq = (i as any)?.sequence_id;
-          if (seq === undefined || seq === null) return name;
-          const idStr = ident ? `${ident}-${seq}` : String(seq);
-          return `${idStr} ${name}`;
-        },
-      },
-    ];
-
-    // Workspace-level custom field catalog (the spreadsheet appends these after the standard columns).
-    const wsCustom =
-      (workspaceUserInfo as any)?.[workspaceSlug ?? ""]?.default_props?.display_properties
-        ?.custom_properties || {};
-
-    // Same predicate the spreadsheet uses: include the column only if displayProperties[key] is truthy.
-    // (See header-column.tsx — `if (!displayProperties?.[property]) return null;`.) For custom fields
-    // we additionally allow the toggle to live under displayProperties.custom_properties[key].
-    const visited = new Set<string>(["key"]); // `key` is folded into the Title column above
-    const pushColumn = (key: string) => {
-      if (!key || visited.has(key) || key === "custom_properties") return;
-      const on = dp[key] || dp?.custom_properties?.[key];
-      if (!on) return;
-      visited.add(key);
-      const resolver = RESOLVERS[key];
-      columns.push({
-        header: humanize(key),
-        get: (issue) => {
-          const raw = getIssueValueForKey(issue, key);
-          return resolver ? resolver(raw) : stringify(raw);
-        },
-      });
-    };
-
-    // Standard columns first, in canonical spreadsheet order, then custom columns.
-    SPREADSHEET_PROPERTY_LIST.forEach(pushColumn);
-    // Custom properties: view-level toggles first, then workspace-level catalog. Do NOT use a
-    // generic `Object.keys(dp)` catch-all — it sweeps in standard toggles like `issue_type` that
-    // the on-screen spreadsheet intentionally doesn't render.
-    Object.keys(dp.custom_properties || {}).forEach(pushColumn);
-    Object.keys(wsCustom).forEach(pushColumn);
-
-    const lines: string[] = [];
-    lines.push(columns.map((c) => csvEscape(c.header)).join(","));
-    for (const issue of issues) {
-      lines.push(columns.map((c) => csvEscape(c.get(issue))).join(","));
-    }
-
-    const csv = "﻿" + lines.join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    const safeName = (fileName || "issues").replace(/[^\w.\-]+/g, "_");
-    link.href = url;
-    link.download = `${safeName}-${ts}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    setIsDownloading(false);
-    setToast({
-      type: truncated ? TOAST_TYPE.WARNING : TOAST_TYPE.SUCCESS,
-      title: truncated ? "Download truncated" : "Download started",
-      message: truncated
-        ? `Exported the first ${MAX_ROWS} of ${allIssues.length} issues. Apply filters to narrow the list.`
-        : `Exported ${issues.length} issue${issues.length === 1 ? "" : "s"} to CSV.`,
-    });
   };
 
-  // When `fetchAllIssues` is wired, the in-memory count is no longer meaningful
-  // — the real row count is only known after the fetch. Above the cap we still
-  // download, just truncated, so the button is never hard-disabled.
+  // Only meaningful in the in-memory fallback path. When `fetchAllIssues` is wired,
+  // the real row count is only known after the fetch, and the server-side hard cap
+  // is surfaced via the post-download toast instead.
   const tooltipMessage =
     !fetchAllIssues && overLimit
-      ? `Too many issues loaded in memory (${totalRows}). The download will be truncated to ${MAX_ROWS} rows.`
+      ? `Too many issues loaded in memory (${totalRows}). The download will be truncated to ${MAX_MEMORY_ROWS} rows.`
       : "";
 
   return (
