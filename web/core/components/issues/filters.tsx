@@ -3,7 +3,9 @@
 import { useCallback, useState } from "react";
 import { observer } from "mobx-react";
 // types
-import { IIssueDisplayFilterOptions, IIssueDisplayProperties, IIssueFilterOptions } from "@plane/types";
+import { IIssueDisplayFilterOptions, IIssueDisplayProperties, IIssueFilterOptions, TIssue } from "@plane/types";
+// services
+import { IssueService } from "@/services/issue/issue.service";
 // ui
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/ui";
@@ -40,10 +42,44 @@ const HeaderFilters = observer(({ currentProjectDetails, projectId, workspaceSlu
     project: { projectMemberIds },
   } = useMember();
   const {
-    issuesFilter: { issueFilters, updateFilters },
+    issuesFilter,
     issues: { groupedIssueIds },
     issueMap,
   } = useIssues(EIssuesStoreType.PROJECT);
+  const { issueFilters, updateFilters } = issuesFilter;
+
+  // Lazily build a fetcher that walks the issue list endpoint (one page at a time,
+  // ungrouped) with the current filters applied so the CSV reflects the full
+  // filtered set, not just what the on-screen layout has paginated in.
+  // Note: call `getAppliedFilters` off `issuesFilter` (not destructured) — it's a
+  // regular class method that uses `this`, so destructuring breaks the binding.
+  const fetchAllProjectIssues = useCallback(async (): Promise<TIssue[]> => {
+    if (!workspaceSlug || !projectId) return [];
+    const issueService = new IssueService();
+    const appliedFilters = (issuesFilter.getAppliedFilters?.(projectId) as Record<string, any>) || {};
+    const baseParams: Record<string, any> = { ...appliedFilters };
+    // Force a flat (ungrouped) response and drop any layout-specific filters
+    // so we get every matching issue, not just the current group/page.
+    delete baseParams.group_by;
+    delete baseParams.sub_group_by;
+
+    const PER_PAGE = 500;
+    const HARD_CAP_PAGES = 50; // safety net — 25k issues
+    const all: TIssue[] = [];
+    let cursor = `${PER_PAGE}:0:0`;
+    for (let page = 0; page < HARD_CAP_PAGES; page++) {
+      const response = await issueService.getIssuesFromServer(workspaceSlug, projectId, {
+        ...baseParams,
+        cursor,
+        per_page: PER_PAGE,
+      });
+      const results = response?.results;
+      if (Array.isArray(results)) all.push(...(results as TIssue[]));
+      if (!response?.next_page_results || !response?.next_cursor) break;
+      cursor = response.next_cursor;
+    }
+    return all;
+  }, [workspaceSlug, projectId, issuesFilter]);
 
   const { projectStates } = useProjectState();
   const { projectLabels } = useLabel();
@@ -141,6 +177,7 @@ const HeaderFilters = observer(({ currentProjectDetails, projectId, workspaceSlu
         issueMap={issueMap}
         displayProperties={issueFilters?.displayProperties ?? {}}
         fileName={currentProjectDetails?.identifier ? `${currentProjectDetails.identifier}-issues` : "issues"}
+        fetchAllIssues={fetchAllProjectIssues}
       />
       {canUserCreateIssue ? (
         <Button className="hidden md:block" onClick={() => setAnalyticsModal(true)} variant="neutral-primary" size="sm">

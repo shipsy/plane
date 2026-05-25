@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { observer } from "mobx-react";
-import { Download } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 // types
 import { IIssueDisplayProperties, TIssue, TIssueMap } from "@plane/types";
 // ui
@@ -15,10 +15,15 @@ import { SPREADSHEET_PROPERTY_LIST } from "@/constants/spreadsheet";
 
 type Props = {
   // Accepts either a flat list of issue IDs, or the grouped/sub-grouped issue map from the issues store.
+  // Used as the fallback source when `fetchAllIssues` is not provided.
   issueIds: string[] | Record<string, any> | undefined;
   issueMap: TIssueMap;
   displayProperties: IIssueDisplayProperties;
   fileName?: string;
+  // When provided, the button fetches the full filtered issue set from the server
+  // (paginated) instead of relying on what's loaded in memory. Returned issues
+  // are used directly to build the CSV.
+  fetchAllIssues?: () => Promise<TIssue[]>;
 };
 
 const MAX_ROWS = 1000;
@@ -115,9 +120,11 @@ const getIssueValueForKey = (issue: TIssue, key: string): any => {
 };
 
 export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
-  const { issueIds, issueMap, displayProperties, fileName = "issues" } = props;
+  const { issueIds, issueMap, displayProperties, fileName = "issues", fetchAllIssues } = props;
+  const [isDownloading, setIsDownloading] = useState(false);
   const { workspaceUserInfo } = useUserPermissions();
-  const { workspaceSlug } = useParams();
+  const { workspaceSlug: rawWorkspaceSlug } = useParams();
+  const workspaceSlug = Array.isArray(rawWorkspaceSlug) ? rawWorkspaceSlug[0] : rawWorkspaceSlug;
   // Resolver stores — used to turn raw foreign-key IDs into human names. Keyed dynamically below.
   const { getStateById } = useProjectState();
   const { getLabelById } = useLabel();
@@ -147,12 +154,39 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
     },
   };
 
-  const handleDownload = () => {
-    const flatIds = flattenIds(issueIds);
-    const allIssues: TIssue[] = flatIds.map((id) => issueMap?.[id]).filter(Boolean) as TIssue[];
+  const handleDownload = async () => {
+    if (isDownloading) return;
+
+    let allIssues: TIssue[] = [];
+
+    if (fetchAllIssues) {
+      // Fetch the full filtered set from the server. The CSV reflects the active
+      // filters/sort regardless of what the on-screen layout has paginated in.
+      setIsDownloading(true);
+      try {
+        allIssues = await fetchAllIssues();
+      } catch {
+        setIsDownloading(false);
+        setToast({
+          type: TOAST_TYPE.ERROR,
+          title: "Download failed",
+          message: "Couldn't fetch issues from the server. Try again.",
+        });
+        return;
+      }
+    } else {
+      // Fallback: use whatever is currently loaded in the issues store.
+      const flatIds = flattenIds(issueIds);
+      allIssues = flatIds.map((id) => issueMap?.[id]).filter(Boolean) as TIssue[];
+    }
 
     if (allIssues.length === 0) {
-      setToast({ type: TOAST_TYPE.WARNING, title: "Nothing to download", message: "No issues are visible on screen." });
+      setIsDownloading(false);
+      setToast({
+        type: TOAST_TYPE.WARNING,
+        title: "Nothing to download",
+        message: "No issues matched the current filters.",
+      });
       return;
     }
 
@@ -182,7 +216,7 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
 
     // Workspace-level custom field catalog (the spreadsheet appends these after the standard columns).
     const wsCustom =
-      (workspaceUserInfo as any)?.[workspaceSlug?.toString() ?? ""]?.default_props?.display_properties
+      (workspaceUserInfo as any)?.[workspaceSlug ?? ""]?.default_props?.display_properties
         ?.custom_properties || {};
 
     // Same predicate the spreadsheet uses: include the column only if displayProperties[key] is truthy.
@@ -223,13 +257,15 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    const safeName = (fileName || "issues").replace(/[^\w.\-]+/g, "_");
     link.href = url;
-    link.download = `${fileName}-${ts}.csv`;
+    link.download = `${safeName}-${ts}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
+    setIsDownloading(false);
     setToast({
       type: truncated ? TOAST_TYPE.WARNING : TOAST_TYPE.SUCCESS,
       title: truncated ? "Download truncated" : "Download started",
@@ -239,21 +275,27 @@ export const DownloadIssuesButton: React.FC<Props> = observer((props) => {
     });
   };
 
-  const tooltipMessage = overLimit
-    ? `Too many issues to download (${totalRows}). The download is limited to ${MAX_ROWS} rows — apply filters to narrow the list.`
-    : "";
+  // When `fetchAllIssues` is wired, the in-memory count is no longer meaningful
+  // — the real row count is only known after the fetch. Above the cap we still
+  // download, just truncated, so the button is never hard-disabled.
+  const tooltipMessage =
+    !fetchAllIssues && overLimit
+      ? `Too many issues loaded in memory (${totalRows}). The download will be truncated to ${MAX_ROWS} rows.`
+      : "";
 
   return (
-    <Tooltip tooltipContent={tooltipMessage} disabled={!overLimit}>
+    <Tooltip tooltipContent={tooltipMessage} disabled={!tooltipMessage}>
       <span>
         <Button
           variant="neutral-primary"
           size="sm"
-          prependIcon={<Download className="h-3.5 w-3.5" />}
+          prependIcon={
+            isDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />
+          }
           onClick={handleDownload}
-          disabled={overLimit}
+          disabled={isDownloading}
         >
-          Download
+          {isDownloading ? "Preparing…" : "Download"}
         </Button>
       </span>
     </Tooltip>
