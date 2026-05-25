@@ -296,6 +296,82 @@ def track_start_date(
         )
 
 
+# Track changes in issue target date time
+def track_target_date_time(
+    requested_data,
+    current_instance,
+    issue_id,
+    project_id,
+    workspace_id,
+    actor_id,
+    issue_activities,
+    epoch,
+):
+    if current_instance.get("target_date_time") != requested_data.get(
+        "target_date_time"
+    ):
+        issue_activities.append(
+            IssueActivity(
+                issue_id=issue_id,
+                actor_id=actor_id,
+                verb="updated",
+                old_value=(
+                    current_instance.get("target_date_time")
+                    if current_instance.get("target_date_time") is not None
+                    else ""
+                ),
+                new_value=(
+                    requested_data.get("target_date_time")
+                    if requested_data.get("target_date_time") is not None
+                    else ""
+                ),
+                field="target_date_time",
+                project_id=project_id,
+                workspace_id=workspace_id,
+                comment="updated the target date time to",
+                epoch=epoch,
+            )
+        )
+
+
+# Track changes in issue start date time
+def track_start_date_time(
+    requested_data,
+    current_instance,
+    issue_id,
+    project_id,
+    workspace_id,
+    actor_id,
+    issue_activities,
+    epoch,
+):
+    if current_instance.get("start_date_time") != requested_data.get(
+        "start_date_time"
+    ):
+        issue_activities.append(
+            IssueActivity(
+                issue_id=issue_id,
+                actor_id=actor_id,
+                verb="updated",
+                old_value=(
+                    current_instance.get("start_date_time")
+                    if current_instance.get("start_date_time") is not None
+                    else ""
+                ),
+                new_value=(
+                    requested_data.get("start_date_time")
+                    if requested_data.get("start_date_time") is not None
+                    else ""
+                ),
+                field="start_date_time",
+                project_id=project_id,
+                workspace_id=workspace_id,
+                comment="updated the start date time to ",
+                epoch=epoch,
+            )
+        )
+
+
 # Track changes in issue labels
 def track_labels(
     requested_data,
@@ -632,6 +708,8 @@ def update_issue_activity(
         "description_html": track_description,
         "target_date": track_target_date,
         "start_date": track_start_date,
+        "target_date_time": track_target_date_time,
+        "start_date_time": track_start_date_time,
         "label_ids": track_labels,
         "assignee_ids": track_assignees,
         "estimate_point": track_estimate_points,
