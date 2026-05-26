@@ -21,4 +21,41 @@ export class ProjectExportService extends APIService {
         throw error?.response?.data;
       });
   }
+
+  async getExportsServicesList(
+    workspaceSlug: string,
+    cursor: string,
+    per_page: number = 10
+  ): Promise<any> {
+    return this.get(`/api/workspaces/${workspaceSlug}/export-issues/`, {
+      params: { cursor, per_page },
+    })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  async downloadIssues(
+    workspaceSlug: string,
+    data: {
+      provider: string;
+      project: string[];
+      multiple?: boolean;
+    }
+  ): Promise<{ blob: Blob; filename: string }> {
+    return this.post(`/api/workspaces/${workspaceSlug}/download-issues/`, data, {
+      responseType: "blob",
+    })
+      .then((response) => {
+        const disposition: string = response?.headers?.["content-disposition"] || "";
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const fallbackExt = data.multiple ? "zip" : data.provider;
+        const filename = match?.[1] || `${workspaceSlug}-issues.${fallbackExt}`;
+        return { blob: response.data as Blob, filename };
+      })
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
 }

@@ -1,0 +1,57 @@
+"use client";
+
+import React, { useState } from "react";
+import { observer } from "mobx-react";
+import { ChevronDown, Download, History } from "lucide-react";
+// ui
+import { CustomMenu } from "@plane/ui";
+// components
+import { Exporter } from "./export-modal";
+import { ExportHistory } from "./export-history";
+// hooks
+import { useUser } from "@/hooks/store";
+
+export const WorkspaceExportsPopover = observer(() => {
+  const { data: currentUser } = useUser();
+  const [exportProvider, setExportProvider] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+
+  return (
+    <>
+      <CustomMenu
+        customButton={
+          <div className="flex items-center gap-1.5 rounded border border-custom-border-200 bg-custom-background-100 px-2 py-1 text-xs font-medium hover:bg-custom-background-80">
+            <Download className="h-3 w-3" />
+            <span>Download</span>
+            <ChevronDown className="h-3 w-3" />
+          </div>
+        }
+        placement="bottom-end"
+        closeOnSelect
+      >
+        <CustomMenu.MenuItem onClick={() => setExportProvider("csv")}>CSV</CustomMenu.MenuItem>
+        <CustomMenu.MenuItem onClick={() => setExportProvider("xlsx")}>Excel</CustomMenu.MenuItem>
+        <CustomMenu.MenuItem onClick={() => setExportProvider("json")}>JSON</CustomMenu.MenuItem>
+        <CustomMenu.MenuItem onClick={() => setHistoryOpen(true)}>
+          <span className="flex items-center gap-2">
+            <History className="h-3 w-3" />
+            View export history
+          </span>
+        </CustomMenu.MenuItem>
+      </CustomMenu>
+
+      {exportProvider && (
+        <Exporter
+          isOpen
+          handleClose={() => setExportProvider(null)}
+          data={null}
+          user={currentUser || null}
+          provider={exportProvider}
+          mutateServices={() => {}}
+        />
+      )}
+
+      <ExportHistory isOpen={historyOpen} handleClose={() => setHistoryOpen(false)} />
+    </>
+  );
+});
