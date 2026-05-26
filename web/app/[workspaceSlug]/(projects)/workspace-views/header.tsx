@@ -4,13 +4,14 @@ import { useCallback, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // types
-import { Layers } from "lucide-react";
+import { ChevronDown, Download, Layers } from "lucide-react";
 import { IIssueDisplayFilterOptions, IIssueDisplayProperties, IIssueFilterOptions } from "@plane/types";
 // ui
 import { useTranslation } from "@plane/i18n";
-import { Breadcrumbs, Button, Header } from "@plane/ui";
+import { Breadcrumbs, Button, CustomMenu, Header } from "@plane/ui";
 // components
 import { BreadcrumbLink } from "@/components/common";
+import { Exporter } from "@/components/exporter";
 import { DisplayFiltersSelection, FiltersDropdown, FilterSelection } from "@/components/issues";
 import { CreateUpdateWorkspaceViewModal } from "@/components/workspace";
 // constants
@@ -18,12 +19,13 @@ import { EIssueFilterType, EIssuesStoreType, ISSUE_DISPLAY_FILTERS_BY_LAYOUT } f
 // helpers
 import { isIssueFilterActive } from "@/helpers/filter.helper";
 // hooks
-import { useLabel, useMember, useIssues, useGlobalView } from "@/hooks/store";
+import { useLabel, useMember, useIssues, useGlobalView, useUser } from "@/hooks/store";
 
 export const GlobalIssuesHeader = observer(() => {
   const { t } = useTranslation();
   // states
   const [createViewModal, setCreateViewModal] = useState(false);
+  const [exportProvider, setExportProvider] = useState<string | null>(null);
   // router
   const { workspaceSlug, globalViewId } = useParams();
   // store hooks
@@ -31,6 +33,7 @@ export const GlobalIssuesHeader = observer(() => {
     issuesFilter: { filters, updateFilters },
   } = useIssues(EIssuesStoreType.GLOBAL);
   const { getViewDetailsById } = useGlobalView();
+  const { data: currentUser } = useUser();
   const { workspaceLabels } = useLabel();
   const {
     workspace: { workspaceMemberIds },
@@ -142,11 +145,37 @@ export const GlobalIssuesHeader = observer(() => {
             <></>
           )}
 
+          <CustomMenu
+            customButton={
+              <div className="flex items-center gap-1.5 rounded border border-custom-border-200 bg-custom-background-100 px-2 py-1 text-xs font-medium hover:bg-custom-background-80">
+                <Download className="h-3 w-3" />
+                <span>Download</span>
+                <ChevronDown className="h-3 w-3" />
+              </div>
+            }
+            placement="bottom-end"
+            closeOnSelect
+          >
+            <CustomMenu.MenuItem onClick={() => setExportProvider("csv")}>CSV</CustomMenu.MenuItem>
+            <CustomMenu.MenuItem onClick={() => setExportProvider("xlsx")}>Excel</CustomMenu.MenuItem>
+            <CustomMenu.MenuItem onClick={() => setExportProvider("json")}>JSON</CustomMenu.MenuItem>
+          </CustomMenu>
+
           <Button variant="primary" size="sm" onClick={() => setCreateViewModal(true)}>
           {t("add_view")}
           </Button>
         </Header.RightItem>
       </Header>
+      {exportProvider && (
+        <Exporter
+          isOpen
+          handleClose={() => setExportProvider(null)}
+          data={null}
+          user={currentUser || null}
+          provider={exportProvider}
+          mutateServices={() => {}}
+        />
+      )}
     </>
   );
 });

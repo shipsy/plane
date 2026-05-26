@@ -12,6 +12,7 @@ export class ProjectExportService extends APIService {
     data: {
       provider: string;
       project: string[];
+      multiple?: boolean;
     }
   ): Promise<any> {
     return this.post(`/api/workspaces/${workspaceSlug}/export-issues/`, data)
