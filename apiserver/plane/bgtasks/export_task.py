@@ -16,7 +16,7 @@ from django.utils import timezone
 from openpyxl import Workbook
 
 # Module imports
-from plane.db.models import ExporterHistory, Issue
+from plane.db.models import ExporterHistory
 from plane.utils.exception_logger import log_exception
 from plane.utils.order_queryset import order_issue_queryset
 
@@ -338,6 +338,7 @@ def issue_export_task(
     multiple,
     slug,
     filters=None,
+    custom_properties=None,
     order_by_param="-created_at",
 ):
     try:
@@ -345,13 +346,18 @@ def issue_export_task(
         exporter_instance.status = "processing"
         exporter_instance.save(update_fields=["status"])
 
-        base_qs = Issue.objects.filter(
-            workspace__id=workspace_id,
-            project_id__in=project_ids,
-            project__project_projectmember__member=exporter_instance.initiated_by_id,
-            project__project_projectmember__is_active=True,
-            project__archived_at__isnull=True,
+        # Use the same baseline queryset the list view uses so the export
+        # mirrors what the user sees on the page (drafts/archived/triage
+        # excluded, hub scoped, guest restrictions applied).
+        from plane.app.views.exporter.base import _build_list_view_base_queryset
+        from plane.utils.issue_filters import build_custom_property_q_objects
+        base_qs = _build_list_view_base_queryset(
+            slug=slug,
+            user=exporter_instance.initiated_by,
+            project_ids=project_ids,
         )
+        if custom_properties:
+            base_qs = base_qs.filter(*build_custom_property_q_objects(custom_properties))
         if filters:
             base_qs = base_qs.filter(**filters)
         base_qs, _ = order_issue_queryset(
