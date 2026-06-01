@@ -18,6 +18,7 @@ from plane.bgtasks.export_task import (
     generate_json,
     generate_xlsx,
     issue_export_task,
+    resolve_export_columns,
 )
 from django.db.models import Exists, OuterRef, Q
 
@@ -63,7 +64,7 @@ def _run_export_in_background(**kwargs):
         connections.close_all()
 
 
-ISSUE_EXPORT_HEADER = [
+_LEGACY_ISSUE_EXPORT_HEADER = [
     "ID",
     "Project",
     "Name",
@@ -193,13 +194,20 @@ class ExportIssuesEndpoint(BaseAPIView):
             filters = issue_filters(request.query_params, "GET")
             custom_properties = filters.pop("custom_properties", {}) or {}
             order_by_param = request.query_params.get("order_by", "-created_at")
+            display_properties_raw = request.query_params.get("display_properties")
+            display_properties = (
+                [k.strip() for k in display_properties_raw.split(",") if k.strip()]
+                if display_properties_raw
+                else None
+            )
             print(
                 f"[EXPORT_POST] full_path={request.get_full_path()}\n"
                 f"[EXPORT_POST] query_params={dict(request.query_params)}\n"
                 f"[EXPORT_POST] body={dict(request.data)}\n"
                 f"[EXPORT_POST] parsed_filters={filters}\n"
                 f"[EXPORT_POST] custom_properties={custom_properties}\n"
-                f"[EXPORT_POST] order_by={order_by_param}"
+                f"[EXPORT_POST] order_by={order_by_param}\n"
+                f"[EXPORT_POST] display_properties={display_properties}"
             )
 
             threading.Thread(
@@ -214,6 +222,7 @@ class ExportIssuesEndpoint(BaseAPIView):
                     "filters": filters,
                     "custom_properties": custom_properties,
                     "order_by_param": order_by_param,
+                    "display_properties": display_properties,
                 },
                 daemon=True,
             ).start()
@@ -338,6 +347,14 @@ class DownloadIssuesEndpoint(BaseAPIView):
         custom_properties = filters.pop("custom_properties", {}) or {}
         custom_filters = build_custom_property_q_objects(custom_properties)
         order_by_param = request.query_params.get("order_by", "-created_at")
+        display_properties_raw = request.query_params.get("display_properties")
+        display_properties = (
+            [k.strip() for k in display_properties_raw.split(",") if k.strip()]
+            if display_properties_raw
+            else None
+        )
+        columns = resolve_export_columns(display_properties)
+        header = [label for (_key, label, _fn) in columns]
         print(
             f"[DOWNLOAD_POST] full_path={request.get_full_path()}\n"
             f"[DOWNLOAD_POST] query_params={dict(request.query_params)}\n"
@@ -345,6 +362,8 @@ class DownloadIssuesEndpoint(BaseAPIView):
             f"[DOWNLOAD_POST] parsed_filters={filters}\n"
             f"[DOWNLOAD_POST] custom_properties={custom_properties}\n"
             f"[DOWNLOAD_POST] order_by={order_by_param}\n"
+            f"[DOWNLOAD_POST] display_properties={display_properties}\n"
+            f"[DOWNLOAD_POST] columns={[c[1] for c in columns]}\n"
             f"[DOWNLOAD_POST] project_ids={project_ids}"
         )
 
@@ -380,6 +399,8 @@ class DownloadIssuesEndpoint(BaseAPIView):
                 "description_stripped",
                 "priority",
                 "state__name",
+                "start_date",
+                "target_date",
                 "created_at",
                 "updated_at",
                 "completed_at",
@@ -405,9 +426,9 @@ class DownloadIssuesEndpoint(BaseAPIView):
         if multiple:
             for project_id in project_ids:
                 issues = workspace_issues.filter(project__id=project_id)
-                exporter(ISSUE_EXPORT_HEADER, project_id, issues, files)
+                exporter(header, project_id, issues, files, columns)
         else:
-            exporter(ISSUE_EXPORT_HEADER, str(workspace.id), workspace_issues, files)
+            exporter(header, str(workspace.id), workspace_issues, files, columns)
 
         date_str = timezone.now().date().isoformat()
 

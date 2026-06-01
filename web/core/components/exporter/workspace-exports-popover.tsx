@@ -23,9 +23,27 @@ export const WorkspaceExportsPopover = observer(() => {
 
   // Mirror the same query params the issues list call sends so the export
   // server-side queryset matches what the user sees on the page.
-  const filterParams = globalViewId
+  const appliedFilters = globalViewId
     ? (issuesFilter.getAppliedFilters?.(globalViewId.toString()) as Record<string, any> | undefined)
     : undefined;
+
+  // Forward the view's displayProperties so the CSV only contains the
+  // columns the user has toggled on.
+  const viewId = globalViewId?.toString();
+  const displayProperties = viewId
+    ? (issuesFilter.getIssueFilters?.(viewId)?.displayProperties as Record<string, boolean> | undefined)
+    : undefined;
+  const enabledDisplayProperties = displayProperties
+    ? Object.entries(displayProperties)
+        .filter(([, enabled]) => !!enabled)
+        .map(([key]) => key)
+        .join(",")
+    : undefined;
+
+  const filterParams = {
+    ...(appliedFilters ?? {}),
+    ...(enabledDisplayProperties ? { display_properties: enabledDisplayProperties } : {}),
+  };
   // eslint-disable-next-line no-console
   console.log("[WorkspaceExportsPopover] globalViewId=", globalViewId, "filterParams=", filterParams);
 

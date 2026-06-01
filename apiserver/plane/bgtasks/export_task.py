@@ -183,161 +183,158 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
     print(f"[EXPORT_UPLOAD] DB updated token={str(token_id)[:8]} status={exporter_instance.status}")
 
 
-def generate_table_row(issue):
-    return [
-        f"""{issue["project__identifier"]}-{issue["sequence_id"]}""",
-        issue["project__name"],
-        issue["name"],
-        issue["description_stripped"],
-        issue["state__name"],
-        issue["priority"],
-        (
-            f"{issue['created_by__first_name']} {issue['created_by__last_name']}"
-            if issue["created_by__first_name"]
-            and issue["created_by__last_name"]
-            else ""
-        ),
-        (
-            f"{issue['assignees__first_name']} {issue['assignees__last_name']}"
-            if issue["assignees__first_name"] and issue["assignees__last_name"]
-            else ""
-        ),
-        issue["labels__name"] if issue["labels__name"] else "",
-        issue["issue_cycle__cycle__name"],
-        dateConverter(issue["issue_cycle__cycle__start_date"]),
-        dateConverter(issue["issue_cycle__cycle__end_date"]),
-        issue["issue_module__module__name"],
-        dateConverter(issue["issue_module__module__start_date"]),
-        dateConverter(issue["issue_module__module__target_date"]),
-        dateTimeConverter(issue["created_at"]),
-        dateTimeConverter(issue["updated_at"]),
-        dateTimeConverter(issue["completed_at"]),
-        dateTimeConverter(issue["archived_at"]),
-    ]
+# Column registry. Each column is gated on a `displayProperties` key the
+# frontend sends; `"always"` means the column is unconditionally included
+# (id, name, project are not toggleable on the page either).
+#
+# The order here defines the column order in the exported file.
+def _assignee_cell(issue):
+    if issue.get("assignees__first_name") and issue.get("assignees__last_name"):
+        return f"{issue['assignees__first_name']} {issue['assignees__last_name']}"
+    return ""
 
 
-def generate_json_row(issue):
-    return {
-        "ID": f"""{issue["project__identifier"]}-{issue["sequence_id"]}""",
-        "Project": issue["project__name"],
-        "Name": issue["name"],
-        "Description": issue["description_stripped"],
-        "State": issue["state__name"],
-        "Priority": issue["priority"],
-        "Created By": (
-            f"{issue['created_by__first_name']} {issue['created_by__last_name']}"
-            if issue["created_by__first_name"]
-            and issue["created_by__last_name"]
-            else ""
-        ),
-        "Assignee": (
-            f"{issue['assignees__first_name']} {issue['assignees__last_name']}"
-            if issue["assignees__first_name"] and issue["assignees__last_name"]
-            else ""
-        ),
-        "Labels": issue["labels__name"] if issue["labels__name"] else "",
-        "Cycle Name": issue["issue_cycle__cycle__name"],
-        "Cycle Start Date": dateConverter(
-            issue["issue_cycle__cycle__start_date"]
-        ),
-        "Cycle End Date": dateConverter(issue["issue_cycle__cycle__end_date"]),
-        "Module Name": issue["issue_module__module__name"],
-        "Module Start Date": dateConverter(
-            issue["issue_module__module__start_date"]
-        ),
-        "Module Target Date": dateConverter(
-            issue["issue_module__module__target_date"]
-        ),
-        "Created At": dateTimeConverter(issue["created_at"]),
-        "Updated At": dateTimeConverter(issue["updated_at"]),
-        "Completed At": dateTimeConverter(issue["completed_at"]),
-        "Archived At": dateTimeConverter(issue["archived_at"]),
-    }
+def _created_by_cell(issue):
+    if issue.get("created_by__first_name") and issue.get("created_by__last_name"):
+        return f"{issue['created_by__first_name']} {issue['created_by__last_name']}"
+    return ""
 
 
-def update_json_row(rows, row):
+EXPORT_COLUMNS = [
+    # (display_key, header, extractor)
+    ("always", "ID", lambda i: f"{i['project__identifier']}-{i['sequence_id']}"),
+    ("always", "Project", lambda i: i["project__name"]),
+    ("always", "Name", lambda i: i["name"]),
+    ("always", "Description", lambda i: i["description_stripped"]),
+    ("state", "State", lambda i: i["state__name"]),
+    ("priority", "Priority", lambda i: i["priority"]),
+    ("always", "Created By", _created_by_cell),
+    ("assignee", "Assignee", _assignee_cell),
+    ("labels", "Labels", lambda i: i["labels__name"] if i.get("labels__name") else ""),
+    ("cycle", "Cycle Name", lambda i: i["issue_cycle__cycle__name"]),
+    ("cycle", "Cycle Start Date", lambda i: dateConverter(i["issue_cycle__cycle__start_date"])),
+    ("cycle", "Cycle End Date", lambda i: dateConverter(i["issue_cycle__cycle__end_date"])),
+    ("modules", "Module Name", lambda i: i["issue_module__module__name"]),
+    ("modules", "Module Start Date", lambda i: dateConverter(i["issue_module__module__start_date"])),
+    ("modules", "Module Target Date", lambda i: dateConverter(i["issue_module__module__target_date"])),
+    ("start_date", "Start Date", lambda i: dateConverter(i.get("start_date"))),
+    ("due_date", "Due Date", lambda i: dateConverter(i.get("target_date"))),
+    ("created_on", "Created At", lambda i: dateTimeConverter(i["created_at"])),
+    ("updated_on", "Updated At", lambda i: dateTimeConverter(i["updated_at"])),
+    ("always", "Completed At", lambda i: dateTimeConverter(i["completed_at"])),
+    ("always", "Archived At", lambda i: dateTimeConverter(i["archived_at"])),
+]
+
+
+def resolve_export_columns(display_properties=None):
+    """Filter EXPORT_COLUMNS to the subset enabled by displayProperties.
+
+    `display_properties` is the list of enabled property keys forwarded by
+    the frontend. If `None`, all columns are kept (so direct API callers
+    still get the full export). "always" columns are always included.
+    """
+    if display_properties is None:
+        return list(EXPORT_COLUMNS)
+    enabled = set(display_properties)
+    return [c for c in EXPORT_COLUMNS if c[0] == "always" or c[0] in enabled]
+
+
+def _index_for(columns, header_label):
+    for idx, (_key, label, _fn) in enumerate(columns):
+        if label == header_label:
+            return idx
+    return None
+
+
+def generate_table_row(issue, columns):
+    return [extractor(issue) for (_key, _label, extractor) in columns]
+
+
+def generate_json_row(issue, columns):
+    return {label: extractor(issue) for (_key, label, extractor) in columns}
+
+
+def update_json_row(rows, row, columns):
+    assignee_key = "Assignee" if any(label == "Assignee" for _, label, _ in columns) else None
+    labels_key = "Labels" if any(label == "Labels" for _, label, _ in columns) else None
+
     matched_index = next(
-        (
-            index
-            for index, existing_row in enumerate(rows)
-            if existing_row["ID"] == row["ID"]
-        ),
+        (index for index, existing_row in enumerate(rows) if existing_row["ID"] == row["ID"]),
         None,
     )
 
     if matched_index is not None:
-        existing_assignees, existing_labels = (
-            rows[matched_index]["Assignee"],
-            rows[matched_index]["Labels"],
-        )
-        assignee, label = row["Assignee"], row["Labels"]
-
-        if assignee is not None and (
-            existing_assignees is None or label not in existing_assignees
-        ):
-            rows[matched_index]["Assignee"] += f", {assignee}"
-        if label is not None and (
-            existing_labels is None or label not in existing_labels
-        ):
-            rows[matched_index]["Labels"] += f", {label}"
+        if assignee_key:
+            existing = rows[matched_index].get(assignee_key) or ""
+            incoming = row.get(assignee_key) or ""
+            if incoming and incoming not in existing:
+                rows[matched_index][assignee_key] = (
+                    f"{existing}, {incoming}" if existing else incoming
+                )
+        if labels_key:
+            existing = rows[matched_index].get(labels_key) or ""
+            incoming = row.get(labels_key) or ""
+            if incoming and incoming not in existing:
+                rows[matched_index][labels_key] = (
+                    f"{existing}, {incoming}" if existing else incoming
+                )
     else:
         rows.append(row)
 
 
-def update_table_row(rows, row):
+def update_table_row(rows, row, columns):
+    id_idx = _index_for(columns, "ID")
+    assignee_idx = _index_for(columns, "Assignee")
+    labels_idx = _index_for(columns, "Labels")
+
     matched_index = next(
-        (
-            index
-            for index, existing_row in enumerate(rows)
-            if existing_row[0] == row[0]
-        ),
+        (index for index, existing_row in enumerate(rows) if existing_row[id_idx] == row[id_idx]),
         None,
     )
 
     if matched_index is not None:
-        existing_assignees, existing_labels = rows[matched_index][7:9]
-        assignee, label = row[7:9]
-
-        if assignee is not None and (
-            existing_assignees is None or label not in existing_assignees
-        ):
-            rows[matched_index][8] += f", {assignee}"
-        if label is not None and (
-            existing_labels is None or label not in existing_labels
-        ):
-            rows[matched_index][8] += f", {label}"
+        if assignee_idx is not None:
+            existing = rows[matched_index][assignee_idx] or ""
+            incoming = row[assignee_idx] or ""
+            if incoming and incoming not in existing:
+                rows[matched_index][assignee_idx] = (
+                    f"{existing}, {incoming}" if existing else incoming
+                )
+        if labels_idx is not None:
+            existing = rows[matched_index][labels_idx] or ""
+            incoming = row[labels_idx] or ""
+            if incoming and incoming not in existing:
+                rows[matched_index][labels_idx] = (
+                    f"{existing}, {incoming}" if existing else incoming
+                )
     else:
         rows.append(row)
 
 
-def generate_csv(header, project_id, issues, files):
-    """
-    Generate CSV export for all the passed issues.
-    """
-    rows = [
-        header,
-    ]
+def generate_csv(header, project_id, issues, files, columns):
+    """Generate CSV export for the passed issues using `columns`."""
+    rows = [header]
     for issue in issues:
-        row = generate_table_row(issue)
-        update_table_row(rows, row)
+        row = generate_table_row(issue, columns)
+        update_table_row(rows, row, columns)
     csv_file = create_csv_file(rows)
     files.append((f"{project_id}.csv", csv_file))
 
 
-def generate_json(header, project_id, issues, files):
+def generate_json(header, project_id, issues, files, columns):
     rows = []
     for issue in issues:
-        row = generate_json_row(issue)
-        update_json_row(rows, row)
+        row = generate_json_row(issue, columns)
+        update_json_row(rows, row, columns)
     json_file = create_json_file(rows)
     files.append((f"{project_id}.json", json_file))
 
 
-def generate_xlsx(header, project_id, issues, files):
+def generate_xlsx(header, project_id, issues, files, columns):
     rows = [header]
     for issue in issues:
-        row = generate_table_row(issue)
-        update_table_row(rows, row)
+        row = generate_table_row(issue, columns)
+        update_table_row(rows, row, columns)
     xlsx_file = create_xlsx_file(rows)
     files.append((f"{project_id}.xlsx", xlsx_file))
 
@@ -353,6 +350,7 @@ def issue_export_task(
     filters=None,
     custom_properties=None,
     order_by_param="-created_at",
+    display_properties=None,
 ):
     try:
         exporter_instance = ExporterHistory.objects.get(token=token_id)
@@ -400,6 +398,8 @@ def issue_export_task(
                     "description_stripped",
                     "priority",
                     "state__name",
+                    "start_date",
+                    "target_date",
                     "created_at",
                     "updated_at",
                     "completed_at",
@@ -419,28 +419,9 @@ def issue_export_task(
             )
             .distinct()
         )
-        # CSV header
-        header = [
-            "ID",
-            "Project",
-            "Name",
-            "Description",
-            "State",
-            "Priority",
-            "Created By",
-            "Assignee",
-            "Labels",
-            "Cycle Name",
-            "Cycle Start Date",
-            "Cycle End Date",
-            "Module Name",
-            "Module Start Date",
-            "Module Target Date",
-            "Created At",
-            "Updated At",
-            "Completed At",
-            "Archived At",
-        ]
+        # Resolve which columns to include based on the user's displayProperties.
+        columns = resolve_export_columns(display_properties)
+        header = [label for (_key, label, _fn) in columns]
 
         EXPORTER_MAPPER = {
             "csv": generate_csv,
@@ -454,22 +435,11 @@ def issue_export_task(
                 issues = workspace_issues.filter(project__id=project_id)
                 exporter = EXPORTER_MAPPER.get(provider)
                 if exporter is not None:
-                    exporter(
-                        header,
-                        project_id,
-                        issues,
-                        files,
-                    )
-
+                    exporter(header, project_id, issues, files, columns)
         else:
             exporter = EXPORTER_MAPPER.get(provider)
             if exporter is not None:
-                exporter(
-                    header,
-                    workspace_id,
-                    workspace_issues,
-                    files,
-                )
+                exporter(header, workspace_id, workspace_issues, files, columns)
 
         # Single file → upload as the raw provider extension (.csv/.json/.xlsx).
         # Multiple files → zip them together. Mirrors DownloadIssuesEndpoint.
