@@ -41,8 +41,6 @@ export const WorkspaceExportsPopover = observer(() => {
         closeOnSelect
       >
         <CustomMenu.MenuItem onClick={() => setExportProvider("csv")}>CSV</CustomMenu.MenuItem>
-        <CustomMenu.MenuItem onClick={() => setExportProvider("xlsx")}>Excel</CustomMenu.MenuItem>
-        <CustomMenu.MenuItem onClick={() => setExportProvider("json")}>JSON</CustomMenu.MenuItem>
         <CustomMenu.MenuItem onClick={() => setHistoryOpen(true)}>
           <span className="flex items-center gap-2">
             <History className="h-3 w-3" />

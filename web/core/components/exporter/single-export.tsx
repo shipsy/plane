@@ -5,7 +5,7 @@ import { useState, FC } from "react";
 import { IExportData } from "@plane/types";
 import { Button } from "@plane/ui";
 // helpers
-import { getDate, renderFormattedDate } from "@/helpers/date-time.helper";
+import { getDate, renderFormattedDate, renderFormattedTime } from "@/helpers/date-time.helper";
 // types
 
 type Props = {
@@ -53,7 +53,10 @@ export const SingleExport: FC<Props> = ({ service, refreshing }) => {
           </span>
         </h4>
         <div className="mt-2 flex items-center gap-2 text-xs text-custom-text-200">
-          <span>{renderFormattedDate(service.created_at)}</span>|
+          <span>
+            {renderFormattedDate(service.created_at)}, {renderFormattedTime(service.created_at, "12-hour")}
+          </span>
+          |
           <span>Exported by {service?.initiated_by_detail?.display_name}</span>
         </div>
       </div>
