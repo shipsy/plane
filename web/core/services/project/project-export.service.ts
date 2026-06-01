@@ -16,6 +16,11 @@ export class ProjectExportService extends APIService {
     },
     filterParams?: Record<string, any>
   ): Promise<any> {
+    // eslint-disable-next-line no-console
+    console.log("[csvExport] POST", `/api/workspaces/${workspaceSlug}/export-issues/`, {
+      body: data,
+      params: filterParams,
+    });
     return this.post(`/api/workspaces/${workspaceSlug}/export-issues/`, data, {
       params: filterParams,
     })

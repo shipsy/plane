@@ -128,6 +128,13 @@ class ExportIssuesEndpoint(BaseAPIView):
             filters = issue_filters(request.query_params, "GET")
             filters.pop("custom_properties", None)
             order_by_param = request.query_params.get("order_by", "-created_at")
+            print(
+                f"[EXPORT_POST] full_path={request.get_full_path()}\n"
+                f"[EXPORT_POST] query_params={dict(request.query_params)}\n"
+                f"[EXPORT_POST] body={dict(request.data)}\n"
+                f"[EXPORT_POST] parsed_filters={filters}\n"
+                f"[EXPORT_POST] order_by={order_by_param}"
+            )
 
             threading.Thread(
                 target=_run_export_in_background,
@@ -262,6 +269,14 @@ class DownloadIssuesEndpoint(BaseAPIView):
         filters = issue_filters(request.query_params, "GET")
         filters.pop("custom_properties", None)
         order_by_param = request.query_params.get("order_by", "-created_at")
+        print(
+            f"[DOWNLOAD_POST] full_path={request.get_full_path()}\n"
+            f"[DOWNLOAD_POST] query_params={dict(request.query_params)}\n"
+            f"[DOWNLOAD_POST] body={dict(request.data)}\n"
+            f"[DOWNLOAD_POST] parsed_filters={filters}\n"
+            f"[DOWNLOAD_POST] order_by={order_by_param}\n"
+            f"[DOWNLOAD_POST] project_ids={project_ids}"
+        )
 
         base_qs = (
             Issue.objects.filter(

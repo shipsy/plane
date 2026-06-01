@@ -26,6 +26,8 @@ export const WorkspaceExportsPopover = observer(() => {
   const filterParams = globalViewId
     ? (issuesFilter.getAppliedFilters?.(globalViewId.toString()) as Record<string, any> | undefined)
     : undefined;
+  // eslint-disable-next-line no-console
+  console.log("[WorkspaceExportsPopover] globalViewId=", globalViewId, "filterParams=", filterParams);
 
   return (
     <>
