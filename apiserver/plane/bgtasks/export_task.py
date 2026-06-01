@@ -72,6 +72,15 @@ def upload_to_s3(zip_file, workspace_id, token_id, slug):
     file_name = f"{workspace_id}/export-{slug}-{token_id[:6]}-{str(timezone.now().date())}.zip"
     expires_in = 7 * 24 * 60 * 60
 
+    print(
+        f"[EXPORT_UPLOAD] start token={str(token_id)[:8]} slug={slug} "
+        f"bucket={settings.AWS_STORAGE_BUCKET_NAME} key={file_name} "
+        f"USE_MINIO={settings.USE_MINIO} "
+        f"AWS_S3_ENDPOINT_URL={settings.AWS_S3_ENDPOINT_URL} "
+        f"AWS_S3_CUSTOM_DOMAIN={getattr(settings, 'AWS_S3_CUSTOM_DOMAIN', None)} "
+        f"AWS_S3_URL_PROTOCOL={getattr(settings, 'AWS_S3_URL_PROTOCOL', None)}"
+    )
+
     if settings.USE_MINIO:
         upload_s3 = boto3.client(
             "s3",
@@ -141,6 +150,11 @@ def upload_to_s3(zip_file, workspace_id, token_id, slug):
             ExpiresIn=expires_in,
         )
 
+    print(
+        f"[EXPORT_UPLOAD] stored token={str(token_id)[:8]} key={file_name} "
+        f"presigned_url={(presigned_url[:140] + '...') if presigned_url else None}"
+    )
+
     exporter_instance = ExporterHistory.objects.get(token=token_id)
 
     # Update the exporter instance with the presigned url
@@ -152,6 +166,7 @@ def upload_to_s3(zip_file, workspace_id, token_id, slug):
         exporter_instance.status = "failed"
 
     exporter_instance.save(update_fields=["status", "url", "key"])
+    print(f"[EXPORT_UPLOAD] DB updated token={str(token_id)[:8]} status={exporter_instance.status}")
 
 
 def generate_table_row(issue):

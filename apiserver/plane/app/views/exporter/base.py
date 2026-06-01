@@ -1,3 +1,4 @@
+import logging
 import threading
 
 # Python imports
@@ -19,16 +20,30 @@ from plane.bgtasks.export_task import (
     issue_export_task,
 )
 from plane.db.models import ExporterHistory, Issue, Project, Workspace
+from plane.settings.storage import S3Storage
 
 # Module imports
 from .. import BaseAPIView
+
+logger = logging.getLogger("plane.exporter")
 
 
 def _run_export_in_background(**kwargs):
     """Run the export task synchronously in a worker thread and clean up DB
     connections after. Avoids the Celery dependency."""
+    token = str(kwargs.get("token_id", ""))[:8]
+    print(
+        f"[EXPORT_BG] start token={token} provider={kwargs.get('provider')} "
+        f"slug={kwargs.get('slug')} projects={len(kwargs.get('project_ids') or [])} "
+        f"multiple={kwargs.get('multiple')}"
+    )
     try:
         issue_export_task(**kwargs)
+        print(f"[EXPORT_BG] finished token={token}")
+    except Exception as e:
+        print(f"[EXPORT_BG] FAILED token={token} err={e}")
+        logger.exception("export thread failed token=%s", token)
+        raise
     finally:
         connections.close_all()
 
@@ -81,6 +96,11 @@ class ExportIssuesEndpoint(BaseAPIView):
         multiple = request.data.get("multiple", False)
         project_ids = request.data.get("project", [])
 
+        print(
+            f"[EXPORT_POST] slug={slug} host={request.get_host()} provider={provider} "
+            f"multiple={multiple} project_ids={project_ids} user={request.user.id}"
+        )
+
         if provider in ["csv", "xlsx", "json"]:
             if not project_ids:
                 project_ids = Project.objects.filter(
@@ -127,10 +147,57 @@ class ExportIssuesEndpoint(BaseAPIView):
         allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE"
     )
     def get(self, request, slug):
+        # ─── DEBUG ──────────────────────────────────────────────────────────
+        print(f"[EXPORT_HISTORY] GET slug={slug} host={request.get_host()} scheme={request.scheme}")
+        logger.info(
+            "[EXPORT_HISTORY] GET slug=%s host=%s scheme=%s user=%s",
+            slug,
+            request.get_host(),
+            request.scheme,
+            getattr(request.user, "id", "anon"),
+        )
+        # ────────────────────────────────────────────────────────────────────
+
         exporter_history = ExporterHistory.objects.filter(
             workspace__slug=slug,
             type="issue_exports",
         ).select_related("workspace", "initiated_by")
+
+        # Build one request-aware S3Storage. This is exactly the same pattern
+        # used by /api/.../assets/ for image downloads — endpoint_url is built
+        # from request.get_host(), so the resulting presigned URL points to
+        # whatever host the browser is already talking to (proxy port, public
+        # domain, etc.).
+        storage = S3Storage(request=request)
+
+        def _resign(row_data, row_obj):
+            """Override the stale `url` on each serialized row with a fresh
+            presigned URL minted against the current request host."""
+            key = row_obj.key
+            if not key:
+                print(f"[EXPORT_HISTORY]   row={str(row_obj.token)[:8]} status={row_obj.status} key=None → no URL")
+                row_data["url"] = None
+                return row_data
+            try:
+                fresh_url = storage.generate_presigned_url(
+                    object_name=key,
+                    expiration=7 * 24 * 60 * 60,
+                    disposition="attachment",
+                )
+                print(
+                    f"[EXPORT_HISTORY]   row={str(row_obj.token)[:8]} status={row_obj.status} "
+                    f"key={key} → {fresh_url[:120]}..."
+                )
+                row_data["url"] = fresh_url
+            except Exception as e:
+                print(f"[EXPORT_HISTORY]   row={str(row_obj.token)[:8]} re-sign FAILED: {e}")
+                logger.exception("Failed to resign export URL for token=%s", row_obj.token)
+            return row_data
+
+        def _on_results(rows):
+            serialized = ExporterHistorySerializer(rows, many=True).data
+            print(f"[EXPORT_HISTORY] paginated batch size={len(serialized)}")
+            return [_resign(d, r) for d, r in zip(serialized, rows)]
 
         if request.GET.get("per_page", False) and request.GET.get(
             "cursor", False
@@ -139,9 +206,7 @@ class ExportIssuesEndpoint(BaseAPIView):
                 order_by=request.GET.get("order_by", "-created_at"),
                 request=request,
                 queryset=exporter_history,
-                on_results=lambda exporter_history: ExporterHistorySerializer(
-                    exporter_history, many=True
-                ).data,
+                on_results=_on_results,
             )
         else:
             return Response(
