@@ -19,9 +19,22 @@ from plane.bgtasks.export_task import (
     generate_xlsx,
     issue_export_task,
 )
-from plane.db.models import ExporterHistory, Issue, Project, Workspace
+from django.db.models import Exists, OuterRef, Q
+
+from plane.db.models import (
+    ExporterHistory,
+    Issue,
+    Project,
+    ProjectMember,
+    State,
+    Workspace,
+)
 from plane.settings.storage import S3Storage
-from plane.utils.issue_filters import issue_filters
+from plane.utils.issue_filters import (
+    apply_user_hub_filters,
+    build_custom_property_q_objects,
+    issue_filters,
+)
 from plane.utils.order_queryset import order_issue_queryset
 
 # Module imports
@@ -78,6 +91,57 @@ EXPORTER_MAPPER = {
     "xlsx": generate_xlsx,
 }
 
+def _build_list_view_base_queryset(slug, user, project_ids):
+    """Mirror the baseline queryset used by WorkspaceViewIssuesViewSet.list so
+    the export contains exactly the rows the user sees on the page (drafts /
+    archived / triage states excluded, hub-scoped, guest restrictions applied).
+    """
+    qs = (
+        Issue.objects.filter(
+            workspace__slug=slug,
+            project_id__in=project_ids,
+            deleted_at__isnull=True,
+            archived_at__isnull=True,
+            is_draft=False,
+            project__archived_at__isnull=True,
+            state_id__isnull=False,
+        )
+        .exclude(
+            state_id__in=State.objects.filter(is_triage=True).values("id")
+        )
+        .filter(
+            Exists(
+                ProjectMember.objects.filter(
+                    project_id=OuterRef("project_id"),
+                    member=user,
+                    is_active=True,
+                )
+            )
+        )
+    )
+
+    # Mirror the guest_view_all_features split applied by the list view.
+    guest_pm = ProjectMember.objects.filter(
+        project_id=OuterRef("project_id"),
+        member=user,
+        is_active=True,
+        role=5,
+    )
+    non_guest_pm = ProjectMember.objects.filter(
+        project_id=OuterRef("project_id"),
+        member=user,
+        is_active=True,
+        role__gt=5,
+    )
+    qs = qs.filter(
+        Exists(non_guest_pm)
+        | (Exists(guest_pm) & Q(project__guest_view_all_features=True))
+        | (Exists(guest_pm) & Q(project__guest_view_all_features=False) & Q(created_by=user))
+    )
+
+    return apply_user_hub_filters(qs, user, workspace_slug=slug)
+
+
 CONTENT_TYPES = {
     "csv": "text/csv",
     "json": "application/json",
@@ -123,16 +187,18 @@ class ExportIssuesEndpoint(BaseAPIView):
 
             # Forward the same filters the user has applied on the frontend
             # (assignees, state, labels, priority, sub_issue, cycle, module,
-            # start_date, target_date, search, etc.) so the export matches the
-            # list view 1:1.
+            # start_date, target_date, search, hub/customer/vendor/worker/
+            # business fields, custom_properties, etc.) so the export matches
+            # the list view 1:1.
             filters = issue_filters(request.query_params, "GET")
-            filters.pop("custom_properties", None)
+            custom_properties = filters.pop("custom_properties", {}) or {}
             order_by_param = request.query_params.get("order_by", "-created_at")
             print(
                 f"[EXPORT_POST] full_path={request.get_full_path()}\n"
                 f"[EXPORT_POST] query_params={dict(request.query_params)}\n"
                 f"[EXPORT_POST] body={dict(request.data)}\n"
                 f"[EXPORT_POST] parsed_filters={filters}\n"
+                f"[EXPORT_POST] custom_properties={custom_properties}\n"
                 f"[EXPORT_POST] order_by={order_by_param}"
             )
 
@@ -146,6 +212,7 @@ class ExportIssuesEndpoint(BaseAPIView):
                     "multiple": multiple,
                     "slug": slug,
                     "filters": filters,
+                    "custom_properties": custom_properties,
                     "order_by_param": order_by_param,
                 },
                 daemon=True,
@@ -264,28 +331,30 @@ class DownloadIssuesEndpoint(BaseAPIView):
 
         # Parse same filters the issues list view uses (assignees, state,
         # labels, priority, sub_issue, cycle, module, start_date, target_date,
-        # search/name, etc.) from the request query string so the export
+        # search/name, hub/customer/vendor/worker/business fields,
+        # custom_properties, etc.) from the request query string so the export
         # matches what the user sees on the frontend.
         filters = issue_filters(request.query_params, "GET")
-        filters.pop("custom_properties", None)
+        custom_properties = filters.pop("custom_properties", {}) or {}
+        custom_filters = build_custom_property_q_objects(custom_properties)
         order_by_param = request.query_params.get("order_by", "-created_at")
         print(
             f"[DOWNLOAD_POST] full_path={request.get_full_path()}\n"
             f"[DOWNLOAD_POST] query_params={dict(request.query_params)}\n"
             f"[DOWNLOAD_POST] body={dict(request.data)}\n"
             f"[DOWNLOAD_POST] parsed_filters={filters}\n"
+            f"[DOWNLOAD_POST] custom_properties={custom_properties}\n"
             f"[DOWNLOAD_POST] order_by={order_by_param}\n"
             f"[DOWNLOAD_POST] project_ids={project_ids}"
         )
 
         base_qs = (
-            Issue.objects.filter(
-                workspace__id=workspace.id,
-                project_id__in=project_ids,
-                project__project_projectmember__member=request.user,
-                project__project_projectmember__is_active=True,
-                project__archived_at__isnull=True,
+            _build_list_view_base_queryset(
+                slug=slug,
+                user=request.user,
+                project_ids=project_ids,
             )
+            .filter(*custom_filters)
             .filter(**filters)
         )
         base_qs, _ = order_issue_queryset(
