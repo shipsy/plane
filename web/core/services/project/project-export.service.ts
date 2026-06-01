@@ -13,9 +13,12 @@ export class ProjectExportService extends APIService {
       provider: string;
       project: string[];
       multiple?: boolean;
-    }
+    },
+    filterParams?: Record<string, any>
   ): Promise<any> {
-    return this.post(`/api/workspaces/${workspaceSlug}/export-issues/`, data)
+    return this.post(`/api/workspaces/${workspaceSlug}/export-issues/`, data, {
+      params: filterParams,
+    })
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;
@@ -42,10 +45,12 @@ export class ProjectExportService extends APIService {
       provider: string;
       project: string[];
       multiple?: boolean;
-    }
+    },
+    filterParams?: Record<string, any>
   ): Promise<{ blob: Blob; filename: string }> {
     return this.post(`/api/workspaces/${workspaceSlug}/download-issues/`, data, {
       responseType: "blob",
+      params: filterParams,
     })
       .then((response) => {
         const disposition: string = response?.headers?.["content-disposition"] || "";

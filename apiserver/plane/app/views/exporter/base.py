@@ -21,6 +21,8 @@ from plane.bgtasks.export_task import (
 )
 from plane.db.models import ExporterHistory, Issue, Project, Workspace
 from plane.settings.storage import S3Storage
+from plane.utils.issue_filters import issue_filters
+from plane.utils.order_queryset import order_issue_queryset
 
 # Module imports
 from .. import BaseAPIView
@@ -119,6 +121,14 @@ class ExportIssuesEndpoint(BaseAPIView):
                 type="issue_exports",
             )
 
+            # Forward the same filters the user has applied on the frontend
+            # (assignees, state, labels, priority, sub_issue, cycle, module,
+            # start_date, target_date, search, etc.) so the export matches the
+            # list view 1:1.
+            filters = issue_filters(request.query_params, "GET")
+            filters.pop("custom_properties", None)
+            order_by_param = request.query_params.get("order_by", "-created_at")
+
             threading.Thread(
                 target=_run_export_in_background,
                 kwargs={
@@ -128,6 +138,8 @@ class ExportIssuesEndpoint(BaseAPIView):
                     "token_id": exporter.token,
                     "multiple": multiple,
                     "slug": slug,
+                    "filters": filters,
+                    "order_by_param": order_by_param,
                 },
                 daemon=True,
             ).start()
@@ -243,7 +255,15 @@ class DownloadIssuesEndpoint(BaseAPIView):
             )
             project_ids = [str(project_id) for project_id in project_ids]
 
-        workspace_issues = (
+        # Parse same filters the issues list view uses (assignees, state,
+        # labels, priority, sub_issue, cycle, module, start_date, target_date,
+        # search/name, etc.) from the request query string so the export
+        # matches what the user sees on the frontend.
+        filters = issue_filters(request.query_params, "GET")
+        filters.pop("custom_properties", None)
+        order_by_param = request.query_params.get("order_by", "-created_at")
+
+        base_qs = (
             Issue.objects.filter(
                 workspace__id=workspace.id,
                 project_id__in=project_ids,
@@ -251,6 +271,14 @@ class DownloadIssuesEndpoint(BaseAPIView):
                 project__project_projectmember__is_active=True,
                 project__archived_at__isnull=True,
             )
+            .filter(**filters)
+        )
+        base_qs, _ = order_issue_queryset(
+            issue_queryset=base_qs,
+            order_by_param=order_by_param,
+        )
+        workspace_issues = (
+            base_qs
             .select_related("project", "workspace", "state", "parent", "created_by")
             .prefetch_related(
                 "assignees",
@@ -284,7 +312,6 @@ class DownloadIssuesEndpoint(BaseAPIView):
                 "assignees__last_name",
                 "labels__name",
             )
-            .order_by("project__identifier", "sequence_id")
             .distinct()
         )
 

@@ -20,12 +20,13 @@ type Props = {
   user: IUser | null;
   provider: string | string[];
   mutateServices: () => void;
+  filterParams?: Record<string, any>;
 };
 
 const projectExportService = new ProjectExportService();
 
 export const Exporter: React.FC<Props> = observer((props) => {
-  const { isOpen, handleClose, user, provider, mutateServices } = props;
+  const { isOpen, handleClose, user, provider, mutateServices, filterParams } = props;
   // states
   const [exportLoading, setExportLoading] = useState(false);
   const [isSelectOpen, setIsSelectOpen] = useState(false);
@@ -68,7 +69,7 @@ export const Exporter: React.FC<Props> = observer((props) => {
         multiple: multiple,
       };
       try {
-        await projectExportService.csvExport(workspaceSlug as string, payload);
+        await projectExportService.csvExport(workspaceSlug as string, payload, filterParams);
         mutateServices();
         setExportLoading(false);
         handleClose();

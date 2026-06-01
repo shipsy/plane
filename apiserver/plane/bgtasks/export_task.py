@@ -18,6 +18,7 @@ from openpyxl import Workbook
 # Module imports
 from plane.db.models import ExporterHistory, Issue
 from plane.utils.exception_logger import log_exception
+from plane.utils.order_queryset import order_issue_queryset
 
 
 def dateTimeConverter(time):
@@ -330,22 +331,37 @@ def generate_xlsx(header, project_id, issues, files):
 
 @shared_task
 def issue_export_task(
-    provider, workspace_id, project_ids, token_id, multiple, slug
+    provider,
+    workspace_id,
+    project_ids,
+    token_id,
+    multiple,
+    slug,
+    filters=None,
+    order_by_param="-created_at",
 ):
     try:
         exporter_instance = ExporterHistory.objects.get(token=token_id)
         exporter_instance.status = "processing"
         exporter_instance.save(update_fields=["status"])
 
+        base_qs = Issue.objects.filter(
+            workspace__id=workspace_id,
+            project_id__in=project_ids,
+            project__project_projectmember__member=exporter_instance.initiated_by_id,
+            project__project_projectmember__is_active=True,
+            project__archived_at__isnull=True,
+        )
+        if filters:
+            base_qs = base_qs.filter(**filters)
+        base_qs, _ = order_issue_queryset(
+            issue_queryset=base_qs,
+            order_by_param=order_by_param,
+        )
+
         workspace_issues = (
             (
-                Issue.objects.filter(
-                    workspace__id=workspace_id,
-                    project_id__in=project_ids,
-                    project__project_projectmember__member=exporter_instance.initiated_by_id,
-                    project__project_projectmember__is_active=True,
-                    project__archived_at__isnull=True,
-                )
+                base_qs
                 .select_related(
                     "project", "workspace", "state", "parent", "created_by"
                 )
@@ -382,7 +398,6 @@ def issue_export_task(
                     "labels__name",
                 )
             )
-            .order_by("project__identifier", "sequence_id")
             .distinct()
         )
         # CSV header

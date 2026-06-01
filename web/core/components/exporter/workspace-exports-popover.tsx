@@ -2,19 +2,30 @@
 
 import React, { useState } from "react";
 import { observer } from "mobx-react";
+import { useParams } from "next/navigation";
 import { ChevronDown, Download, History } from "lucide-react";
 // ui
 import { CustomMenu } from "@plane/ui";
 // components
 import { Exporter } from "./export-modal";
 import { ExportHistory } from "./export-history";
+// constants
+import { EIssuesStoreType } from "@/constants/issue";
 // hooks
-import { useUser } from "@/hooks/store";
+import { useIssues, useUser } from "@/hooks/store";
 
 export const WorkspaceExportsPopover = observer(() => {
   const { data: currentUser } = useUser();
+  const { globalViewId } = useParams();
+  const { issuesFilter } = useIssues(EIssuesStoreType.GLOBAL);
   const [exportProvider, setExportProvider] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Mirror the same query params the issues list call sends so the export
+  // server-side queryset matches what the user sees on the page.
+  const filterParams = globalViewId
+    ? (issuesFilter.getAppliedFilters?.(globalViewId.toString()) as Record<string, any> | undefined)
+    : undefined;
 
   return (
     <>
@@ -48,6 +59,7 @@ export const WorkspaceExportsPopover = observer(() => {
           user={currentUser || null}
           provider={exportProvider}
           mutateServices={() => {}}
+          filterParams={filterParams}
         />
       )}
 
