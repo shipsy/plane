@@ -69,13 +69,26 @@ def create_zip_file(files):
     return zip_buffer
 
 
-def upload_to_s3(zip_file, workspace_id, token_id, slug):
-    file_name = f"{workspace_id}/export-{slug}-{token_id[:6]}-{str(timezone.now().date())}.zip"
+EXPORT_CONTENT_TYPES = {
+    "csv": "text/csv",
+    "json": "application/json",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "zip": "application/zip",
+}
+
+
+def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
+    content_type = EXPORT_CONTENT_TYPES.get(extension, "application/octet-stream")
+    file_name = (
+        f"{workspace_id}/export-{slug}-{token_id[:6]}-"
+        f"{str(timezone.now().date())}.{extension}"
+    )
     expires_in = 7 * 24 * 60 * 60
 
     print(
         f"[EXPORT_UPLOAD] start token={str(token_id)[:8]} slug={slug} "
         f"bucket={settings.AWS_STORAGE_BUCKET_NAME} key={file_name} "
+        f"content_type={content_type} "
         f"USE_MINIO={settings.USE_MINIO} "
         f"AWS_S3_ENDPOINT_URL={settings.AWS_S3_ENDPOINT_URL} "
         f"AWS_S3_CUSTOM_DOMAIN={getattr(settings, 'AWS_S3_CUSTOM_DOMAIN', None)} "
@@ -91,10 +104,10 @@ def upload_to_s3(zip_file, workspace_id, token_id, slug):
             config=Config(signature_version="s3v4"),
         )
         upload_s3.upload_fileobj(
-            zip_file,
+            file_obj,
             settings.AWS_STORAGE_BUCKET_NAME,
             file_name,
-            ExtraArgs={"ACL": "public-read", "ContentType": "application/zip"},
+            ExtraArgs={"ACL": "public-read", "ContentType": content_type},
         )
 
         # Generate presigned url for the uploaded file with different base
@@ -135,10 +148,10 @@ def upload_to_s3(zip_file, workspace_id, token_id, slug):
 
         # Upload the file to S3
         s3.upload_fileobj(
-            zip_file,
+            file_obj,
             settings.AWS_STORAGE_BUCKET_NAME,
             file_name,
-            ExtraArgs={"ContentType": "application/zip"},
+            ExtraArgs={"ContentType": content_type},
         )
 
         # Generate presigned url for the uploaded file
@@ -458,8 +471,15 @@ def issue_export_task(
                     files,
                 )
 
-        zip_buffer = create_zip_file(files)
-        upload_to_s3(zip_buffer, workspace_id, token_id, slug)
+        # Single file → upload as the raw provider extension (.csv/.json/.xlsx).
+        # Multiple files → zip them together. Mirrors DownloadIssuesEndpoint.
+        if not multiple and len(files) == 1:
+            _filename, content = files[0]
+            payload = content if isinstance(content, (bytes, bytearray)) else content.encode("utf-8")
+            upload_to_s3(io.BytesIO(payload), workspace_id, token_id, slug, extension=provider)
+        else:
+            zip_buffer = create_zip_file(files)
+            upload_to_s3(zip_buffer, workspace_id, token_id, slug, extension="zip")
 
     except Exception as e:
         exporter_instance = ExporterHistory.objects.get(token=token_id)
