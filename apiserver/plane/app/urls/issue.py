@@ -7,7 +7,6 @@ from plane.app.views import (
     IssueLinkViewSet,
     IssueAttachmentEndpoint,
     CommentReactionViewSet,
-    DownloadIssuesEndpoint,
     ExportIssuesEndpoint,
     IssueActivityEndpoint,
     IssueArchiveViewSet,
@@ -161,12 +160,6 @@ urlpatterns = [
         "workspaces/<str:slug>/export-issues/",
         ExportIssuesEndpoint.as_view(),
         name="export-issues",
-    ),
-    ## Direct Download Issues (synchronous, no Celery)
-    path(
-        "workspaces/<str:slug>/download-issues/",
-        DownloadIssuesEndpoint.as_view(),
-        name="download-issues",
     ),
     ## End Issues
     ## Issue Activity

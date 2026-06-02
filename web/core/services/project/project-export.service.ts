@@ -16,11 +16,6 @@ export class ProjectExportService extends APIService {
     },
     filterParams?: Record<string, any>
   ): Promise<any> {
-    // eslint-disable-next-line no-console
-    console.log("[csvExport] POST", `/api/workspaces/${workspaceSlug}/export-issues/`, {
-      body: data,
-      params: filterParams,
-    });
     return this.post(`/api/workspaces/${workspaceSlug}/export-issues/`, data, {
       params: filterParams,
     })
@@ -44,28 +39,4 @@ export class ProjectExportService extends APIService {
       });
   }
 
-  async downloadIssues(
-    workspaceSlug: string,
-    data: {
-      provider: string;
-      project: string[];
-      multiple?: boolean;
-    },
-    filterParams?: Record<string, any>
-  ): Promise<{ blob: Blob; filename: string }> {
-    return this.post(`/api/workspaces/${workspaceSlug}/download-issues/`, data, {
-      responseType: "blob",
-      params: filterParams,
-    })
-      .then((response) => {
-        const disposition: string = response?.headers?.["content-disposition"] || "";
-        const match = disposition.match(/filename="?([^"]+)"?/i);
-        const fallbackExt = data.multiple ? "zip" : data.provider;
-        const filename = match?.[1] || `${workspaceSlug}-issues.${fallbackExt}`;
-        return { blob: response.data as Blob, filename };
-      })
-      .catch((error) => {
-        throw error?.response?.data;
-      });
-  }
 }

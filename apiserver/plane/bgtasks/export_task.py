@@ -1,7 +1,6 @@
 # Python imports
 import csv
 import io
-import json
 import zipfile
 
 import boto3
@@ -12,14 +11,74 @@ from celery import shared_task
 
 # Django imports
 from django.conf import settings
-from django.db.models import F, Func, OuterRef
+from django.db.models import Exists, F, Func, OuterRef, Q
 from django.utils import timezone
-from openpyxl import Workbook
 
 # Module imports
-from plane.db.models import ExporterHistory, FileAsset, Issue, IssueLink
+from plane.db.models import (
+    ExporterHistory,
+    FileAsset,
+    Issue,
+    IssueLink,
+    ProjectMember,
+    State,
+)
 from plane.utils.exception_logger import log_exception
+from plane.utils.issue_filters import (
+    apply_user_hub_filters,
+    build_custom_property_q_objects,
+)
 from plane.utils.order_queryset import order_issue_queryset
+
+
+def _build_list_view_base_queryset(slug, user, project_ids):
+    """Mirror the baseline queryset used by WorkspaceViewIssuesViewSet.list so
+    the export contains exactly the rows the user sees on the page (drafts /
+    archived / triage states excluded, hub-scoped, guest restrictions applied).
+    """
+    qs = (
+        Issue.objects.filter(
+            workspace__slug=slug,
+            project_id__in=project_ids,
+            deleted_at__isnull=True,
+            archived_at__isnull=True,
+            is_draft=False,
+            project__archived_at__isnull=True,
+            state_id__isnull=False,
+        )
+        .exclude(
+            state_id__in=State.objects.filter(is_triage=True).values("id")
+        )
+        .filter(
+            Exists(
+                ProjectMember.objects.filter(
+                    project_id=OuterRef("project_id"),
+                    member=user,
+                    is_active=True,
+                )
+            )
+        )
+    )
+
+    guest_pm = ProjectMember.objects.filter(
+        project_id=OuterRef("project_id"),
+        member=user,
+        is_active=True,
+        role=5,
+    )
+    non_guest_pm = ProjectMember.objects.filter(
+        project_id=OuterRef("project_id"),
+        member=user,
+        is_active=True,
+        role__gt=5,
+    )
+    qs = qs.filter(
+        Exists(non_guest_pm)
+        | (Exists(guest_pm) & Q(project__guest_view_all_features=True))
+        | (Exists(guest_pm) & Q(project__guest_view_all_features=False) & Q(created_by=user))
+    )
+
+    return apply_user_hub_filters(qs, user, workspace_slug=slug)
 
 
 def dateTimeConverter(time):
@@ -43,23 +102,6 @@ def create_csv_file(data):
     return csv_buffer.getvalue()
 
 
-def create_json_file(data):
-    return json.dumps(data)
-
-
-def create_xlsx_file(data):
-    workbook = Workbook()
-    sheet = workbook.active
-
-    for row in data:
-        sheet.append(row)
-
-    xlsx_buffer = io.BytesIO()
-    workbook.save(xlsx_buffer)
-    xlsx_buffer.seek(0)
-    return xlsx_buffer.getvalue()
-
-
 def create_zip_file(files):
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
@@ -72,8 +114,6 @@ def create_zip_file(files):
 
 EXPORT_CONTENT_TYPES = {
     "csv": "text/csv",
-    "json": "application/json",
-    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "zip": "application/zip",
 }
 
@@ -501,38 +541,6 @@ def generate_table_row(issue, columns):
     return [resolver.extractor(issue) for resolver in columns]
 
 
-def generate_json_row(issue, columns):
-    return {resolver.label: resolver.extractor(issue) for resolver in columns}
-
-
-def update_json_row(rows, row, columns):
-    assignee_key = "Assignees" if any(r.label == "Assignees" for r in columns) else None
-    labels_key = "Labels" if any(r.label == "Labels" for r in columns) else None
-
-    matched_index = next(
-        (index for index, existing_row in enumerate(rows) if existing_row["ID"] == row["ID"]),
-        None,
-    )
-
-    if matched_index is not None:
-        if assignee_key:
-            existing = rows[matched_index].get(assignee_key) or ""
-            incoming = row.get(assignee_key) or ""
-            if incoming and incoming not in existing:
-                rows[matched_index][assignee_key] = (
-                    f"{existing}, {incoming}" if existing else incoming
-                )
-        if labels_key:
-            existing = rows[matched_index].get(labels_key) or ""
-            incoming = row.get(labels_key) or ""
-            if incoming and incoming not in existing:
-                rows[matched_index][labels_key] = (
-                    f"{existing}, {incoming}" if existing else incoming
-                )
-    else:
-        rows.append(row)
-
-
 def update_table_row(rows, row, columns):
     id_idx = _index_for(columns, "ID")
     assignee_idx = _index_for(columns, "Assignees")
@@ -572,24 +580,6 @@ def generate_csv(header, project_id, issues, files, columns):
     files.append((f"{project_id}.csv", csv_file))
 
 
-def generate_json(header, project_id, issues, files, columns):
-    rows = []
-    for issue in issues:
-        row = generate_json_row(issue, columns)
-        update_json_row(rows, row, columns)
-    json_file = create_json_file(rows)
-    files.append((f"{project_id}.json", json_file))
-
-
-def generate_xlsx(header, project_id, issues, files, columns):
-    rows = [header]
-    for issue in issues:
-        row = generate_table_row(issue, columns)
-        update_table_row(rows, row, columns)
-    xlsx_file = create_xlsx_file(rows)
-    files.append((f"{project_id}.xlsx", xlsx_file))
-
-
 @shared_task
 def issue_export_task(
     provider,
@@ -611,8 +601,6 @@ def issue_export_task(
         # Use the same baseline queryset the list view uses so the export
         # mirrors what the user sees on the page (drafts/archived/triage
         # excluded, hub scoped, guest restrictions applied).
-        from plane.app.views.exporter.base import _build_list_view_base_queryset
-        from plane.utils.issue_filters import build_custom_property_q_objects
         base_qs = _build_list_view_base_queryset(
             slug=slug,
             user=exporter_instance.initiated_by,
@@ -633,30 +621,19 @@ def issue_export_task(
         header = [r.label for r in columns]
         workspace_issues = build_export_queryset(base_qs, columns)
 
-        EXPORTER_MAPPER = {
-            "csv": generate_csv,
-            "json": generate_json,
-            "xlsx": generate_xlsx,
-        }
-
         files = []
         if multiple:
             for project_id in project_ids:
                 issues = workspace_issues.filter(project__id=project_id)
-                exporter = EXPORTER_MAPPER.get(provider)
-                if exporter is not None:
-                    exporter(header, project_id, issues, files, columns)
+                generate_csv(header, project_id, issues, files, columns)
         else:
-            exporter = EXPORTER_MAPPER.get(provider)
-            if exporter is not None:
-                exporter(header, workspace_id, workspace_issues, files, columns)
+            generate_csv(header, workspace_id, workspace_issues, files, columns)
 
-        # Single file → upload as the raw provider extension (.csv/.json/.xlsx).
-        # Multiple files → zip them together. Mirrors DownloadIssuesEndpoint.
+        # Single file → upload the raw .csv. Multiple files → zip them.
         if not multiple and len(files) == 1:
             _filename, content = files[0]
             payload = content if isinstance(content, (bytes, bytearray)) else content.encode("utf-8")
-            upload_to_s3(io.BytesIO(payload), workspace_id, token_id, slug, extension=provider)
+            upload_to_s3(io.BytesIO(payload), workspace_id, token_id, slug, extension="csv")
         else:
             zip_buffer = create_zip_file(files)
             upload_to_s3(zip_buffer, workspace_id, token_id, slug, extension="zip")

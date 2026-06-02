@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Dialog, Transition } from "@headlessui/react";
 import useSWR from "swr";
@@ -24,8 +24,6 @@ const PER_PAGE = 10;
 export const ExportHistory: React.FC<Props> = ({ isOpen, handleClose }) => {
   const { workspaceSlug } = useParams();
   const [cursor, setCursor] = useState<string>(`${PER_PAGE}:0:0`);
-  const lastFetchedCursor = useRef<string>(cursor);
-  lastFetchedCursor.current = cursor;
 
   const swrKey = workspaceSlug && isOpen ? `EXPORT_HISTORY_${workspaceSlug}_${cursor}` : null;
 

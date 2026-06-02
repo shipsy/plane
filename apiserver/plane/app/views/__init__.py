@@ -250,7 +250,7 @@ from .notification.base import (
     UserNotificationPreferenceEndpoint,
 )
 
-from .exporter.base import ExportIssuesEndpoint, DownloadIssuesEndpoint
+from .exporter.base import ExportIssuesEndpoint
 
 
 from .webhook.base import (
@@ -263,6 +263,6 @@ from .dashboard.base import DashboardEndpoint, WidgetsEndpoint
 
 from .error_404 import custom_404_view
 
-from .exporter.base import ExportIssuesEndpoint, DownloadIssuesEndpoint
+from .exporter.base import ExportIssuesEndpoint
 from .notification.base import MarkAllReadNotificationViewSet
 from .user.base import AccountEndpoint, ProfileEndpoint, UserSessionEndpoint
