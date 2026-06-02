@@ -118,6 +118,12 @@ EXPORT_CONTENT_TYPES = {
     "zip": "application/zip",
 }
 
+# Hard cap on the number of distinct issues we export in a single run. This
+# guards Celery workers from runaway memory / timeouts on huge workspaces.
+# When the user's filter selects more than this, we truncate and prepend a
+# notice row so the recipient knows the file is incomplete.
+EXPORT_ROW_LIMIT = 10000
+
 
 def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
     content_type = EXPORT_CONTENT_TYPES.get(extension, "application/octet-stream")
@@ -536,41 +542,51 @@ def generate_table_row(issue, columns):
     return [resolver.extractor(issue) for resolver in columns]
 
 
-def update_table_row(rows, row, columns):
+def _merge_multivalue_cell(existing_cell, incoming_cell):
+    """Append `incoming_cell` to `existing_cell` as a comma-separated list,
+    skipping duplicates with exact (not substring) matching."""
+    incoming = (incoming_cell or "").strip()
+    if not incoming:
+        return existing_cell or ""
+    existing = existing_cell or ""
+    if not existing:
+        return incoming
+    parts = [p.strip() for p in existing.split(",") if p.strip()]
+    if incoming in parts:
+        return existing
+    return f"{existing}, {incoming}"
+
+
+def generate_csv(header, project_id, issues, files, columns):
+    """Generate CSV export for the passed issues using `columns`.
+
+    Deduplicates M2M fan-out rows (assignees × labels) by issue ID in O(1)
+    per input row using a dict keyed on the issue's ID cell.
+    """
     id_idx = _index_for(columns, "ID")
     assignee_idx = _index_for(columns, "Assignees")
     labels_idx = _index_for(columns, "Labels")
 
-    matched_index = next(
-        (index for index, existing_row in enumerate(rows) if existing_row[id_idx] == row[id_idx]),
-        None,
-    )
-
-    if matched_index is not None:
-        if assignee_idx is not None:
-            existing = rows[matched_index][assignee_idx] or ""
-            incoming = row[assignee_idx] or ""
-            if incoming and incoming not in existing:
-                rows[matched_index][assignee_idx] = (
-                    f"{existing}, {incoming}" if existing else incoming
-                )
-        if labels_idx is not None:
-            existing = rows[matched_index][labels_idx] or ""
-            incoming = row[labels_idx] or ""
-            if incoming and incoming not in existing:
-                rows[matched_index][labels_idx] = (
-                    f"{existing}, {incoming}" if existing else incoming
-                )
-    else:
-        rows.append(row)
-
-
-def generate_csv(header, project_id, issues, files, columns):
-    """Generate CSV export for the passed issues using `columns`."""
-    rows = [header]
+    id_to_row = {}
+    insertion_order = []
     for issue in issues:
         row = generate_table_row(issue, columns)
-        update_table_row(rows, row, columns)
+        row_id = row[id_idx] if id_idx is not None else id(row)
+        existing = id_to_row.get(row_id)
+        if existing is None:
+            id_to_row[row_id] = row
+            insertion_order.append(row_id)
+            continue
+        if assignee_idx is not None:
+            existing[assignee_idx] = _merge_multivalue_cell(
+                existing[assignee_idx], row[assignee_idx]
+            )
+        if labels_idx is not None:
+            existing[labels_idx] = _merge_multivalue_cell(
+                existing[labels_idx], row[labels_idx]
+            )
+
+    rows = [header] + [id_to_row[rid] for rid in insertion_order]
     csv_file = create_csv_file(rows)
     files.append((f"{project_id}.csv", csv_file))
 
@@ -611,7 +627,30 @@ def issue_export_task(
 
         columns = resolve_export_columns(display_properties)
         header = [r.label for r in columns]
-        workspace_issues = build_export_queryset(base_qs, columns)
+
+        # Cap the export to EXPORT_ROW_LIMIT distinct issues *before* the
+        # M2M-joined .values() fan-out. We slice the already-ordered base
+        # queryset's IDs, then re-filter so the value rows only fan out for
+        # the capped set.
+        capped_ids = list(
+            base_qs.values_list("id", flat=True).distinct()[: EXPORT_ROW_LIMIT + 1]
+        )
+        truncated = len(capped_ids) > EXPORT_ROW_LIMIT
+        if truncated:
+            capped_ids = capped_ids[:EXPORT_ROW_LIMIT]
+
+        workspace_issues = build_export_queryset(
+            base_qs.filter(id__in=capped_ids), columns
+        )
+
+        truncation_notice_row = (
+            [
+                f"NOTE: Export truncated to the first {EXPORT_ROW_LIMIT} "
+                f"issues. Narrow your filters to export the remaining rows."
+            ]
+            if truncated
+            else None
+        )
 
         files = []
         if multiple:
@@ -620,6 +659,11 @@ def issue_export_task(
                 generate_csv(header, project_id, issues, files, columns)
         else:
             generate_csv(header, workspace_id, workspace_issues, files, columns)
+
+        # Prepend a single-cell truncation notice to every generated CSV.
+        if truncation_notice_row:
+            notice_csv = create_csv_file([truncation_notice_row])
+            files = [(name, notice_csv + content) for name, content in files]
 
         # Single file → upload the raw .csv. Multiple files → zip them.
         if not multiple and len(files) == 1:
