@@ -74,7 +74,10 @@ export const WorkspaceExportsPopover = observer(() => {
           data={null}
           user={currentUser || null}
           provider={exportProvider}
-          mutateServices={() => {}}
+          mutateServices={
+            // no-op: ExportHistory manages its own refresh via SWR
+            () => {}
+          }
           filterParams={filterParams}
         />
       )}

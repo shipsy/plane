@@ -76,9 +76,7 @@ export const Exporter: React.FC<Props> = observer((props) => {
         setToast({
           type: TOAST_TYPE.SUCCESS,
           title: "Export queued",
-          message: `Your ${
-            provider === "csv" ? "CSV" : provider === "xlsx" ? "Excel" : provider === "json" ? "JSON" : ""
-          } export is being prepared. You'll be able to download it from the export history once it's ready.`,
+          message: `Your CSV export is being prepared. You'll be able to download it from the export history once it's ready.`,
         });
       } catch {
         setExportLoading(false);
@@ -127,10 +125,7 @@ export const Exporter: React.FC<Props> = observer((props) => {
                 <div className="flex flex-col gap-6 gap-y-4 p-6">
                   <div className="flex w-full items-center justify-start gap-6">
                     <span className="flex items-center justify-start">
-                      <h3 className="text-xl font-medium 2xl:text-2xl">
-                        Export to{" "}
-                        {provider === "csv" ? "CSV" : provider === "xlsx" ? "Excel" : provider === "json" ? "JSON" : ""}
-                      </h3>
+                      <h3 className="text-xl font-medium 2xl:text-2xl">Export to CSV</h3>
                     </span>
                   </div>
                   <div>

@@ -31,7 +31,7 @@ class ExportIssuesEndpoint(BaseAPIView):
         # Get the workspace
         workspace = Workspace.objects.get(slug=slug)
 
-        provider = request.data.get("provider", False)
+        provider = request.data.get("provider")
         multiple = request.data.get("multiple", False)
         project_ids = request.data.get("project", [])
 
@@ -68,7 +68,6 @@ class ExportIssuesEndpoint(BaseAPIView):
                 else None
             )
             issue_export_task.delay(
-                provider=exporter.provider,
                 workspace_id=workspace.id,
                 project_ids=project_ids,
                 token_id=exporter.token,
@@ -87,7 +86,7 @@ class ExportIssuesEndpoint(BaseAPIView):
             )
         else:
             return Response(
-                {"error": f"Provider '{provider}' not found."},
+                {"error": "Provider 'csv' is the only supported format."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

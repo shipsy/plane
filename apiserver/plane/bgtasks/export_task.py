@@ -15,6 +15,7 @@ from django.db.models import Exists, F, Func, OuterRef, Q
 from django.utils import timezone
 
 # Module imports
+from plane.app.permissions import ROLE
 from plane.db.models import (
     ExporterHistory,
     FileAsset,
@@ -64,13 +65,13 @@ def _build_list_view_base_queryset(slug, user, project_ids):
         project_id=OuterRef("project_id"),
         member=user,
         is_active=True,
-        role=5,
+        role=ROLE.GUEST.value,
     )
     non_guest_pm = ProjectMember.objects.filter(
         project_id=OuterRef("project_id"),
         member=user,
         is_active=True,
-        role__gt=5,
+        role__gt=ROLE.GUEST.value,
     )
     qs = qs.filter(
         Exists(non_guest_pm)
@@ -216,12 +217,6 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
 def _assignee_cell(issue):
     if issue.get("assignees__first_name") and issue.get("assignees__last_name"):
         return f"{issue['assignees__first_name']} {issue['assignees__last_name']}"
-    return ""
-
-
-def _created_by_cell(issue):
-    if issue.get("created_by__first_name") and issue.get("created_by__last_name"):
-        return f"{issue['created_by__first_name']} {issue['created_by__last_name']}"
     return ""
 
 
@@ -582,7 +577,6 @@ def generate_csv(header, project_id, issues, files, columns):
 
 @shared_task
 def issue_export_task(
-    provider,
     workspace_id,
     project_ids,
     token_id,
@@ -615,8 +609,6 @@ def issue_export_task(
             order_by_param=order_by_param,
         )
 
-        # Resolve columns + build the final values()-queryset via the shared
-        # helper so this path and DownloadIssuesEndpoint stay in lockstep.
         columns = resolve_export_columns(display_properties)
         header = [r.label for r in columns]
         workspace_issues = build_export_queryset(base_qs, columns)
