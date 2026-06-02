@@ -63,9 +63,8 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
     if (!displayPropertiesToRender.includes(property.key)) return false;
     switch (property.key) {
       case "cycle":
-        return !cycleViewDisabled;
       case "modules":
-        return !moduleViewDisabled;
+        return false;
       default:
         return shouldRenderDisplayProperty({ workspaceSlug: workspaceSlug?.toString(), projectId, key: property.key });
     }

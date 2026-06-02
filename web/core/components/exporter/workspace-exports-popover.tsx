@@ -11,6 +11,7 @@ import { Exporter } from "./export-modal";
 import { ExportHistory } from "./export-history";
 // constants
 import { EIssuesStoreType } from "@/constants/issue";
+import { SPREADSHEET_PROPERTY_LIST } from "@/constants/spreadsheet";
 // hooks
 import { useIssues, useUser } from "@/hooks/store";
 
@@ -33,19 +34,16 @@ export const WorkspaceExportsPopover = observer(() => {
   const displayProperties = viewId
     ? (issuesFilter.getIssueFilters?.(viewId)?.displayProperties as Record<string, boolean> | undefined)
     : undefined;
+  // Preserve the visible column order from SPREADSHEET_PROPERTY_LIST so the
+  // CSV columns match the order shown in the spreadsheet view.
   const enabledDisplayProperties = displayProperties
-    ? Object.entries(displayProperties)
-        .filter(([, enabled]) => !!enabled)
-        .map(([key]) => key)
-        .join(",")
+    ? SPREADSHEET_PROPERTY_LIST.filter((key) => !!displayProperties[key]).join(",")
     : undefined;
 
   const filterParams = {
     ...(appliedFilters ?? {}),
     ...(enabledDisplayProperties ? { display_properties: enabledDisplayProperties } : {}),
   };
-  // eslint-disable-next-line no-console
-  console.log("[WorkspaceExportsPopover] globalViewId=", globalViewId, "filterParams=", filterParams);
 
   return (
     <>
