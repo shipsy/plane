@@ -432,6 +432,64 @@ def resolve_export_columns(display_properties=None):
 
     return cols
 
+def build_export_queryset(base_qs, columns):
+    """Finalize an ordered/filtered base queryset into a `.values(...)`
+    queryset that carries exactly the fields the resolved `columns` need,
+    plus any required count annotations.
+
+    Used by both the async Celery exporter and the synchronous download
+    endpoint so both paths emit identical rows for the same filters.
+    """
+    # 1. Union of `.values(...)` paths from every resolver, plus bookkeeping
+    #    fields used by the row deduper / per-project `multiple` filtering.
+    values_fields = {"id", "project__id"}
+    for r in columns:
+        values_fields.update(r.values_fields)
+
+    # 2. Annotations — only attach the counts that some selected column
+    #    actually consumes.
+    needed_annotations = {r.requires_annotation for r in columns if r.requires_annotation}
+    annotations = {}
+    if "sub_issues_count" in needed_annotations:
+        annotations["sub_issues_count"] = (
+            Issue.objects.filter(
+                parent=OuterRef("id"),
+                deleted_at__isnull=True,
+                is_draft=False,
+                archived_at__isnull=True,
+            )
+            .order_by()
+            .annotate(count=Func(F("id"), function="Count"))
+            .values("count")
+        )
+    if "link_count" in needed_annotations:
+        annotations["link_count"] = (
+            IssueLink.objects.filter(issue=OuterRef("id"))
+            .order_by()
+            .annotate(count=Func(F("id"), function="Count"))
+            .values("count")
+        )
+    if "attachment_count" in needed_annotations:
+        annotations["attachment_count"] = (
+            FileAsset.objects.filter(
+                issue_id=OuterRef("id"),
+                entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+            )
+            .order_by()
+            .annotate(count=Func(F("id"), function="Count"))
+            .values("count")
+        )
+
+    qs = base_qs.select_related(
+        "project", "workspace", "state", "parent", "created_by", "estimate_point", "type"
+    ).prefetch_related(
+        "assignees", "labels", "issue_cycle__cycle", "issue_module__module"
+    )
+    if annotations:
+        qs = qs.annotate(**annotations)
+    return qs.values(*sorted(values_fields)).distinct()
+
+
 def _index_for(columns, header_label):
     for idx, resolver in enumerate(columns):
         if resolver.label == header_label:
@@ -569,58 +627,11 @@ def issue_export_task(
             order_by_param=order_by_param,
         )
 
-        # ── Dynamically build the queryset from the resolved columns ────────
-        # 1. Resolve which columns we need.
+        # Resolve columns + build the final values()-queryset via the shared
+        # helper so this path and DownloadIssuesEndpoint stay in lockstep.
         columns = resolve_export_columns(display_properties)
         header = [r.label for r in columns]
-
-        # 2. Collect the union of `.values(...)` paths from every resolver,
-        #    plus a couple of always-needed bookkeeping fields used by the
-        #    row deduper / `id` lookup.
-        values_fields = set(["id", "project__id"])
-        for r in columns:
-            values_fields.update(r.values_fields)
-        # 3. Add annotations only for the count-resolvers that were selected.
-        needed_annotations = {r.requires_annotation for r in columns if r.requires_annotation}
-        annotations = {}
-        if "sub_issues_count" in needed_annotations:
-            annotations["sub_issues_count"] = (
-                Issue.objects.filter(
-                    parent=OuterRef("id"),
-                    deleted_at__isnull=True,
-                    is_draft=False,
-                    archived_at__isnull=True,
-                )
-                .order_by()
-                .annotate(count=Func(F("id"), function="Count"))
-                .values("count")
-            )
-        if "link_count" in needed_annotations:
-            annotations["link_count"] = (
-                IssueLink.objects.filter(issue=OuterRef("id"))
-                .order_by()
-                .annotate(count=Func(F("id"), function="Count"))
-                .values("count")
-            )
-        if "attachment_count" in needed_annotations:
-            annotations["attachment_count"] = (
-                FileAsset.objects.filter(
-                    issue_id=OuterRef("id"),
-                    entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
-                )
-                .order_by()
-                .annotate(count=Func(F("id"), function="Count"))
-                .values("count")
-            )
-
-        workspace_issues = (
-            base_qs
-            .select_related("project", "workspace", "state", "parent", "created_by", "estimate_point", "type")
-            .prefetch_related("assignees", "labels", "issue_cycle__cycle", "issue_module__module")
-        )
-        if annotations:
-            workspace_issues = workspace_issues.annotate(**annotations)
-        workspace_issues = workspace_issues.values(*sorted(values_fields)).distinct()
+        workspace_issues = build_export_queryset(base_qs, columns)
 
         EXPORTER_MAPPER = {
             "csv": generate_csv,

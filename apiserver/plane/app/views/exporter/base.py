@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from plane.app.permissions import allow_permission, ROLE
 from plane.app.serializers import ExporterHistorySerializer
 from plane.bgtasks.export_task import (
+    build_export_queryset,
     create_zip_file,
     generate_csv,
     generate_json,
@@ -301,7 +302,7 @@ class DownloadIssuesEndpoint(BaseAPIView):
             else None
         )
         columns = resolve_export_columns(display_properties)
-        header = [label for (_key, label, _fn) in columns]
+        header = [r.label for r in columns]
 
         base_qs = (
             _build_list_view_base_queryset(
@@ -337,45 +338,10 @@ class DownloadIssuesEndpoint(BaseAPIView):
             issue_queryset=base_qs,
             order_by_param=order_by_param,
         )
-        workspace_issues = (
-            base_qs
-            .select_related("project", "workspace", "state", "parent", "created_by")
-            .prefetch_related(
-                "assignees",
-                "labels",
-                "issue_cycle__cycle",
-                "issue_module__module",
-            )
-            .values(
-                "id",
-                "project__identifier",
-                "project__name",
-                "project__id",
-                "sequence_id",
-                "name",
-                "description_stripped",
-                "priority",
-                "state__name",
-                "start_date",
-                "target_date",
-                "created_at",
-                "updated_at",
-                "completed_at",
-                "archived_at",
-                "issue_cycle__cycle__name",
-                "issue_cycle__cycle__start_date",
-                "issue_cycle__cycle__end_date",
-                "issue_module__module__name",
-                "issue_module__module__start_date",
-                "issue_module__module__target_date",
-                "created_by__first_name",
-                "created_by__last_name",
-                "assignees__first_name",
-                "assignees__last_name",
-                "labels__name",
-            )
-            .distinct()
-        )
+        # Build the final values()-queryset from the resolved columns so
+        # this endpoint and issue_export_task emit identical rows for the
+        # same filters (including custom/introspected Issue fields).
+        workspace_issues = build_export_queryset(base_qs, columns)
 
         exporter = EXPORTER_MAPPER.get(provider)
         files = []
