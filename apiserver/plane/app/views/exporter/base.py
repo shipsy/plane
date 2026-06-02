@@ -1,8 +1,6 @@
 import logging
-import threading
 
 # Python imports
-from django.db import connections
 from django.http import HttpResponse
 from django.utils import timezone
 
@@ -43,18 +41,11 @@ from .. import BaseAPIView
 
 logger = logging.getLogger("plane.exporter")
 
-
-def _run_export_in_background(**kwargs):
-    """Run the export task synchronously in a worker thread and clean up DB
-    connections after. Avoids the Celery dependency."""
-    token = str(kwargs.get("token_id", ""))[:8]
-    try:
-        issue_export_task(**kwargs)
-    except Exception:
-        logger.exception("export thread failed token=%s", token)
-        raise
-    finally:
-        connections.close_all()
+# Hard cap on issue count for the synchronous DownloadIssuesEndpoint. Above
+# this, force the user onto the async export path so we don't OOM a request
+# worker on the cartesian explosion produced by `.values(...)` over
+# assignees + labels.
+DOWNLOAD_ISSUE_LIMIT = 10_000
 
 
 _LEGACY_ISSUE_EXPORT_HEADER = [
@@ -188,22 +179,18 @@ class ExportIssuesEndpoint(BaseAPIView):
                 if display_properties_raw
                 else None
             )
-            threading.Thread(
-                target=_run_export_in_background,
-                kwargs={
-                    "provider": exporter.provider,
-                    "workspace_id": workspace.id,
-                    "project_ids": project_ids,
-                    "token_id": exporter.token,
-                    "multiple": multiple,
-                    "slug": slug,
-                    "filters": filters,
-                    "custom_properties": custom_properties,
-                    "order_by_param": order_by_param,
-                    "display_properties": display_properties,
-                },
-                daemon=True,
-            ).start()
+            issue_export_task.delay(
+                provider=exporter.provider,
+                workspace_id=workspace.id,
+                project_ids=project_ids,
+                token_id=exporter.token,
+                multiple=multiple,
+                slug=slug,
+                filters=filters,
+                custom_properties=custom_properties,
+                order_by_param=order_by_param,
+                display_properties=display_properties,
+            )
             return Response(
                 {
                     "message": "Once the export is ready you will be able to download it"
@@ -325,6 +312,27 @@ class DownloadIssuesEndpoint(BaseAPIView):
             .filter(*custom_filters)
             .filter(**filters)
         )
+
+        # Guard: hard cap on issue count. Count distinct Issue IDs *before*
+        # the cartesian `.values(...)` join with assignees/labels — counting
+        # after that explodes memory. If the user is over the limit, point
+        # them at the async export path which writes to S3 and doesn't tie
+        # up a request worker.
+        issue_count = base_qs.values("id").distinct().count()
+        if issue_count > DOWNLOAD_ISSUE_LIMIT:
+            return Response(
+                {
+                    "error": (
+                        f"This download would include {issue_count} issues, "
+                        f"which exceeds the {DOWNLOAD_ISSUE_LIMIT} limit. "
+                        "Use the async export instead, or narrow your filters."
+                    ),
+                    "issue_count": issue_count,
+                    "limit": DOWNLOAD_ISSUE_LIMIT,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         base_qs, _ = order_issue_queryset(
             issue_queryset=base_qs,
             order_by_param=order_by_param,

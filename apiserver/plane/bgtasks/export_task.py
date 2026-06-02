@@ -378,6 +378,12 @@ def _introspect_field(key):
     return None
 
 
+# Columns the user has chosen to hide from the export entirely, regardless
+# of what the frontend sends. Mirrors the UI hiding cycle/modules/estimate
+# from the display-properties picker.
+EXCLUDED_EXPORT_KEYS = {"cycle", "modules", "estimate"}
+
+
 def resolve_export_columns(display_properties=None):
     """Build the ordered list of `_Resolver` objects for this export.
 
@@ -388,6 +394,8 @@ def resolve_export_columns(display_properties=None):
             a. If it's in COMPLEX_RESOLVERS → use that.
             b. Else, try `Issue._meta.get_field(key)` introspection.
             c. Else, skip (unknown key).
+
+    Keys in `EXCLUDED_EXPORT_KEYS` are skipped unconditionally.
     """
     cols = list(ALWAYS_COLUMNS)
 
@@ -397,10 +405,12 @@ def resolve_export_columns(display_properties=None):
         # field declaration order.
         seen = set()
         for key, resolver in COMPLEX_RESOLVERS.items():
+            if key in EXCLUDED_EXPORT_KEYS:
+                continue
             cols.append(resolver)
             seen.add(key)
         for field in Issue._meta.get_fields():
-            if field.name in seen:
+            if field.name in seen or field.name in EXCLUDED_EXPORT_KEYS:
                 continue
             resolver = _introspect_field(field.name)
             if resolver is not None:
@@ -410,7 +420,7 @@ def resolve_export_columns(display_properties=None):
 
     seen = set()
     for key in display_properties:
-        if key in seen or key == "key":
+        if key in seen or key == "key" or key in EXCLUDED_EXPORT_KEYS:
             # "key" is the UI's name for the ID column we already include.
             continue
         seen.add(key)
