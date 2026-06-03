@@ -6,9 +6,6 @@ import zipfile
 import boto3
 from botocore.client import Config
 
-# Third party imports
-from celery import shared_task
-
 # Django imports
 from django.conf import settings
 from django.db.models import Exists, F, Func, OuterRef, Q
@@ -591,7 +588,6 @@ def generate_csv(header, project_id, issues, files, columns):
     files.append((f"{project_id}.csv", csv_file))
 
 
-@shared_task
 def issue_export_task(
     workspace_id,
     project_ids,

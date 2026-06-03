@@ -1,4 +1,5 @@
 import logging
+import threading
 
 # Third Party imports
 from rest_framework import status
@@ -67,17 +68,25 @@ class ExportIssuesEndpoint(BaseAPIView):
                 if display_properties_raw
                 else None
             )
-            issue_export_task.delay(
-                workspace_id=workspace.id,
-                project_ids=project_ids,
-                token_id=exporter.token,
-                multiple=multiple,
-                slug=slug,
-                filters=filters,
-                custom_properties=custom_properties,
-                order_by_param=order_by_param,
-                display_properties=display_properties,
-            )
+            # Run the export in a background daemon thread so the HTTP
+            # request can return immediately. The task writes progress and
+            # the final S3 URL back onto the ExporterHistory row, which the
+            # frontend polls via GET.
+            threading.Thread(
+                target=issue_export_task,
+                kwargs={
+                    "workspace_id": workspace.id,
+                    "project_ids": project_ids,
+                    "token_id": exporter.token,
+                    "multiple": multiple,
+                    "slug": slug,
+                    "filters": filters,
+                    "custom_properties": custom_properties,
+                    "order_by_param": order_by_param,
+                    "display_properties": display_properties,
+                },
+                daemon=True,
+            ).start()
             return Response(
                 {
                     "message": "Once the export is ready you will be able to download it"
