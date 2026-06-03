@@ -187,17 +187,21 @@ export const IssueFormRoot: FC<IssueFormProps> = observer((props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, projectId]);
 
-  // Populate title with issue type name when type changes and title is empty
+  // Populate title with issue type name when type changes, as long as the user hasn't customized it
   const typeId = watch("type_id");
+  const lastAutoFilledNameRef = useRef<string | null>(null);
   useEffect(() => {
-    const currentName = watch("name");
-    if (!typeId || currentName) return;
+    if (!typeId) return;
 
     const issueType = getIssueTypeById(typeId);
-    if (issueType?.name) {
-      setValue("name", issueType.name, { shouldValidate: true });
-      handleFormChange();
-    }
+    if (!issueType?.name) return;
+
+    const currentName = watch("name");
+    if (currentName && currentName !== lastAutoFilledNameRef.current) return;
+
+    setValue("name", issueType.name, { shouldValidate: true });
+    lastAutoFilledNameRef.current = issueType.name;
+    handleFormChange();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeId]);
 
