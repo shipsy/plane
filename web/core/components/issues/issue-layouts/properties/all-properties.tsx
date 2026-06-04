@@ -362,10 +362,10 @@ export const IssueProperties: React.FC<IIssueProperties> = observer((props) => {
         displayPropertyKey="start_date_time"
         shouldRenderProperty={() => !!issue.start_date_time}
       >
-        <Tooltip tooltipHeading="Start date time" tooltipContent={`${renderFormattedDate(issue.start_date_time)} ${renderFormattedTime(issue.start_date_time)}`} isMobile={isMobile}>
+        <Tooltip tooltipHeading="Start date time" tooltipContent={`${renderFormattedDate(issue.start_date_time!)} ${renderFormattedTime(issue.start_date_time!)}`} isMobile={isMobile}>
           <div className="flex h-5 items-center gap-1 rounded border-[0.5px] border-custom-border-300 px-2 text-xs text-custom-text-100">
             <CalendarClock className="h-3 w-3 flex-shrink-0" />
-            <span>{`${renderFormattedDate(issue.start_date_time)} ${renderFormattedTime(issue.start_date_time)}`}</span>
+            <span>{`${renderFormattedDate(issue.start_date_time!)} ${renderFormattedTime(issue.start_date_time!)}`}</span>
           </div>
         </Tooltip>
       </WithDisplayPropertiesHOC>
@@ -376,10 +376,10 @@ export const IssueProperties: React.FC<IIssueProperties> = observer((props) => {
         displayPropertyKey="target_date_time"
         shouldRenderProperty={() => !!issue.target_date_time}
       >
-        <Tooltip tooltipHeading="Due date time" tooltipContent={`${renderFormattedDate(issue.target_date_time)} ${renderFormattedTime(issue.target_date_time)}`} isMobile={isMobile}>
+        <Tooltip tooltipHeading="Due date time" tooltipContent={`${renderFormattedDate(issue.target_date_time!)} ${renderFormattedTime(issue.target_date_time!)}`} isMobile={isMobile}>
           <div className="flex h-5 items-center gap-1 rounded border-[0.5px] border-custom-border-300 px-2 text-xs text-custom-text-100">
             <CalendarCheck2 className="h-3 w-3 flex-shrink-0" />
-            <span>{`${renderFormattedDate(issue.target_date_time)} ${renderFormattedTime(issue.target_date_time)}`}</span>
+            <span>{`${renderFormattedDate(issue.target_date_time!)} ${renderFormattedTime(issue.target_date_time!)}`}</span>
           </div>
         </Tooltip>
       </WithDisplayPropertiesHOC>
