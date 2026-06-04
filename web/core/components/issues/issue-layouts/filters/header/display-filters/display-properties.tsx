@@ -54,20 +54,16 @@ export const FilterDisplayProperties: React.FC<Props> = observer((props) => {
     ...customPropertiesForDisplay
   ];
 
-  // Filter out "cycle" and "module" keys if cycleViewDisabled or moduleViewDisabled is true
-  // Also filter out display properties that should not be rendered
+  // Keep custom workspace properties unconditionally; everything else must be
+  // both present in the page's render list and pass shouldRenderDisplayProperty
+  // (which is the single place that gates cycle/modules/estimate, plus any
+  // workspace-/project-level feature flags).
   const filteredDisplayProperties = combinedPropertiesForDisplay.filter((property) => {
     if (customPropertiesForDisplay.some((customProperty) => customProperty.key === property.key)) {
       return true;
     }
     if (!displayPropertiesToRender.includes(property.key)) return false;
-    switch (property.key) {
-      case "cycle":
-      case "modules":
-        return false;
-      default:
-        return shouldRenderDisplayProperty({ workspaceSlug: workspaceSlug?.toString(), projectId, key: property.key });
-    }
+    return shouldRenderDisplayProperty({ workspaceSlug: workspaceSlug?.toString(), projectId, key: property.key });
   });
 
   return (
