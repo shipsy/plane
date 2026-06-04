@@ -17,6 +17,8 @@ import {
   IssueRelationActivity,
   IssueStartDateActivity,
   IssueTargetDateActivity,
+  IssueStartDateTimeActivity,
+  IssueTargetDateTimeActivity,
   IssueCycleActivity,
   IssueModuleActivity,
   IssueLabelActivity,
@@ -71,6 +73,10 @@ export const IssueActivityItem: FC<TIssueActivityItem> = observer((props) => {
       return <IssueStartDateActivity {...componentDefaultProps} showIssue={false} />;
     case "target_date":
       return <IssueTargetDateActivity {...componentDefaultProps} showIssue={false} />;
+    case "start_date_time":
+      return <IssueStartDateTimeActivity {...componentDefaultProps} showIssue={false} />;
+    case "target_date_time":
+      return <IssueTargetDateTimeActivity {...componentDefaultProps} showIssue={false} />;
     case "cycles":
       return <IssueCycleActivity {...componentDefaultProps} />;
     case "modules":
