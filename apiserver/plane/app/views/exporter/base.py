@@ -72,21 +72,34 @@ class ExportIssuesEndpoint(BaseAPIView):
             # request can return immediately. The task writes progress and
             # the final S3 URL back onto the ExporterHistory row, which the
             # frontend polls via GET.
-            threading.Thread(
-                target=issue_export_task,
-                kwargs={
-                    "workspace_id": workspace.id,
-                    "project_ids": project_ids,
-                    "token_id": exporter.token,
-                    "multiple": multiple,
-                    "slug": slug,
-                    "filters": filters,
-                    "custom_properties": custom_properties,
-                    "order_by_param": order_by_param,
-                    "display_properties": display_properties,
-                },
-                daemon=True,
-            ).start()
+            try:
+                threading.Thread(
+                    target=issue_export_task,
+                    kwargs={
+                        "workspace_id": workspace.id,
+                        "project_ids": project_ids,
+                        "token_id": exporter.token,
+                        "multiple": multiple,
+                        "slug": slug,
+                        "filters": filters,
+                        "custom_properties": custom_properties,
+                        "order_by_param": order_by_param,
+                        "display_properties": display_properties,
+                    },
+                    daemon=True,
+                ).start()
+            except Exception:
+                # If we can't even spawn the worker, don't leave the row
+                # stranded in its default state — flip it to failed so the
+                # frontend stops polling and the user sees an error.
+                logger.exception("Failed to start export thread for token=%s", exporter.token)
+                exporter.status = "failed"
+                exporter.reason = "Failed to start export worker"
+                exporter.save(update_fields=["status", "reason"])
+                return Response(
+                    {"error": "Failed to start export. Please try again."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
             return Response(
                 {
                     "message": "Once the export is ready you will be able to download it"
