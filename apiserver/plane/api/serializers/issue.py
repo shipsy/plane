@@ -597,9 +597,9 @@ class IssueBulkUpdateSerializer(serializers.Serializer):
         "vendor_code", "hub_code", "customer_code", "worker_code",
         "reference_number", "trip_reference_number", "hub_name", "customer_name",
         "vendor_name", "worker_name", "business_type", "source", "name",
-        "start_date", "target_date"
+        "start_date", "target_date", "start_date_time", "target_date_time"
     }
-    
+
     def validate_filters(self, value):
         if not value or not isinstance(value, dict):
             raise serializers.ValidationError("Filters must be a non-empty dictionary")

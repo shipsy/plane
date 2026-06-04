@@ -24,7 +24,7 @@ import {
 import { ISSUE_UPDATED } from "@/constants/event-tracker";
 // helpers
 import { cn } from "@/helpers/common.helper";
-import { getDate, renderFormattedPayloadDate } from "@/helpers/date-time.helper";
+import { getDate, renderFormattedDate, renderFormattedPayloadDate, renderFormattedTime } from "@/helpers/date-time.helper";
 import { shouldHighlightIssueDueDate } from "@/helpers/issue.helper";
 // hooks
 import { useEventTracker, useLabel, useIssues, useProjectState, useProject, useProjectEstimates } from "@/hooks/store";
@@ -354,6 +354,34 @@ export const IssueProperties: React.FC<IIssueProperties> = observer((props) => {
             showTooltip
           />
         </div>
+      </WithDisplayPropertiesHOC>
+
+      {/* start date time */}
+      <WithDisplayPropertiesHOC
+        displayProperties={displayProperties}
+        displayPropertyKey="start_date_time"
+        shouldRenderProperty={() => !!issue.start_date_time}
+      >
+        <Tooltip tooltipHeading="Start date time" tooltipContent={`${renderFormattedDate(issue.start_date_time)} ${renderFormattedTime(issue.start_date_time)}`} isMobile={isMobile}>
+          <div className="flex h-5 items-center gap-1 rounded border-[0.5px] border-custom-border-300 px-2 text-xs text-custom-text-100">
+            <CalendarClock className="h-3 w-3 flex-shrink-0" />
+            <span>{`${renderFormattedDate(issue.start_date_time)} ${renderFormattedTime(issue.start_date_time)}`}</span>
+          </div>
+        </Tooltip>
+      </WithDisplayPropertiesHOC>
+
+      {/* target date time */}
+      <WithDisplayPropertiesHOC
+        displayProperties={displayProperties}
+        displayPropertyKey="target_date_time"
+        shouldRenderProperty={() => !!issue.target_date_time}
+      >
+        <Tooltip tooltipHeading="Due date time" tooltipContent={`${renderFormattedDate(issue.target_date_time)} ${renderFormattedTime(issue.target_date_time)}`} isMobile={isMobile}>
+          <div className="flex h-5 items-center gap-1 rounded border-[0.5px] border-custom-border-300 px-2 text-xs text-custom-text-100">
+            <CalendarCheck2 className="h-3 w-3 flex-shrink-0" />
+            <span>{`${renderFormattedDate(issue.target_date_time)} ${renderFormattedTime(issue.target_date_time)}`}</span>
+          </div>
+        </Tooltip>
       </WithDisplayPropertiesHOC>
 
       {/* assignee */}

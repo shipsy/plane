@@ -296,6 +296,88 @@ def track_start_date(
         )
 
 
+# Track changes in issue target date time
+def _normalize_datetime_value(value):
+    """
+    Normalize a datetime string/object to a stable ISO 8601 representation
+    so that values produced by `str(datetime)` ("YYYY-MM-DD HH:MM:SS+TZ") and
+    values produced by DRF/JS (`YYYY-MM-DDTHH:MM:SS.sssZ`) compare equal when
+    they represent the same instant. Returns None for falsy/unparseable input.
+    """
+    from django.utils.dateparse import parse_datetime
+
+    if value in (None, "", "None"):
+        return None
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    try:
+        parsed = parse_datetime(str(value))
+        if parsed is not None:
+            return parsed.isoformat()
+    except (TypeError, ValueError):
+        pass
+    return str(value)
+
+
+def track_target_date_time(
+    requested_data,
+    current_instance,
+    issue_id,
+    project_id,
+    workspace_id,
+    actor_id,
+    issue_activities,
+    epoch,
+):
+    old_value = _normalize_datetime_value(current_instance.get("target_date_time"))
+    new_value = _normalize_datetime_value(requested_data.get("target_date_time"))
+    if old_value != new_value:
+        issue_activities.append(
+            IssueActivity(
+                issue_id=issue_id,
+                actor_id=actor_id,
+                verb="updated",
+                old_value=old_value if old_value is not None else "",
+                new_value=new_value if new_value is not None else "",
+                field="target_date_time",
+                project_id=project_id,
+                workspace_id=workspace_id,
+                comment="updated the target date time to",
+                epoch=epoch,
+            )
+        )
+
+
+# Track changes in issue start date time
+def track_start_date_time(
+    requested_data,
+    current_instance,
+    issue_id,
+    project_id,
+    workspace_id,
+    actor_id,
+    issue_activities,
+    epoch,
+):
+    old_value = _normalize_datetime_value(current_instance.get("start_date_time"))
+    new_value = _normalize_datetime_value(requested_data.get("start_date_time"))
+    if old_value != new_value:
+        issue_activities.append(
+            IssueActivity(
+                issue_id=issue_id,
+                actor_id=actor_id,
+                verb="updated",
+                old_value=old_value if old_value is not None else "",
+                new_value=new_value if new_value is not None else "",
+                field="start_date_time",
+                project_id=project_id,
+                workspace_id=workspace_id,
+                comment="updated the start date time to ",
+                epoch=epoch,
+            )
+        )
+
+
 # Track changes in issue labels
 def track_labels(
     requested_data,
@@ -632,6 +714,8 @@ def update_issue_activity(
         "description_html": track_description,
         "target_date": track_target_date,
         "start_date": track_start_date,
+        "target_date_time": track_target_date_time,
+        "start_date_time": track_start_date_time,
         "label_ids": track_labels,
         "assignee_ids": track_assignees,
         "estimate_point": track_estimate_points,

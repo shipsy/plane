@@ -168,6 +168,10 @@ const ISSUE_ORDERBY_KEY: Record<TIssueOrderByOptions, keyof TIssue> = {
   "-estimate_point": "estimate_point",
   start_date: "start_date",
   "-start_date": "start_date",
+  start_date_time: "start_date_time",
+  "-start_date_time": "start_date_time",
+  target_date_time: "target_date_time",
+  "-target_date_time": "target_date_time",
   link_count: "link_count",
   "-link_count": "link_count",
   attachment_count: "attachment_count",
@@ -1836,6 +1840,32 @@ export abstract class BaseIssuesStore implements IBaseIssuesStore {
           orderBy(
             array,
             [getSortOrderToFilterEmptyValues.bind(null, "target_date"), "target_date"], //preferring sorting based on empty values to always keep the empty values below
+            ["asc", "desc"]
+          )
+        );
+
+      case "start_date_time":
+        return getIssueIds(
+          orderBy(array, [getSortOrderToFilterEmptyValues.bind(null, "start_date_time"), "start_date_time"])
+        );
+      case "-start_date_time":
+        return getIssueIds(
+          orderBy(
+            array,
+            [getSortOrderToFilterEmptyValues.bind(null, "start_date_time"), "start_date_time"],
+            ["asc", "desc"]
+          )
+        );
+
+      case "target_date_time":
+        return getIssueIds(
+          orderBy(array, [getSortOrderToFilterEmptyValues.bind(null, "target_date_time"), "target_date_time"])
+        );
+      case "-target_date_time":
+        return getIssueIds(
+          orderBy(
+            array,
+            [getSortOrderToFilterEmptyValues.bind(null, "target_date_time"), "target_date_time"],
             ["asc", "desc"]
           )
         );

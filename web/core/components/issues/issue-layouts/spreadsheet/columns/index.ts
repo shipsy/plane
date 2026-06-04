@@ -13,4 +13,5 @@ export * from "./updated-on-column";
 export * from "./module-column";
 export * from "./cycle-column";
 export * from "./standard-property-column";
+export * from "./datetime-property-column";
 export * from "./custom-property-column";

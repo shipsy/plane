@@ -46,6 +46,8 @@ class AnalyticsEndpoint(BaseAPIView):
             "priority",
             "start_date",
             "target_date",
+            "start_date_time",
+            "target_date_time",
             "created_at",
             "completed_at",
         ]
@@ -297,6 +299,8 @@ class ExportAnalyticsEndpoint(BaseAPIView):
             "priority",
             "start_date",
             "target_date",
+            "start_date_time",
+            "target_date_time",
             "created_at",
             "completed_at",
         ]
