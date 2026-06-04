@@ -29,8 +29,8 @@ export const IssueTargetDateTimeActivity: FC<TIssueTargetDateTimeActivity> = obs
     >
       <>
         {activity.new_value
-          ? `${t("set_target_date_time_to", { defaultValue: "set the target date & time to" })} `
-          : `${t("removed_target_date_time", { defaultValue: "removed the target date & time" })} `}
+          ? `${t("set_target_date_time_to")} `
+          : `${t("removed_target_date_time")} `}
         {activity.new_value && (
           <span className="font-medium text-custom-text-100">
             {`${renderFormattedDate(activity.new_value)} ${renderFormattedTime(activity.new_value, "12-hour")}`}
