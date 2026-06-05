@@ -344,6 +344,7 @@
   "hub_code": "Hub Code",
   "hub_name": "Hub Name",
   "customer_code": "Customer Code",
+  "customer_category": "Customer Category",
   "customer_name": "Customer Name",
   "vendor_name": "Vendor Name",
   "vendor_code": "Vendor Code",
