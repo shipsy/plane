@@ -730,6 +730,7 @@ class IssueSerializer(DynamicBaseSerializer):
             "hub_code",
             "hub_name",
             "customer_code",
+            "customer_category",
             "customer_name",
             "vendor_name",
             "vendor_code",

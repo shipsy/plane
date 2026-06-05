@@ -101,6 +101,7 @@ def issue_on_results(issues, group_by, sub_group_by):
         "hub_code",
         "hub_name",
         "customer_code",
+        "customer_category",
         "customer_name",
         "vendor_name",
         "vendor_code",

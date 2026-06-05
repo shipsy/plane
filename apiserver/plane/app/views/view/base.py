@@ -221,7 +221,7 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
         "created_at", "updated_at", "created_by", "updated_by",
         "attachment_count", "link_count", "is_draft", "archived_at",
         "state__group", "trip_reference_number", "reference_number",
-        "hub_code", "hub_name", "customer_code", "customer_name",
+        "hub_code", "hub_name", "customer_code", "customer_category", "customer_name",
         "vendor_name", "vendor_code", "worker_code", "worker_name",
         "business_type", "estimate_point", "source", "type_id",
     ]
