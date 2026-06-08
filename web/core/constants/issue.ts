@@ -587,6 +587,7 @@ export const ISSUE_ADDITIONAL_PROPERTIES: {
     { key: "hub_code", title: "Hub Code" },
     { key: "hub_name", title: "Hub Name" },
     { key: "customer_code", title: "Customer Code" },
+    { key: "customer_category", title: "Customer Category" },
     { key: "customer_name", title: "Customer Name" },
     { key: "vendor_code", title: "Vendor Code" },
     { key: "vendor_name", title: "Vendor Name" },
