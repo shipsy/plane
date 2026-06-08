@@ -405,6 +405,7 @@
   "set_estimate_point_to": "set the estimate point to ",
   "removed_estimate_point": "removed the estimate point ",
   "to": "to",
+  "set": "set",
   "set_parent_to": "set the parent to ",
   "removed_parent": "removed the parent ",
   "marked_blocking_issue": "marked this issue is blocking issue ",
