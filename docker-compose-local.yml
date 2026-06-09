@@ -24,7 +24,7 @@ services:
       - 9090:9090
 
   plane-db:
-    image: postgres:15.7-alpine
+    image: postgres:17-alpine
     restart: unless-stopped
     networks:
       - dev_env
