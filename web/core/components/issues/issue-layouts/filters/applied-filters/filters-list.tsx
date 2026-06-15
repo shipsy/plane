@@ -90,6 +90,14 @@ export const AppliedFiltersList: React.FC<Props> = observer((props) => {
                 values={value}
               />
             )}
+            {filterKey === "ticket_type_name" && (
+              <AppliedLabelsFilters
+                editable={isEditingAllowed}
+                handleRemove={(val) => handleRemoveFilter("ticket_type_name", val)}
+                labels={labels}
+                values={value}
+              />
+            )}
             {filterKey === "priority" && (
               <AppliedPriorityFilters
                 editable={isEditingAllowed}

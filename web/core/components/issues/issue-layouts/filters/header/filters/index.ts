@@ -12,3 +12,4 @@ export * from "./cycle";
 export * from "./module";
 export * from "./target-date";
 export * from "./additional-properties";
+export * from "./ticket-type-name";

@@ -364,6 +364,7 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
         "trip_reference_number",
         "reference_number",
         "custom_properties",
+        "ticket_type_name",
       ],
       display_properties: ISSUE_DISPLAY_PROPERTIES_KEYS,
       display_filters: {
@@ -423,7 +424,8 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
         "business_type",
         "trip_reference_number",
         "reference_number",
-        "custom_properties"
+        "custom_properties",
+        "ticket_type_name"
       ],
       display_properties: ISSUE_DISPLAY_PROPERTIES_KEYS,
       display_filters: {
@@ -510,7 +512,8 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
         "business_type",
         "trip_reference_number",
         "reference_number",
-        "custom_properties"
+        "custom_properties",
+        "ticket_type_name"
       ],
       display_properties: ISSUE_DISPLAY_PROPERTIES_KEYS,
       display_filters: {

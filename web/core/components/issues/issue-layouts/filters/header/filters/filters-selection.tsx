@@ -20,6 +20,7 @@ import {
   FilterCycle,
   FilterModule,
   FilterIssueGrouping,
+  FilterTicketTypeName,
 } from "@/components/issues";
 // constants
 import { ILayoutDisplayFiltersOptions, ISSUE_ADDITIONAL_PROPERTIES } from "@/constants/issue";
@@ -197,6 +198,18 @@ export const FilterSelection: React.FC<Props> = observer((props) => {
               appliedFilters={filters.labels ?? null}
               handleUpdate={(val) => handleFiltersUpdate("labels", val)}
               labels={labels}
+              searchQuery={filtersSearchQuery}
+            />
+          </div>
+        )}
+
+        {/* ticket type name */}
+        {isFilterEnabled("ticket_type_name") && (
+          <div className="py-2">
+            <FilterTicketTypeName
+              appliedFilters={filters.ticket_type_name ?? null}
+              handleUpdate={(val) => handleFiltersUpdate("ticket_type_name", val)}
+              ticketTypes={labels}
               searchQuery={filtersSearchQuery}
             />
           </div>

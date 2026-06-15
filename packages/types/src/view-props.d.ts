@@ -122,6 +122,7 @@ export type TIssueParams =
   | "hub_code"
   | "hub_name"
   | "business_type"
+  | "ticket_type_name"
 
 export type TCalendarLayouts = "month" | "week";
 
@@ -153,6 +154,7 @@ export interface IIssueFilterOptions {
   vendor_name?: string[] | null;
   business_type?: string[] | null;
   custom_properties?: string[] | null;
+  ticket_type_name?: string[] | null;
 }
 
 export interface IIssueDisplayFilterOptions {

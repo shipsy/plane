@@ -116,6 +116,7 @@ export class IssueFilterHelperStore implements IIssueFilterHelperStore {
       vendor_name: filters?.vendor_name || undefined,
       business_type: filters?.business_type || undefined,
       reference_number: filters?.reference_number || undefined,
+      ticket_type_name: filters?.ticket_type_name || undefined,
     };
 
     const issueFiltersParams: Partial<Record<TIssueParams, boolean | string>> = {};
@@ -169,6 +170,7 @@ export class IssueFilterHelperStore implements IIssueFilterHelperStore {
     vendor_name: filters?.vendor_name || null,
     business_type: filters?.business_type || null,
     reference_number: filters?.reference_number || null,
+    ticket_type_name: filters?.ticket_type_name || null,
   });
 
   /**
