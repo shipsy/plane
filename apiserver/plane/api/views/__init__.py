@@ -16,7 +16,11 @@ from .issue import (
     IssueCustomPropertyUpdateAPIView,
     IssueBulkUpdateAPIEndpoint,
 )
-from .issue_type import IssueTypeAPIEndpoint,IssueTypeCustomPropertyAPIEndpoint
+from .issue_type import (
+    IssueTypeAPIEndpoint,
+    IssueTypeCustomPropertyAPIEndpoint,
+    IssueTypeWithPropertiesAPIEndpoint,
+)
 from .attachment import IssueAttachmentV2Endpoint
 from .cycle import (
     CycleAPIEndpoint,
