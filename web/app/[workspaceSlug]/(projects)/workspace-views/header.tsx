@@ -18,7 +18,7 @@ import { EIssueFilterType, EIssuesStoreType, ISSUE_DISPLAY_FILTERS_BY_LAYOUT } f
 // helpers
 import { isIssueFilterActive } from "@/helpers/filter.helper";
 // hooks
-import { useLabel, useMember, useIssues, useGlobalView } from "@/hooks/store";
+import { useLabel, useMember, useIssues, useGlobalView, useProjectState } from "@/hooks/store";
 
 export const GlobalIssuesHeader = observer(() => {
   const { t } = useTranslation();
@@ -32,6 +32,7 @@ export const GlobalIssuesHeader = observer(() => {
   } = useIssues(EIssuesStoreType.GLOBAL);
   const { getViewDetailsById } = useGlobalView();
   const { workspaceLabels } = useLabel();
+  const { workspaceStates } = useProjectState();
   const {
     workspace: { workspaceMemberIds },
   } = useMember();
@@ -126,6 +127,7 @@ export const GlobalIssuesHeader = observer(() => {
                   handleDisplayFiltersUpdate={handleDisplayFilters}
                   labels={workspaceLabels ?? undefined}
                   memberIds={workspaceMemberIds ?? undefined}
+                  states={workspaceStates}
                 />
               </FiltersDropdown>
               <FiltersDropdown title={t("display")} placement="bottom-end">
