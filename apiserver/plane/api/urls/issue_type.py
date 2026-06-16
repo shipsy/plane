@@ -8,14 +8,14 @@ from plane.api.views import (
 
 urlpatterns = [
     path(
-        "workspaces/<str:slug>/issue-type/",
-        IssueTypeAPIEndpoint.as_view(),
-        name="issue-type",
-    ),
-    path(
         "workspaces/<str:slug>/issue-type-setup/",
         IssueTypeWithPropertiesAPIEndpoint.as_view(),
         name="issue-type-setup",
+    ),
+    path(
+        "workspaces/<str:slug>/issue-type/",
+        IssueTypeAPIEndpoint.as_view(),
+        name="issue-type",
     ),
     path(
         "workspaces/<str:slug>/issue-type/<uuid:pk>/",

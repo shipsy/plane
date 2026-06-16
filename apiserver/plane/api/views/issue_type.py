@@ -1,8 +1,7 @@
 import json
-import uuid
 
-from django.contrib.auth.hashers import make_password
 from django.core.serializers.json import DjangoJSONEncoder
+
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError as DjangoValidationError
 
@@ -32,13 +31,14 @@ from rest_framework.exceptions import ValidationError # Added import
 # Module imports
 from plane.api.serializers import (
     IssueTypeSerializer,
-    IssueTypeCustomPropertySerializer
+    IssueTypeCustomPropertySerializer,
+    UserLiteSerializer,
 )
+from plane.api.views.member import ProjectMemberAPIEndpoint
 from plane.app.permissions import (
     ProjectLitePermission,
 )
 from plane.bgtasks.issue_activities_task import issue_activity
-from plane.api.serializers import UserLiteSerializer
 from plane.db.models import (
     Workspace,
     IssueType,
@@ -287,7 +287,7 @@ class IssueTypeCustomPropertyAPIEndpoint(BaseAPIView):
 class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
     """
     Idempotent, atomic setup of an issue type together with its custom
-    properties AND the project members (assignees) it needs.
+    properties and the project members (assignees) it needs.
 
     POST body:
     {
@@ -297,24 +297,18 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
         "is_epic": false,                       # optional
         "level": 0,                             # optional
         "custom_properties": [                  # optional, list
-            {
-                "name": "SLA",                  # required per item
-                "value": {...},                 # required per item (JSON)
-                "data_type": "text",            # optional
-                "is_required": false,           # optional
-                "is_active": true               # optional
-            },
+            { "name": "SLA", "value": {...},
+              "data_type": "text",
+              "is_required": false,
+              "is_active": true },
             ...
         ],
         "project_id": "DEFAULT",                # optional, project identifier
-                                                # (defaults to "DEFAULT")
         "assignees": [                          # optional, list
-            {
-                "email": "u@example.com",       # required per item
-                "first_name": "...",            # optional
-                "last_name": "...",             # optional
-                "display_name": "..."           # optional
-            },
+            { "email": "u@example.com",
+              "first_name": "...",
+              "last_name": "...",
+              "display_name": "..." },
             ...
         ]
     }
@@ -324,52 +318,40 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
         Missing → created.
       * Each custom property is looked up by (issue_type, name). Exists →
         reused. Missing → created.
-      * Each assignee is looked up by email. If the user / workspace
-        member / project member is missing, it is created.
-      * Issue type + properties + assignees all run inside a single
-        transaction. Any failure rolls the whole thing back — no orphan
-        issue type, no orphan properties, no orphan members.
+      * Each assignee is looked up by email. Missing User /
+        WorkspaceMember / ProjectMember rows are created via the existing
+        helpers on ProjectMemberAPIEndpoint (no code duplication).
+      * Everything runs inside a single transaction. Any failure rolls
+        the whole thing back — no orphan issue type, no orphan
+        properties, no orphan members.
       * Safe to retry. Re-posting the same payload returns the same IDs
         without raising 409.
-
-    Response: 200 if nothing new was created, 201 if anything was created.
-    Body shape:
-    {
-        "issue_type": { ...IssueTypeSerializer... },
-        "custom_properties": [ {...IssueTypeCustomPropertySerializer...}, ... ],
-        "assignees": [ {...UserLiteSerializer...}, ... ],
-        "created": {
-            "issue_type": bool,
-            "custom_properties": [<names created>],
-            "assignees": [<emails created>]
-        }
-    }
     """
 
     permission_classes = [ProjectLitePermission]
 
-    # ---- assignee helpers (mirror plane.api.views.member behavior) ----
+    # Single instance reused across calls — the create_* methods on
+    # ProjectMemberAPIEndpoint don't depend on self state, they're
+    # effectively static helpers we delegate to.
+    _member_helpers = ProjectMemberAPIEndpoint()
+
+    # ---- get-or-create wrappers around the existing helpers ----
 
     def _ensure_user(self, data):
-        """Get-or-create a User by email. Returns (user, created_bool)."""
+        """Get user by email; create via the existing helper if missing.
+        Returns (user, created_bool)."""
         email = data["email"].lower()
         user = User.objects.filter(email=email).first()
         if user:
             return user, False
-        user = User.objects.create(
-            email=email,
-            display_name=data.get("display_name") or "",
-            first_name=data.get("first_name", "") or "",
-            last_name=data.get("last_name", "") or "",
-            username=data.get("username") or uuid.uuid4().hex,
-            password=make_password(uuid.uuid4().hex),
-            is_password_autoset=False,
-            is_active=True,
-            hub_codes=data.get("hub_codes", []) or [],
-        )
+        # Delegate to the existing create helper rather than duplicating.
+        user = self._member_helpers.create_user({**data, "email": email})
         return user, True
 
     def _ensure_profile(self, user, workspace):
+        """Profile setup mirrors what ProjectMemberAPIEndpoint.post does
+        inline. There is no extractable helper for this in member.py, so
+        we keep the logic here."""
         profile, created = Profile.objects.get_or_create(user=user)
         if created:
             profile.last_workspace_id = workspace.id
@@ -388,9 +370,11 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
         ).first()
         if wm:
             return wm
-        return WorkspaceMember.objects.create(
-            workspace_id=workspace.id, member=user, role=role
+        # Delegate to the existing helper.
+        self._member_helpers.create_workspace_member(
+            workspace.id, user, role=role
         )
+        return WorkspaceMember.objects.get(workspace=workspace, member=user)
 
     def _ensure_project_member(self, project, user, role=15):
         pm = ProjectMember.objects.filter(
@@ -398,9 +382,13 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
         ).first()
         if pm:
             return pm
-        return ProjectMember.objects.create(
-            project_id=project.id, member=user, role=role
+        # Delegate to the existing helper.
+        self._member_helpers.create_project_member(
+            project.id, user, role=role
         )
+        return ProjectMember.objects.get(project=project, member=user)
+
+    # ---- main entry point ----
 
     def post(self, request, slug):
         name = (request.data.get("name") or "").strip()
@@ -424,9 +412,6 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
                 {"error": "`custom_properties` must be a list."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        # Validate each property up-front so we don't open a transaction
-        # only to bail out mid-way.
         for idx, prop in enumerate(properties_payload):
             if not isinstance(prop, dict):
                 return Response(
@@ -444,7 +429,6 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # ---- assignees: same up-front validation ----
         assignees_payload = request.data.get("assignees") or []
         if not isinstance(assignees_payload, list):
             return Response(
@@ -471,10 +455,11 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-        # Resolve project (used only if assignees are provided). Accepts
-        # either a Project.identifier (e.g. "DEFAULT") or a UUID pk —
-        # matches what the existing /projects/<project_id>/members/
-        # endpoint accepts.
+        # Resolve project (only needed if assignees are provided). Accepts
+        # an `identifier` (e.g. "DEFAULT") or a UUID pk. Falls back to the
+        # first project in the workspace so callers don't have to know
+        # exact identifiers — matches the spirit of the old /projects/
+        # DEFAULT/members/ flow which would silently fail anyway.
         project = None
         if assignees_payload:
             project_identifier = request.data.get("project_id") or "DEFAULT"
@@ -483,7 +468,6 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
                 identifier=str(project_identifier).upper(),
             ).first()
             if project is None:
-                # Try UUID pk lookup as a fallback.
                 try:
                     project = Project.objects.filter(
                         workspace=workspace, pk=project_identifier
@@ -491,8 +475,13 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
                 except (ValueError, DjangoValidationError):
                     project = None
             if project is None:
+                # Last-ditch fallback: take the workspace's first project.
+                project = Project.objects.filter(
+                    workspace=workspace
+                ).order_by("created_at").first()
+            if project is None:
                 return Response(
-                    {"error": f"Project '{project_identifier}' not found in workspace."},
+                    {"error": f"No project found in workspace to attach assignees to."},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
@@ -507,14 +496,14 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
         created_issue_type = False
         created_property_names = []
         created_assignee_emails = []
+        final_props = []
         final_assignees = []
 
         try:
             with transaction.atomic():
-                # Lock any existing row by (workspace, name) so two concurrent
-                # callers can't both think they're the creator. IssueType has
-                # no DB-level uniqueness on (workspace, name) — the lock +
-                # re-check is what makes get-or-create safe here.
+                # ---- Issue type: get-or-create by (workspace, name).
+                # select_for_update locks any existing row so concurrent
+                # callers can't both think they're the creator.
                 existing = (
                     IssueType.objects
                     .select_for_update()
@@ -539,16 +528,13 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
                     issue_type.save(update_fields=["created_by"])
                     created_issue_type = True
 
-                # Properties: get-or-create per name. The DB-level unique
-                # constraint on (issue_type, name) where deleted_at IS NULL
-                # makes this race-safe.
+                # ---- Custom properties: get-or-create per name.
                 existing_props = {
                     p.name: p
                     for p in IssueTypeCustomProperty.objects.filter(
                         issue_type=issue_type
                     )
                 }
-                final_props = []
                 for prop in properties_payload:
                     pname = prop["name"].strip()
                     if pname in existing_props:
@@ -565,8 +551,7 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
                         context={"issue_type_id": issue_type.id},
                     )
                     if not prop_serializer.is_valid():
-                        # Raising forces rollback of the whole atomic block —
-                        # including the freshly-created issue type, if any.
+                        # Raising forces rollback of the whole atomic block.
                         raise ValidationError({
                             "custom_property": pname,
                             "errors": prop_serializer.errors,
@@ -579,13 +564,8 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
                     )
                     created_property_names.append(pname)
 
-                # ---- Assignees: get-or-create User + WorkspaceMember +
-                # ProjectMember for each. Anything created here is rolled
-                # back if a later step in this transaction fails. Members
-                # are re-created idempotently on retry, so rollback is safe.
+                # ---- Assignees: delegate to the existing member helpers.
                 if assignees_payload:
-                    # Lock to keep concurrent calls from racing on the
-                    # same email.
                     existing_pm_user_ids = set(
                         ProjectMember.objects
                         .select_for_update()
@@ -594,7 +574,9 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
                     )
                     for a in assignees_payload:
                         email = a["email"].strip().lower()
-                        user, user_created = self._ensure_user({**a, "email": email})
+                        user, user_created = self._ensure_user(
+                            {**a, "email": email}
+                        )
                         self._ensure_profile(user, workspace)
                         self._ensure_workspace_member(workspace, user)
                         if user.id not in existing_pm_user_ids:
@@ -602,8 +584,6 @@ class IssueTypeWithPropertiesAPIEndpoint(BaseAPIView):
                             existing_pm_user_ids.add(user.id)
                             created_assignee_emails.append(email)
                         elif user_created:
-                            # New user but already had a PM row (shouldn't
-                            # happen, but stay safe).
                             created_assignee_emails.append(email)
                         final_assignees.append(user)
         except ValidationError as exc:
