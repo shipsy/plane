@@ -656,6 +656,27 @@ def track_closed_to(
         )
 
 
+def make_text_field_tracker(field_name):
+    label = field_name.replace("_", " ")
+    def tracker(requested_data, current_instance, issue_id, project_id, workspace_id, actor_id, issue_activities, epoch):
+        if current_instance.get(field_name) != requested_data.get(field_name):
+            issue_activities.append(
+                IssueActivity(
+                    issue_id=issue_id,
+                    actor_id=actor_id,
+                    verb="updated",
+                    old_value=current_instance.get(field_name),
+                    new_value=requested_data.get(field_name),
+                    field=field_name,
+                    project_id=project_id,
+                    workspace_id=workspace_id,
+                    comment=f"updated the {label} to",
+                    epoch=epoch,
+                )
+            )
+    return tracker
+
+
 def create_issue_activity(
     requested_data,
     current_instance,
@@ -721,6 +742,7 @@ def update_issue_activity(
         "estimate_point": track_estimate_points,
         "archived_at": track_archive_at,
         "closed_to": track_closed_to,
+        "customer_category": make_text_field_tracker("customer_category"),
     }
 
     requested_data = (

@@ -27,6 +27,7 @@ import {
   IssueArchivedAtActivity,
   IssueInboxActivity,
   IssueCustomPropertyActivity,
+  IssueTextFieldActivity,
 } from "./actions";
 
 type TIssueActivityItem = {
@@ -93,6 +94,8 @@ export const IssueActivityItem: FC<TIssueActivityItem> = observer((props) => {
       return <IssueInboxActivity {...componentDefaultProps} />;
     case "type":
       return <IssueTypeActivity {...componentDefaultProps} />;
+    case "customer_category":
+      return <IssueTextFieldActivity {...componentDefaultProps} />;
     default:
       return <></>;
   }
