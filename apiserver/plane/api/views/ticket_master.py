@@ -137,7 +137,13 @@ class TicketMasterAPIEndpoint(BaseAPIView):
                 errors.append({"index": index, "errors": serializer.errors})
                 continue
             try:
-                serializer.save()
+                # Savepoint per row: a caught IntegrityError rolls back only
+                # this INSERT and leaves the outer atomic() block usable.
+                # Without this, Postgres aborts the whole transaction on the
+                # first integrity error and every subsequent query raises
+                # TransactionManagementError, which would escape to a 500.
+                with transaction.atomic():
+                    serializer.save()
             except IntegrityError as exc:
                 if "already exists" in str(exc) or "unique" in str(exc).lower():
                     errors.append(
@@ -185,48 +191,52 @@ class TicketMasterAPIEndpoint(BaseAPIView):
                 errors.append({"index": index, "email": "Invalid email provided"})
                 continue
 
-            user = User.objects.filter(email=email).first()
+            # Savepoint per assignee so a per-row failure rolls back only this
+            # assignee's writes (user / profile / memberships) without
+            # poisoning the outer atomic() block.
+            with transaction.atomic():
+                user = User.objects.filter(email=email).first()
 
-            if not user:
-                user = member_helper.create_user(
-                    {
-                        "email": email,
-                        "display_name": assignee.get("display_name"),
-                        "first_name": assignee.get("first_name", ""),
-                        "last_name": assignee.get("last_name", ""),
-                        "role": assignee.get("role", 15),
-                        "hub_codes": assignee.get("hub_codes") or [],
-                        "username": assignee.get("username"),
-                    }
-                )
-                profile, _ = Profile.objects.get_or_create(user=user)
-                profile.last_workspace_id = workspace.id
-                profile.onboarding_step.update(
-                    {"profile_complete": True, "workspace_join": True}
-                )
-                profile.is_tour_completed = True
-                profile.is_onboarded = True
-                profile.company_name = workspace.name
-                profile.save()
-            elif assignee.get("hub_codes") is not None:
-                user.hub_codes = assignee.get("hub_codes")
-                user.save(update_fields=["hub_codes"])
+                if not user:
+                    user = member_helper.create_user(
+                        {
+                            "email": email,
+                            "display_name": assignee.get("display_name"),
+                            "first_name": assignee.get("first_name", ""),
+                            "last_name": assignee.get("last_name", ""),
+                            "role": assignee.get("role", 15),
+                            "hub_codes": assignee.get("hub_codes") or [],
+                            "username": assignee.get("username"),
+                        }
+                    )
+                    profile, _ = Profile.objects.get_or_create(user=user)
+                    profile.last_workspace_id = workspace.id
+                    profile.onboarding_step.update(
+                        {"profile_complete": True, "workspace_join": True}
+                    )
+                    profile.is_tour_completed = True
+                    profile.is_onboarded = True
+                    profile.company_name = workspace.name
+                    profile.save()
+                elif assignee.get("hub_codes") is not None:
+                    user.hub_codes = assignee.get("hub_codes")
+                    user.save(update_fields=["hub_codes"])
 
-            if not WorkspaceMember.objects.filter(
-                workspace=workspace, member=user
-            ).exists():
-                member_helper.create_workspace_member(
-                    workspace.id, user, role=assignee.get("role", 15)
-                )
+                if not WorkspaceMember.objects.filter(
+                    workspace=workspace, member=user
+                ).exists():
+                    member_helper.create_workspace_member(
+                        workspace.id, user, role=assignee.get("role", 15)
+                    )
 
-            if not ProjectMember.objects.filter(
-                project=project, member=user
-            ).exists():
-                member_helper.create_project_member(
-                    project.id, user, role=assignee.get("role", 15)
-                )
-            # "Already a project member" is a silent no-op here — not a 400 —
-            # because for the n8n flow this is the normal case.
+                if not ProjectMember.objects.filter(
+                    project=project, member=user
+                ).exists():
+                    member_helper.create_project_member(
+                        project.id, user, role=assignee.get("role", 15)
+                    )
+                # "Already a project member" is a silent no-op here — not a
+                # 400 — because for the n8n flow this is the normal case.
 
             resolved.append(UserLiteSerializer(user).data)
 
