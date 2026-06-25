@@ -14,7 +14,7 @@ from plane.api.serializers import (
     IssueTypeCustomPropertySerializer,
     UserLiteSerializer,
 )
-from plane.app.permissions import ProjectLitePermission
+from plane.app.permissions import ProjectMemberPermission
 from plane.db.models import (
     IssueType,
     Profile,
@@ -40,7 +40,7 @@ class TicketMasterAPIEndpoint(BaseAPIView):
       3) GET + POST /workspaces/<slug>/projects/<id>/members/        (1 + M times)
     """
 
-    permission_classes = [ProjectLitePermission]
+    permission_classes = [ProjectMemberPermission]
 
     def post(self, request, slug, project_id):
         issue_type_data = request.data.get("issue_type") or {}
@@ -175,21 +175,40 @@ class TicketMasterAPIEndpoint(BaseAPIView):
         if not assignees:
             return []
 
-        member_helper = ProjectMemberAPIEndpoint()
-        resolved = []
-        errors = []
-
+        # Pre-validate every email up front so we never start a write loop
+        # we already know is going to be rolled back. Cheaper than letting
+        # the writes happen and relying on the outer atomic() to undo them.
+        validation_errors = []
+        normalized = []
         for index, assignee in enumerate(assignees):
             raw_email = assignee.get("email")
             if not raw_email:
-                errors.append({"index": index, "email": "This field is required"})
+                validation_errors.append(
+                    {"index": index, "email": "This field is required"}
+                )
+                normalized.append(None)
                 continue
             email = raw_email.lower()
             try:
                 validate_email(email)
             except DjangoValidationError:
-                errors.append({"index": index, "email": "Invalid email provided"})
+                validation_errors.append(
+                    {"index": index, "email": "Invalid email provided"}
+                )
+                normalized.append(None)
                 continue
+            normalized.append(email)
+
+        if validation_errors:
+            raise _TicketMasterError(
+                status.HTTP_400_BAD_REQUEST,
+                {"error": "Invalid assignees", "details": validation_errors},
+            )
+
+        resolved = []
+
+        for index, assignee in enumerate(assignees):
+            email = normalized[index]
 
             # Savepoint per assignee so a per-row failure rolls back only this
             # assignee's writes (user / profile / memberships) without
@@ -198,7 +217,7 @@ class TicketMasterAPIEndpoint(BaseAPIView):
                 user = User.objects.filter(email=email).first()
 
                 if not user:
-                    user = member_helper.create_user(
+                    user = ProjectMemberAPIEndpoint.create_user(
                         {
                             "email": email,
                             "display_name": assignee.get("display_name"),
@@ -225,14 +244,14 @@ class TicketMasterAPIEndpoint(BaseAPIView):
                 if not WorkspaceMember.objects.filter(
                     workspace=workspace, member=user
                 ).exists():
-                    member_helper.create_workspace_member(
+                    ProjectMemberAPIEndpoint.create_workspace_member(
                         workspace.id, user, role=assignee.get("role", 15)
                     )
 
                 if not ProjectMember.objects.filter(
                     project=project, member=user
                 ).exists():
-                    member_helper.create_project_member(
+                    ProjectMemberAPIEndpoint.create_project_member(
                         project.id, user, role=assignee.get("role", 15)
                     )
                 # "Already a project member" is a silent no-op here — not a
@@ -240,11 +259,6 @@ class TicketMasterAPIEndpoint(BaseAPIView):
 
             resolved.append(UserLiteSerializer(user).data)
 
-        if errors:
-            raise _TicketMasterError(
-                status.HTTP_400_BAD_REQUEST,
-                {"error": "Invalid assignees", "details": errors},
-            )
         return resolved
 
 

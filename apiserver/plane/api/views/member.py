@@ -296,7 +296,8 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def create_user(self, data):
+    @staticmethod
+    def create_user(data):
         user = User.objects.create(
             email=data.get("email"),
             display_name=data.get("display_name"),
@@ -310,7 +311,8 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
         )
         return user
 
-    def create_workspace_member(self, workspace_id, user, role=15):
+    @staticmethod
+    def create_workspace_member(workspace_id, user, role=15):
         # Create a workspace member for the user if not already a member
         workspace_member = WorkspaceMember.objects.create(
             workspace_id=workspace_id,
@@ -319,7 +321,8 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
         )
         workspace_member.save()
 
-    def create_project_member(self, project_id, user, role=15):
+    @staticmethod
+    def create_project_member(project_id, user, role=15):
         # Create a project member for the user if not already a member
         project_member = ProjectMember.objects.create(
             project_id=project_id,
