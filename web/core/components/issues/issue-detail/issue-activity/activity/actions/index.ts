@@ -9,6 +9,8 @@ export * from "./parent";
 export * from "./relation";
 export * from "./start_date";
 export * from "./target_date";
+export * from "./start_date_time";
+export * from "./target_date_time";
 export * from "./cycle";
 export * from "./module";
 export * from "./label";
@@ -18,6 +20,7 @@ export * from "./archived-at";
 export * from "./inbox";
 export * from "./label-activity-chip";
 export * from "./custom-properties";
+export * from "./text-field";
 
 // helpers
 export * from "./helpers/activity-block";

@@ -84,10 +84,10 @@ def resolve_update_values(updates, workspace_id, project_id):
             m2m_updates['remove_assignees'] = user_ids
 
     scalar_fields = (
-        'priority', 'vendor_code', 'hub_code', 'customer_code', 'worker_code',
+        'priority', 'vendor_code', 'hub_code', 'customer_code', 'customer_category', 'worker_code',
         'reference_number', 'trip_reference_number', 'hub_name', 'customer_name',
         'vendor_name', 'worker_name', 'business_type', 'source', 'name',
-        'start_date', 'target_date'
+        'start_date', 'target_date', 'start_date_time', 'target_date_time'
     )
     scalar_updates.update({f: updates[f] for f in scalar_fields if f in updates})
 

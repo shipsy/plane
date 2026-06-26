@@ -17,6 +17,8 @@ import {
   IssueRelationActivity,
   IssueStartDateActivity,
   IssueTargetDateActivity,
+  IssueStartDateTimeActivity,
+  IssueTargetDateTimeActivity,
   IssueCycleActivity,
   IssueModuleActivity,
   IssueLabelActivity,
@@ -25,6 +27,7 @@ import {
   IssueArchivedAtActivity,
   IssueInboxActivity,
   IssueCustomPropertyActivity,
+  IssueTextFieldActivity,
 } from "./actions";
 
 type TIssueActivityItem = {
@@ -71,6 +74,10 @@ export const IssueActivityItem: FC<TIssueActivityItem> = observer((props) => {
       return <IssueStartDateActivity {...componentDefaultProps} showIssue={false} />;
     case "target_date":
       return <IssueTargetDateActivity {...componentDefaultProps} showIssue={false} />;
+    case "start_date_time":
+      return <IssueStartDateTimeActivity {...componentDefaultProps} showIssue={false} />;
+    case "target_date_time":
+      return <IssueTargetDateTimeActivity {...componentDefaultProps} showIssue={false} />;
     case "cycles":
       return <IssueCycleActivity {...componentDefaultProps} />;
     case "modules":
@@ -87,6 +94,8 @@ export const IssueActivityItem: FC<TIssueActivityItem> = observer((props) => {
       return <IssueInboxActivity {...componentDefaultProps} />;
     case "type":
       return <IssueTypeActivity {...componentDefaultProps} />;
+    case "customer_category":
+      return <IssueTextFieldActivity {...componentDefaultProps} />;
     default:
       return <></>;
   }

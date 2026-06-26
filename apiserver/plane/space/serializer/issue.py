@@ -253,6 +253,8 @@ class IssueFlatSerializer(BaseSerializer):
             "priority",
             "start_date",
             "target_date",
+            "start_date_time",
+            "target_date_time",
             "sequence_id",
             "sort_order",
             "is_draft",

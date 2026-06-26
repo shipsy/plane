@@ -331,6 +331,19 @@ export const getCurrentDateTimeInISO = () => {
 };
 
 /**
+ * Converts a UTC ISO datetime string to a local "YYYY-MM-DDTHH:mm" value
+ * suitable for an <input type="datetime-local"> control.
+ * Returns an empty string for nullish input.
+ */
+export const toDateTimeLocalInputValue = (iso: string | null | undefined): string => {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return "";
+  const tzOffsetMs = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - tzOffsetMs).toISOString().slice(0, 16);
+};
+
+/**
  * @description converts hours and minutes to minutes
  * @param { number } hours
  * @param { number } minutes

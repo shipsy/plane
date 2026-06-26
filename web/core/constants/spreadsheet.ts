@@ -34,6 +34,7 @@ import {
   SpreadsheetSubIssueColumn,
   SpreadsheetUpdatedOnColumn,
   SpreadsheetStandardPropertyColumn,
+  SpreadsheetDateTimePropertyColumn,
 } from "@/components/issues/issue-layouts/spreadsheet";
 
 export const SPREADSHEET_PROPERTY_DETAILS: {
@@ -224,6 +225,15 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     icon: Tags,
     Column: SpreadsheetStandardPropertyColumn,
   },
+  customer_category: {
+    title: "customer_category",
+    ascendingOrderKey: "customer_category",
+    ascendingOrderTitle: "A",
+    descendingOrderKey: "-customer_category",
+    descendingOrderTitle: "Z",
+    icon: Tags,
+    Column: SpreadsheetStandardPropertyColumn,
+  },
   customer_name: {
     title: "customer_name",
     ascendingOrderKey: "customer_name",
@@ -278,6 +288,24 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     icon: Tags,
     Column: SpreadsheetStandardPropertyColumn,
   },
+  start_date_time: {
+    title: "Start date time",
+    ascendingOrderKey: "-start_date_time",
+    ascendingOrderTitle: "New",
+    descendingOrderKey: "start_date_time",
+    descendingOrderTitle: "Old",
+    icon: CalendarClock,
+    Column: SpreadsheetDateTimePropertyColumn,
+  },
+  target_date_time: {
+    title: "Due date time",
+    ascendingOrderKey: "-target_date_time",
+    ascendingOrderTitle: "New",
+    descendingOrderKey: "target_date_time",
+    descendingOrderTitle: "Old",
+    icon: CalendarCheck2,
+    Column: SpreadsheetDateTimePropertyColumn,
+  },
 };
 
 export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [
@@ -289,6 +317,8 @@ export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [
   "cycle",
   "start_date",
   "due_date",
+  "start_date_time",
+  "target_date_time",
   "estimate",
   "created_on",
   "updated_on",
@@ -300,6 +330,7 @@ export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [
   "hub_code",
   "hub_name",
   "customer_code",
+  "customer_category",
   "customer_name",
   "vendor_name",
   "vendor_code",

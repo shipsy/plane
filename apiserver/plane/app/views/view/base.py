@@ -216,12 +216,12 @@ class WorkspaceViewIssuesViewSet(BaseViewSet):
     # Fields fetched in Phase 2 (includes annotated counts).
     DETAIL_FIELDS = [
         "id", "name", "state_id", "sort_order", "completed_at",
-        "priority", "start_date", "target_date", "sequence_id",
+        "priority", "start_date", "target_date", "start_date_time", "target_date_time", "sequence_id",
         "project_id", "parent_id", "sub_issues_count",
         "created_at", "updated_at", "created_by", "updated_by",
         "attachment_count", "link_count", "is_draft", "archived_at",
         "state__group", "trip_reference_number", "reference_number",
-        "hub_code", "hub_name", "customer_code", "customer_name",
+        "hub_code", "hub_name", "customer_code", "customer_category", "customer_name",
         "vendor_name", "vendor_code", "worker_code", "worker_name",
         "business_type", "estimate_point", "source", "type_id",
     ]
