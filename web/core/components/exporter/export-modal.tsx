@@ -11,7 +11,6 @@ import { IUser, IImporterService } from "@plane/types";
 import { Button, CustomSearchSelect, TOAST_TYPE, setToast } from "@plane/ui";
 // hooks
 import { useProject, useUser } from "@/hooks/store";
-import { useAppRouter } from "@/hooks/use-app-router";
 // services
 import { ProjectExportService } from "@/services/project";
 type Props = {
@@ -21,17 +20,17 @@ type Props = {
   user: IUser | null;
   provider: string | string[];
   mutateServices: () => void;
+  filterParams?: Record<string, any>;
 };
 
 const projectExportService = new ProjectExportService();
 
 export const Exporter: React.FC<Props> = observer((props) => {
-  const { isOpen, handleClose, user, provider, mutateServices } = props;
+  const { isOpen, handleClose, user, provider, mutateServices, filterParams } = props;
   // states
   const [exportLoading, setExportLoading] = useState(false);
   const [isSelectOpen, setIsSelectOpen] = useState(false);
   // router
-  const router = useAppRouter();
   const { workspaceSlug } = useParams();
   // store hooks
   const { workspaceProjectIds, getProjectById } = useProject();
@@ -69,28 +68,24 @@ export const Exporter: React.FC<Props> = observer((props) => {
         project: value,
         multiple: multiple,
       };
-      await projectExportService
-        .csvExport(workspaceSlug as string, payload)
-        .then(() => {
-          mutateServices();
-          router.push(`/${workspaceSlug}/settings/exports`);
-          setExportLoading(false);
-          setToast({
-            type: TOAST_TYPE.SUCCESS,
-            title: "Export Successful",
-            message: `You will be able to download the exported ${
-              provider === "csv" ? "CSV" : provider === "xlsx" ? "Excel" : provider === "json" ? "JSON" : ""
-            } from the previous export.`,
-          });
-        })
-        .catch(() => {
-          setExportLoading(false);
-          setToast({
-            type: TOAST_TYPE.ERROR,
-            title: "Error!",
-            message: "Export was unsuccessful. Please try again.",
-          });
+      try {
+        await projectExportService.csvExport(workspaceSlug as string, payload, filterParams);
+        mutateServices();
+        setExportLoading(false);
+        handleClose();
+        setToast({
+          type: TOAST_TYPE.SUCCESS,
+          title: "Export queued",
+          message: `Your CSV export is being prepared. You'll be able to download it from the export history once it's ready.`,
         });
+      } catch {
+        setExportLoading(false);
+        setToast({
+          type: TOAST_TYPE.ERROR,
+          title: "Error!",
+          message: "Export failed. Please try again.",
+        });
+      }
     }
   };
 
@@ -130,10 +125,7 @@ export const Exporter: React.FC<Props> = observer((props) => {
                 <div className="flex flex-col gap-6 gap-y-4 p-6">
                   <div className="flex w-full items-center justify-start gap-6">
                     <span className="flex items-center justify-start">
-                      <h3 className="text-xl font-medium 2xl:text-2xl">
-                        Export to{" "}
-                        {provider === "csv" ? "CSV" : provider === "xlsx" ? "Excel" : provider === "json" ? "JSON" : ""}
-                      </h3>
+                      <h3 className="text-xl font-medium 2xl:text-2xl">Export to CSV</h3>
                     </span>
                   </div>
                   <div>

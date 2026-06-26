@@ -11,6 +11,7 @@ import { useTranslation } from "@plane/i18n";
 import { Breadcrumbs, Button, Header } from "@plane/ui";
 // components
 import { BreadcrumbLink } from "@/components/common";
+import { WorkspaceExportsPopover } from "@/components/exporter";
 import { DisplayFiltersSelection, FiltersDropdown, FilterSelection } from "@/components/issues";
 import { CreateUpdateWorkspaceViewModal } from "@/components/workspace";
 // constants
@@ -141,6 +142,8 @@ export const GlobalIssuesHeader = observer(() => {
           ) : (
             <></>
           )}
+
+          <WorkspaceExportsPopover />
 
           <Button variant="primary" size="sm" onClick={() => setCreateViewModal(true)}>
           {t("add_view")}

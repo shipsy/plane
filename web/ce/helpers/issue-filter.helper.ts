@@ -11,6 +11,9 @@ export const shouldRenderDisplayProperty = (props: TShouldRenderDisplayProperty)
   const { key } = props;
   switch (key) {
     case "issue_type":
+    case "cycle":
+    case "modules":
+    case "estimate":
       return false;
     default:
       return true;
