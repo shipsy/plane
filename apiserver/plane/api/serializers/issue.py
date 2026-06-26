@@ -587,19 +587,19 @@ class IssueBulkUpdateSerializer(serializers.Serializer):
         "custom_properties", "created_at_ts", "updated_at_ts",
         # Character fields
         "trip_reference_number", "reference_number", "hub_code", "hub_name",
-        "customer_code", "customer_name", "vendor_name", "vendor_code",
+        "customer_code", "customer_category", "customer_name", "vendor_name", "vendor_code",
         "worker_code", "worker_name", "business_type", "source"
     }
     
     # Allowed update fields (scalar fields + special update fields)
     ALLOWED_UPDATE_FIELDS = {
         "add_assignees_by_username", "remove_assignees_by_username", "state_name", "priority",
-        "vendor_code", "hub_code", "customer_code", "worker_code",
+        "vendor_code", "hub_code", "customer_code", "customer_category", "worker_code",
         "reference_number", "trip_reference_number", "hub_name", "customer_name",
         "vendor_name", "worker_name", "business_type", "source", "name",
-        "start_date", "target_date"
+        "start_date", "target_date", "start_date_time", "target_date_time"
     }
-    
+
     def validate_filters(self, value):
         if not value or not isinstance(value, dict):
             raise serializers.ValidationError("Filters must be a non-empty dictionary")

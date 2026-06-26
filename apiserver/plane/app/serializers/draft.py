@@ -266,6 +266,8 @@ class DraftIssueSerializer(BaseSerializer):
             "priority",
             "start_date",
             "target_date",
+            "start_date_time",
+            "target_date_time",
             "project_id",
             "parent_id",
             "cycle_id",

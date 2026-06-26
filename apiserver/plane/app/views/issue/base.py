@@ -194,6 +194,8 @@ class IssueListEndpoint(BaseAPIView):
                 "priority",
                 "start_date",
                 "target_date",
+                "start_date_time",
+                "target_date_time",
                 "sequence_id",
                 "project_id",
                 "parent_id",
@@ -249,12 +251,12 @@ class IssueViewSet(BaseViewSet):
     # Fields fetched in Phase 2. cycle_id is absent — injected by _enrich_issues_with_relations.
     DETAIL_FIELDS = [
         "id", "name", "state_id", "sort_order", "completed_at",
-        "priority", "start_date", "target_date", "sequence_id",
+        "priority", "start_date", "target_date", "start_date_time", "target_date_time", "sequence_id",
         "project_id", "parent_id", "sub_issues_count",
         "created_at", "updated_at", "created_by", "updated_by",
         "attachment_count", "link_count", "is_draft", "archived_at",
         "state__group", "trip_reference_number", "reference_number",
-        "hub_code", "hub_name", "customer_code", "customer_name",
+        "hub_code", "hub_name", "customer_code", "customer_category", "customer_name",
         "vendor_name", "vendor_code", "worker_code", "worker_name",
         "business_type", "estimate_point", "source", "type_id",
     ]
@@ -1045,6 +1047,8 @@ class IssuePaginatedViewSet(BaseViewSet):
             "priority",
             "start_date",
             "target_date",
+            "start_date_time",
+            "target_date_time",
             "sequence_id",
             "project_id",
             "parent_id",
@@ -1278,6 +1282,8 @@ class IssueBulkUpdateDateEndpoint(BaseAPIView):
 
             start_date = update.get("start_date")
             target_date = update.get("target_date")
+            start_date_time = update.get("start_date_time")
+            target_date_time = update.get("target_date_time")
             validate_dates = self.validate_dates(
                 issue.start_date, issue.target_date, start_date, target_date
             )
@@ -1285,6 +1291,19 @@ class IssueBulkUpdateDateEndpoint(BaseAPIView):
                 return Response(
                     {
                         "message": "Start date cannot exceed target date",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            validate_datetimes = self.validate_dates(
+                issue.start_date_time,
+                issue.target_date_time,
+                start_date_time,
+                target_date_time,
+            )
+            if not validate_datetimes:
+                return Response(
+                    {
+                        "message": "Start date time cannot exceed target date time",
                     },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
@@ -1323,9 +1342,44 @@ class IssueBulkUpdateDateEndpoint(BaseAPIView):
                 issue.target_date = target_date
                 issues_to_update.append(issue)
 
+            if start_date_time:
+                issue_activity.delay(
+                    type="issue.activity.updated",
+                    requested_data=json.dumps(
+                        {"start_date_time": str(start_date_time)}
+                    ),
+                    current_instance=json.dumps(
+                        {"start_date_time": str(issue.start_date_time)}
+                    ),
+                    issue_id=str(issue_id),
+                    actor_id=str(request.user.id),
+                    project_id=str(project_id),
+                    epoch=epoch,
+                )
+                issue.start_date_time = start_date_time
+                issues_to_update.append(issue)
+
+            if target_date_time:
+                issue_activity.delay(
+                    type="issue.activity.updated",
+                    requested_data=json.dumps(
+                        {"target_date_time": str(target_date_time)}
+                    ),
+                    current_instance=json.dumps(
+                        {"target_date_time": str(issue.target_date_time)}
+                    ),
+                    issue_id=str(issue_id),
+                    actor_id=str(request.user.id),
+                    project_id=str(project_id),
+                    epoch=epoch,
+                )
+                issue.target_date_time = target_date_time
+                issues_to_update.append(issue)
+
         # Bulk update issues
         Issue.objects.bulk_update(
-            issues_to_update, ["start_date", "target_date"]
+            issues_to_update,
+            ["start_date", "target_date", "start_date_time", "target_date_time"],
         )
 
         return Response(
@@ -1338,7 +1392,7 @@ class SearchAPIEndpoint(BaseAPIView):
     webhook_event = "issue"
     def get(self, request, slug):
         
-        allowed_fields = ["hub_code", "hub_name", "worker_code", "worker_name", "reference_number", "trip_reference_number", "customer_code", "customer_name", "vendor_code", "vendor_name", "business_type"]
+        allowed_fields = ["hub_code", "hub_name", "worker_code", "worker_name", "reference_number", "trip_reference_number", "customer_code", "customer_category", "customer_name", "vendor_code", "vendor_name", "business_type"]
 
         field = request.GET.get("field")  # Get the single field value
         query = request.GET.get("query")
@@ -1408,7 +1462,7 @@ class SearchAPIEndpoint(BaseAPIView):
 
 class SearchSingleValueAPI(BaseAPIView):
     model = Issue
-    allowed_fields = ["hub_code", "trip_reference_number", "reference_number", "worker_code", "vendor_code", "customer_code", "business_type"]
+    allowed_fields = ["hub_code", "trip_reference_number", "reference_number", "worker_code", "vendor_code", "customer_code", "customer_category", "business_type"]
 
     def get(self, request, slug, project_id):
         # Extract query parameters (only one should be provided)

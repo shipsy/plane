@@ -51,6 +51,8 @@ class IssueFlatSerializer(BaseSerializer):
             "priority",
             "start_date",
             "target_date",
+            "start_date_time",
+            "target_date_time",
             "sequence_id",
             "sort_order",
             "is_draft",
@@ -132,6 +134,14 @@ class IssueCreateSerializer(BaseSerializer):
         ):
             raise serializers.ValidationError(
                 "Start date cannot exceed target date"
+            )
+        if (
+            data.get("start_date_time", None) is not None
+            and data.get("target_date_time", None) is not None
+            and data.get("start_date_time", None) > data.get("target_date_time", None)
+        ):
+            raise serializers.ValidationError(
+                "Start date time cannot exceed target date time"
             )
         return data
 
@@ -720,6 +730,7 @@ class IssueSerializer(DynamicBaseSerializer):
             "hub_code",
             "hub_name",
             "customer_code",
+            "customer_category",
             "customer_name",
             "vendor_name",
             "vendor_code",
@@ -730,6 +741,8 @@ class IssueSerializer(DynamicBaseSerializer):
             "priority",
             "start_date",
             "target_date",
+            "start_date_time",
+            "target_date_time",
             "sequence_id",
             "project_id",
             "parent_id",

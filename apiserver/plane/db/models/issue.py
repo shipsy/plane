@@ -82,6 +82,7 @@ def get_default_display_properties():
         "hub_code": True,
         "hub_name": True,
         "customer_code": True,
+        "customer_category": True,
         "customer_name": True,
         "vendor_name":True,
         "vendor_code":True,
@@ -148,6 +149,7 @@ class Issue(ProjectBaseModel):
     hub_code = models.CharField(max_length=255, blank=True, null=True)
     vendor_code = models.CharField(max_length=255, blank=True, null=True)
     customer_code = models.CharField(max_length=255, blank=True, null=True)
+    customer_category = models.CharField(max_length=255, blank=True, null=True)
     worker_code = models.CharField(max_length=255, blank=True, null=True)
     reference_number = models.CharField(max_length=255, blank=True, null=True)
     trip_reference_number = models.CharField(max_length=255, blank=True, null=True)
@@ -170,6 +172,8 @@ class Issue(ProjectBaseModel):
     )
     start_date = models.DateField(null=True, blank=True)
     target_date = models.DateField(null=True, blank=True)
+    start_date_time = models.DateTimeField(null=True, blank=True)
+    target_date_time = models.DateTimeField(null=True, blank=True)
     assignees = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         blank=True,

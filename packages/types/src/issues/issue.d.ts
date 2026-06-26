@@ -32,6 +32,8 @@ export type TBaseIssue = {
   updated_at: string;
   start_date: string | null;
   target_date: string | null;
+  start_date_time: string | null;
+  target_date_time: string | null;
   completed_at: string | null;
   archived_at: string | null;
 
@@ -62,6 +64,7 @@ export type TIssue = TBaseIssue & {
   hub_code?: string[] | null;
   worker_code?: string[] | null;
   customer_code?: string[] | null;
+  customer_category?: string[] | null;
   trip_reference_number?: string[] | null;
   reference_number?: string[] | null;
   vendor_code?: string[] | null;

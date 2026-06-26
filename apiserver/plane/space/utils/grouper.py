@@ -86,6 +86,8 @@ def issue_on_results(issues, group_by, sub_group_by):
         "priority",
         "start_date",
         "target_date",
+        "start_date_time",
+        "target_date_time",
         "sequence_id",
         "project_id",
         "parent_id",
@@ -264,6 +266,28 @@ def issue_group_values(field, slug, project_id=None, filters=dict):
             Issue.issue_objects.filter(workspace__slug=slug)
             .filter(**filters)
             .values_list("start_date", flat=True)
+            .distinct()
+        )
+        if project_id:
+            return list(queryset.filter(project_id=project_id))
+        else:
+            return list(queryset)
+    if field == "target_date_time":
+        queryset = (
+            Issue.issue_objects.filter(workspace__slug=slug)
+            .filter(**filters)
+            .values_list("target_date_time", flat=True)
+            .distinct()
+        )
+        if project_id:
+            return list(queryset.filter(project_id=project_id))
+        else:
+            return list(queryset)
+    if field == "start_date_time":
+        queryset = (
+            Issue.issue_objects.filter(workspace__slug=slug)
+            .filter(**filters)
+            .values_list("start_date_time", flat=True)
             .distinct()
         )
         if project_id:

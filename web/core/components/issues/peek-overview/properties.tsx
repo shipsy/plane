@@ -27,7 +27,7 @@ import {
 } from "@/components/issues";
 // helpers
 import { cn } from "@/helpers/common.helper";
-import { getDate, renderFormattedPayloadDate } from "@/helpers/date-time.helper";
+import { getDate, renderFormattedPayloadDate, toDateTimeLocalInputValue } from "@/helpers/date-time.helper";
 import { shouldHighlightIssueDueDate } from "@/helpers/issue.helper";
 import { useIssueDetail, useMember, useProject, useProjectState } from "@/hooks/store";
 // plane web components
@@ -240,6 +240,52 @@ export const PeekOverviewProperties: FC<IPeekOverviewProperties> = observer((pro
             clearIconClassName="h-3 w-3 hidden group-hover:inline !text-custom-text-100"
             // TODO: add this logic
             // showPlaceholderIcon
+          />
+        </div>
+
+        {/* start date time */}
+        <div className="flex w-full items-center gap-3 h-8">
+          <div className="flex items-center gap-1 w-1/4 flex-shrink-0 text-sm text-custom-text-300">
+            <CalendarClock className="h-4 w-4 flex-shrink-0" />
+            <span>{t("start_date_time") !== "start_date_time" ? t("start_date_time") : "Start date & time"}</span>
+          </div>
+          <input
+            type="datetime-local"
+            disabled={disabled}
+            value={toDateTimeLocalInputValue(issue.start_date_time)}
+            onChange={(e) => {
+              const val = e.target.value;
+              issueOperations.update(workspaceSlug, projectId, issueId, {
+                start_date_time: val ? new Date(val).toISOString() : null,
+              });
+            }}
+            className={cn(
+              "w-3/4 bg-transparent border-none outline-none text-sm",
+              issue.start_date_time ? "text-custom-text-100" : "text-custom-text-400"
+            )}
+          />
+        </div>
+
+        {/* target date time */}
+        <div className="flex w-full items-center gap-3 h-8">
+          <div className="flex items-center gap-1 w-1/4 flex-shrink-0 text-sm text-custom-text-300">
+            <CalendarCheck2 className="h-4 w-4 flex-shrink-0" />
+            <span>{t("target_date_time") !== "target_date_time" ? t("target_date_time") : "Due date & time"}</span>
+          </div>
+          <input
+            type="datetime-local"
+            disabled={disabled}
+            value={toDateTimeLocalInputValue(issue.target_date_time)}
+            onChange={(e) => {
+              const val = e.target.value;
+              issueOperations.update(workspaceSlug, projectId, issueId, {
+                target_date_time: val ? new Date(val).toISOString() : null,
+              });
+            }}
+            className={cn(
+              "w-3/4 bg-transparent border-none outline-none text-sm",
+              issue.target_date_time ? "text-custom-text-100" : "text-custom-text-400"
+            )}
           />
         </div>
 
