@@ -2,10 +2,16 @@ from django.urls import path
 
 from plane.api.views import (
     IssueTypeAPIEndpoint,
-    IssueTypeCustomPropertyAPIEndpoint
+    IssueTypeCustomPropertyAPIEndpoint,
+    TicketMasterAPIEndpoint,
 )
 
 urlpatterns = [
+    path(
+        "workspaces/<str:slug>/projects/<str:project_id>/ticket-master/",
+        TicketMasterAPIEndpoint.as_view(),
+        name="ticket-master",
+    ),
     path(
         "workspaces/<str:slug>/issue-type/",
         IssueTypeAPIEndpoint.as_view(),
