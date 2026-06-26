@@ -1,23 +1,82 @@
 # Python imports
 import csv
 import io
-import json
 import zipfile
 
 import boto3
 from botocore.client import Config
 
-# Third party imports
-from celery import shared_task
-
 # Django imports
 from django.conf import settings
+from django.db.models import Exists, F, Func, OuterRef, Q
 from django.utils import timezone
-from openpyxl import Workbook
 
 # Module imports
-from plane.db.models import ExporterHistory, Issue
+from plane.app.permissions import ROLE
+from plane.db.models import (
+    ExporterHistory,
+    FileAsset,
+    Issue,
+    IssueLink,
+    ProjectMember,
+    State,
+)
 from plane.utils.exception_logger import log_exception
+from plane.utils.issue_filters import (
+    apply_user_hub_filters,
+    build_custom_property_q_objects,
+)
+from plane.utils.order_queryset import order_issue_queryset
+
+
+def _build_list_view_base_queryset(slug, user, project_ids):
+    """Mirror the baseline queryset used by WorkspaceViewIssuesViewSet.list so
+    the export contains exactly the rows the user sees on the page (drafts /
+    archived / triage states excluded, hub-scoped, guest restrictions applied).
+    """
+    qs = (
+        Issue.objects.filter(
+            workspace__slug=slug,
+            project_id__in=project_ids,
+            deleted_at__isnull=True,
+            archived_at__isnull=True,
+            is_draft=False,
+            project__archived_at__isnull=True,
+            state_id__isnull=False,
+        )
+        .exclude(
+            state_id__in=State.objects.filter(is_triage=True).values("id")
+        )
+        .filter(
+            Exists(
+                ProjectMember.objects.filter(
+                    project_id=OuterRef("project_id"),
+                    member=user,
+                    is_active=True,
+                )
+            )
+        )
+    )
+
+    guest_pm = ProjectMember.objects.filter(
+        project_id=OuterRef("project_id"),
+        member=user,
+        is_active=True,
+        role=ROLE.GUEST.value,
+    )
+    non_guest_pm = ProjectMember.objects.filter(
+        project_id=OuterRef("project_id"),
+        member=user,
+        is_active=True,
+        role__gt=ROLE.GUEST.value,
+    )
+    qs = qs.filter(
+        Exists(non_guest_pm)
+        | (Exists(guest_pm) & Q(project__guest_view_all_features=True))
+        | (Exists(guest_pm) & Q(project__guest_view_all_features=False) & Q(created_by=user))
+    )
+
+    return apply_user_hub_filters(qs, user, workspace_slug=slug)
 
 
 def dateTimeConverter(time):
@@ -41,23 +100,6 @@ def create_csv_file(data):
     return csv_buffer.getvalue()
 
 
-def create_json_file(data):
-    return json.dumps(data)
-
-
-def create_xlsx_file(data):
-    workbook = Workbook()
-    sheet = workbook.active
-
-    for row in data:
-        sheet.append(row)
-
-    xlsx_buffer = io.BytesIO()
-    workbook.save(xlsx_buffer)
-    xlsx_buffer.seek(0)
-    return xlsx_buffer.getvalue()
-
-
 def create_zip_file(files):
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zipf:
@@ -68,8 +110,24 @@ def create_zip_file(files):
     return zip_buffer
 
 
-def upload_to_s3(zip_file, workspace_id, token_id, slug):
-    file_name = f"{workspace_id}/export-{slug}-{token_id[:6]}-{str(timezone.now().date())}.zip"
+EXPORT_CONTENT_TYPES = {
+    "csv": "text/csv",
+    "zip": "application/zip",
+}
+
+# Hard cap on the number of distinct issues we export in a single run. This
+# guards Celery workers from runaway memory / timeouts on huge workspaces.
+# When the user's filter selects more than this, we truncate and prepend a
+# notice row so the recipient knows the file is incomplete.
+EXPORT_ROW_LIMIT = 10000
+
+
+def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
+    content_type = EXPORT_CONTENT_TYPES.get(extension, "application/octet-stream")
+    file_name = (
+        f"{workspace_id}/export-{slug}-{token_id[:6]}-"
+        f"{str(timezone.now().date())}.{extension}"
+    )
     expires_in = 7 * 24 * 60 * 60
 
     if settings.USE_MINIO:
@@ -81,10 +139,10 @@ def upload_to_s3(zip_file, workspace_id, token_id, slug):
             config=Config(signature_version="s3v4"),
         )
         upload_s3.upload_fileobj(
-            zip_file,
+            file_obj,
             settings.AWS_STORAGE_BUCKET_NAME,
             file_name,
-            ExtraArgs={"ACL": "public-read", "ContentType": "application/zip"},
+            ExtraArgs={"ACL": "public-read", "ContentType": content_type},
         )
 
         # Generate presigned url for the uploaded file with different base
@@ -125,10 +183,10 @@ def upload_to_s3(zip_file, workspace_id, token_id, slug):
 
         # Upload the file to S3
         s3.upload_fileobj(
-            zip_file,
+            file_obj,
             settings.AWS_STORAGE_BUCKET_NAME,
             file_name,
-            ExtraArgs={"ContentType": "application/zip"},
+            ExtraArgs={"ContentType": content_type},
         )
 
         # Generate presigned url for the uploaded file
@@ -154,276 +212,463 @@ def upload_to_s3(zip_file, workspace_id, token_id, slug):
     exporter_instance.save(update_fields=["status", "url", "key"])
 
 
-def generate_table_row(issue):
-    return [
-        f"""{issue["project__identifier"]}-{issue["sequence_id"]}""",
-        issue["project__name"],
-        issue["name"],
-        issue["description_stripped"],
-        issue["state__name"],
-        issue["priority"],
-        (
-            f"{issue['created_by__first_name']} {issue['created_by__last_name']}"
-            if issue["created_by__first_name"]
-            and issue["created_by__last_name"]
-            else ""
-        ),
-        (
-            f"{issue['assignees__first_name']} {issue['assignees__last_name']}"
-            if issue["assignees__first_name"] and issue["assignees__last_name"]
-            else ""
-        ),
-        issue["labels__name"] if issue["labels__name"] else "",
-        issue["issue_cycle__cycle__name"],
-        dateConverter(issue["issue_cycle__cycle__start_date"]),
-        dateConverter(issue["issue_cycle__cycle__end_date"]),
-        issue["issue_module__module__name"],
-        dateConverter(issue["issue_module__module__start_date"]),
-        dateConverter(issue["issue_module__module__target_date"]),
-        dateTimeConverter(issue["created_at"]),
-        dateTimeConverter(issue["updated_at"]),
-        dateTimeConverter(issue["completed_at"]),
-        dateTimeConverter(issue["archived_at"]),
-    ]
+# Column registry. Each column is gated on a `displayProperties` key the
+# frontend sends; `"always"` means the column is unconditionally included
+# (id, name, project are not toggleable on the page either).
+#
+# The order here defines the column order in the exported file.
+def _assignee_cell(issue):
+    if issue.get("assignees__first_name") and issue.get("assignees__last_name"):
+        return f"{issue['assignees__first_name']} {issue['assignees__last_name']}"
+    return ""
 
 
-def generate_json_row(issue):
-    return {
-        "ID": f"""{issue["project__identifier"]}-{issue["sequence_id"]}""",
-        "Project": issue["project__name"],
-        "Name": issue["name"],
-        "Description": issue["description_stripped"],
-        "State": issue["state__name"],
-        "Priority": issue["priority"],
-        "Created By": (
-            f"{issue['created_by__first_name']} {issue['created_by__last_name']}"
-            if issue["created_by__first_name"]
-            and issue["created_by__last_name"]
-            else ""
-        ),
-        "Assignee": (
-            f"{issue['assignees__first_name']} {issue['assignees__last_name']}"
-            if issue["assignees__first_name"] and issue["assignees__last_name"]
-            else ""
-        ),
-        "Labels": issue["labels__name"] if issue["labels__name"] else "",
-        "Cycle Name": issue["issue_cycle__cycle__name"],
-        "Cycle Start Date": dateConverter(
-            issue["issue_cycle__cycle__start_date"]
-        ),
-        "Cycle End Date": dateConverter(issue["issue_cycle__cycle__end_date"]),
-        "Module Name": issue["issue_module__module__name"],
-        "Module Start Date": dateConverter(
-            issue["issue_module__module__start_date"]
-        ),
-        "Module Target Date": dateConverter(
-            issue["issue_module__module__target_date"]
-        ),
-        "Created At": dateTimeConverter(issue["created_at"]),
-        "Updated At": dateTimeConverter(issue["updated_at"]),
-        "Completed At": dateTimeConverter(issue["completed_at"]),
-        "Archived At": dateTimeConverter(issue["archived_at"]),
-    }
+def _prettify(key):
+    """`trip_reference_number` → `Trip Reference Number`."""
+    return key.replace("_", " ").title()
 
 
-def update_json_row(rows, row):
-    matched_index = next(
-        (
-            index
-            for index, existing_row in enumerate(rows)
-            if existing_row["ID"] == row["ID"]
-        ),
-        None,
+# ────────────────────────────────────────────────────────────────────────────
+# Dynamic column registry
+# ────────────────────────────────────────────────────────────────────────────
+# Two things vary per column:
+#   • the ORM `.values(...)` field(s) needed to fetch the data
+#   • how to render a row dict into a CSV cell
+#
+# For 90 % of the columns these are trivially derivable from the Issue model
+# (a CharField named `hub_code` becomes label "Hub Code" and is read from the
+# row dict by key). Those columns are *introspected* at runtime — adding a
+# new field to the `Issue` model makes it instantly exportable.
+#
+# A few columns need joins, annotations, or string concatenation. Those are
+# the only ones that need a hand-written entry, kept in `COMPLEX_RESOLVERS`.
+
+class _Resolver:
+    """Holds everything needed to render one CSV column.
+
+    Attributes:
+      label: header string (e.g. "Trip Reference Number")
+      values_fields: list of ORM lookup paths to add to `.values(...)`
+      extractor: callable(row_dict) → cell value
+      requires_annotation: optional name of an annotation that must be added
+                           to the queryset (sub_issues_count / link_count /
+                           attachment_count).
+    """
+
+    __slots__ = ("label", "values_fields", "extractor", "requires_annotation")
+
+    def __init__(self, label, values_fields, extractor, requires_annotation=None):
+        self.label = label
+        self.values_fields = list(values_fields)
+        self.extractor = extractor
+        self.requires_annotation = requires_annotation
+
+
+# Resolvers for columns that can't be auto-derived from a single Issue field.
+# Keyed by the frontend's `displayProperties` key.
+COMPLEX_RESOLVERS = {
+    "state": _Resolver(
+        label="State",
+        values_fields=["state__name"],
+        extractor=lambda i: i.get("state__name") or "",
+    ),
+    "assignee": _Resolver(
+        label="Assignees",
+        values_fields=["assignees__first_name", "assignees__last_name"],
+        extractor=_assignee_cell,
+    ),
+    "labels": _Resolver(
+        label="Labels",
+        values_fields=["labels__name"],
+        extractor=lambda i: i.get("labels__name") or "",
+    ),
+    "cycle": _Resolver(
+        label="Cycle",
+        values_fields=["issue_cycle__cycle__name"],
+        extractor=lambda i: i.get("issue_cycle__cycle__name") or "",
+    ),
+    "modules": _Resolver(
+        label="Modules",
+        values_fields=["issue_module__module__name"],
+        extractor=lambda i: i.get("issue_module__module__name") or "",
+    ),
+    "estimate": _Resolver(
+        label="Estimate",
+        values_fields=["estimate_point__value"],
+        extractor=lambda i: i.get("estimate_point__value") or "",
+    ),
+    "issue_type": _Resolver(
+        label="Issue Type",
+        values_fields=["type__name"],
+        extractor=lambda i: i.get("type__name") or "",
+    ),
+    # Frontend keys differ from Issue.field names → handled here.
+    "due_date": _Resolver(
+        label="Due Date",
+        values_fields=["target_date"],
+        extractor=lambda i: dateConverter(i.get("target_date")),
+    ),
+    "start_date": _Resolver(
+        label="Start Date",
+        values_fields=["start_date"],
+        extractor=lambda i: dateConverter(i.get("start_date")),
+    ),
+    "created_on": _Resolver(
+        label="Created On",
+        values_fields=["created_at"],
+        extractor=lambda i: dateTimeConverter(i.get("created_at")),
+    ),
+    "updated_on": _Resolver(
+        label="Updated On",
+        values_fields=["updated_at"],
+        extractor=lambda i: dateTimeConverter(i.get("updated_at")),
+    ),
+    # Counts (need `.annotate(...)`).
+    "link": _Resolver(
+        label="Links",
+        values_fields=["link_count"],
+        extractor=lambda i: i.get("link_count") or 0,
+        requires_annotation="link_count",
+    ),
+    "attachment_count": _Resolver(
+        label="Attachments",
+        values_fields=["attachment_count"],
+        extractor=lambda i: i.get("attachment_count") or 0,
+        requires_annotation="attachment_count",
+    ),
+    "sub_issue_count": _Resolver(
+        label="Sub-issues",
+        values_fields=["sub_issues_count"],
+        extractor=lambda i: i.get("sub_issues_count") or 0,
+        requires_annotation="sub_issues_count",
+    ),
+}
+
+
+# Always-on columns — the ones we always emit regardless of displayProperties.
+# Keep this minimal: the UI's "Issues" cell shows ID + Name, so those two
+# are the only true "must-haves".
+ALWAYS_COLUMNS = [
+    _Resolver(
+        label="ID",
+        values_fields=["project__identifier", "sequence_id"],
+        extractor=lambda i: f"{i['project__identifier']}-{i['sequence_id']}",
+    ),
+    _Resolver(
+        label="Name",
+        values_fields=["name"],
+        extractor=lambda i: i.get("name") or "",
+    ),
+]
+
+
+def _introspect_field(key):
+    """Try to derive a resolver from the Issue model.
+
+    Returns a `_Resolver` if the model has a concrete scalar field named
+    `key`, otherwise `None`. Used as a fallback for keys not in
+    `COMPLEX_RESOLVERS`.
+    """
+    from django.db.models import (
+        CharField, TextField, IntegerField, BooleanField, FloatField,
+        DecimalField, DateField, DateTimeField, EmailField, UUIDField,
+        SlugField, PositiveIntegerField, PositiveSmallIntegerField,
+        SmallIntegerField, BigIntegerField,
     )
 
-    if matched_index is not None:
-        existing_assignees, existing_labels = (
-            rows[matched_index]["Assignee"],
-            rows[matched_index]["Labels"],
+    scalar_types = (
+        CharField, TextField, IntegerField, BooleanField, FloatField,
+        DecimalField, EmailField, UUIDField, SlugField, PositiveIntegerField,
+        PositiveSmallIntegerField, SmallIntegerField, BigIntegerField,
+    )
+    date_types = (DateField, DateTimeField)
+
+    try:
+        field = Issue._meta.get_field(key)
+    except Exception:
+        return None
+
+    if isinstance(field, date_types):
+        is_datetime = isinstance(field, DateTimeField)
+        return _Resolver(
+            label=getattr(field, "verbose_name", key).title()
+                  if isinstance(getattr(field, "verbose_name", ""), str)
+                  else _prettify(key),
+            values_fields=[key],
+            extractor=(lambda k: lambda i: dateTimeConverter(i.get(k)))(key) if is_datetime
+                      else (lambda k: lambda i: dateConverter(i.get(k)))(key),
         )
-        assignee, label = row["Assignee"], row["Labels"]
 
-        if assignee is not None and (
-            existing_assignees is None or label not in existing_assignees
-        ):
-            rows[matched_index]["Assignee"] += f", {assignee}"
-        if label is not None and (
-            existing_labels is None or label not in existing_labels
-        ):
-            rows[matched_index]["Labels"] += f", {label}"
-    else:
-        rows.append(row)
+    if isinstance(field, scalar_types):
+        label = getattr(field, "verbose_name", "") or _prettify(key)
+        # verbose_name is sometimes the lowercase key — prettify in that case
+        if isinstance(label, str) and label == key:
+            label = _prettify(key)
+        else:
+            label = str(label).title()
+        return _Resolver(
+            label=label,
+            values_fields=[key],
+            extractor=(lambda k: lambda i: (i.get(k) if i.get(k) is not None else ""))(key),
+        )
+
+    # Foreign keys, M2M, etc. — let COMPLEX_RESOLVERS handle anything tricky.
+    return None
 
 
-def update_table_row(rows, row):
-    matched_index = next(
-        (
-            index
-            for index, existing_row in enumerate(rows)
-            if existing_row[0] == row[0]
-        ),
-        None,
+# Columns the user has chosen to hide from the export entirely, regardless
+# of what the frontend sends. Mirrors the UI hiding cycle/modules/estimate
+# from the display-properties picker.
+EXCLUDED_EXPORT_KEYS = {"cycle", "modules", "estimate"}
+
+
+def resolve_export_columns(display_properties=None):
+    """Build the ordered list of `_Resolver` objects for this export.
+
+    Order:
+      1. ALWAYS_COLUMNS (ID, Name) — fixed.
+      2. For each key in `display_properties` (in the order the frontend
+         supplied them):
+            a. If it's in COMPLEX_RESOLVERS → use that.
+            b. Else, try `Issue._meta.get_field(key)` introspection.
+            c. Else, skip (unknown key).
+
+    Keys in `EXCLUDED_EXPORT_KEYS` are skipped unconditionally.
+    """
+    cols = list(ALWAYS_COLUMNS)
+
+    if not display_properties:
+        # No frontend hint → emit every complex resolver + every introspectable
+        # Issue field. Stable order = COMPLEX_RESOLVERS dict order + model
+        # field declaration order.
+        seen = set()
+        for key, resolver in COMPLEX_RESOLVERS.items():
+            if key in EXCLUDED_EXPORT_KEYS:
+                continue
+            cols.append(resolver)
+            seen.add(key)
+        for field in Issue._meta.get_fields():
+            if field.name in seen or field.name in EXCLUDED_EXPORT_KEYS:
+                continue
+            resolver = _introspect_field(field.name)
+            if resolver is not None:
+                cols.append(resolver)
+                seen.add(field.name)
+        return cols
+
+    seen = set()
+    for key in display_properties:
+        if key in seen or key == "key" or key in EXCLUDED_EXPORT_KEYS:
+            # "key" is the UI's name for the ID column we already include.
+            continue
+        seen.add(key)
+
+        resolver = COMPLEX_RESOLVERS.get(key) or _introspect_field(key)
+        if resolver is None:
+            continue
+        cols.append(resolver)
+
+    return cols
+
+def build_export_queryset(base_qs, columns):
+    """Finalize an ordered/filtered base queryset into a `.values(...)`
+    queryset that carries exactly the fields the resolved `columns` need,
+    plus any required count annotations.
+
+    Used by both the async Celery exporter and the synchronous download
+    endpoint so both paths emit identical rows for the same filters.
+    """
+    # 1. Union of `.values(...)` paths from every resolver, plus bookkeeping
+    #    fields used by the row deduper / per-project `multiple` filtering.
+    values_fields = {"id", "project__id"}
+    for r in columns:
+        values_fields.update(r.values_fields)
+
+    # 2. Annotations — only attach the counts that some selected column
+    #    actually consumes.
+    needed_annotations = {r.requires_annotation for r in columns if r.requires_annotation}
+    annotations = {}
+    if "sub_issues_count" in needed_annotations:
+        annotations["sub_issues_count"] = (
+            Issue.objects.filter(
+                parent=OuterRef("id"),
+                deleted_at__isnull=True,
+                is_draft=False,
+                archived_at__isnull=True,
+            )
+            .order_by()
+            .annotate(count=Func(F("id"), function="Count"))
+            .values("count")
+        )
+    if "link_count" in needed_annotations:
+        annotations["link_count"] = (
+            IssueLink.objects.filter(issue=OuterRef("id"))
+            .order_by()
+            .annotate(count=Func(F("id"), function="Count"))
+            .values("count")
+        )
+    if "attachment_count" in needed_annotations:
+        annotations["attachment_count"] = (
+            FileAsset.objects.filter(
+                issue_id=OuterRef("id"),
+                entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
+            )
+            .order_by()
+            .annotate(count=Func(F("id"), function="Count"))
+            .values("count")
+        )
+
+    qs = base_qs.select_related(
+        "project", "workspace", "state", "parent", "created_by", "estimate_point", "type"
+    ).prefetch_related(
+        "assignees", "labels", "issue_cycle__cycle", "issue_module__module"
     )
-
-    if matched_index is not None:
-        existing_assignees, existing_labels = rows[matched_index][7:9]
-        assignee, label = row[7:9]
-
-        if assignee is not None and (
-            existing_assignees is None or label not in existing_assignees
-        ):
-            rows[matched_index][8] += f", {assignee}"
-        if label is not None and (
-            existing_labels is None or label not in existing_labels
-        ):
-            rows[matched_index][8] += f", {label}"
-    else:
-        rows.append(row)
+    if annotations:
+        qs = qs.annotate(**annotations)
+    return qs.values(*sorted(values_fields)).distinct()
 
 
-def generate_csv(header, project_id, issues, files):
+def _index_for(columns, header_label):
+    for idx, resolver in enumerate(columns):
+        if resolver.label == header_label:
+            return idx
+    return None
+
+
+def generate_table_row(issue, columns):
+    return [resolver.extractor(issue) for resolver in columns]
+
+
+def _merge_multivalue_cell(existing_cell, incoming_cell):
+    """Append `incoming_cell` to `existing_cell` as a comma-separated list,
+    skipping duplicates with exact (not substring) matching."""
+    incoming = (incoming_cell or "").strip()
+    if not incoming:
+        return existing_cell or ""
+    existing = existing_cell or ""
+    if not existing:
+        return incoming
+    parts = [p.strip() for p in existing.split(",") if p.strip()]
+    if incoming in parts:
+        return existing
+    return f"{existing}, {incoming}"
+
+
+def generate_csv(header, project_id, issues, files, columns):
+    """Generate CSV export for the passed issues using `columns`.
+
+    Deduplicates M2M fan-out rows (assignees × labels) by issue ID in O(1)
+    per input row using a dict keyed on the issue's ID cell.
     """
-    Generate CSV export for all the passed issues.
-    """
-    rows = [
-        header,
-    ]
+    id_idx = _index_for(columns, "ID")
+    assignee_idx = _index_for(columns, "Assignees")
+    labels_idx = _index_for(columns, "Labels")
+
+    id_to_row = {}
+    insertion_order = []
     for issue in issues:
-        row = generate_table_row(issue)
-        update_table_row(rows, row)
+        row = generate_table_row(issue, columns)
+        row_id = row[id_idx] if id_idx is not None else id(row)
+        existing = id_to_row.get(row_id)
+        if existing is None:
+            id_to_row[row_id] = row
+            insertion_order.append(row_id)
+            continue
+        if assignee_idx is not None:
+            existing[assignee_idx] = _merge_multivalue_cell(
+                existing[assignee_idx], row[assignee_idx]
+            )
+        if labels_idx is not None:
+            existing[labels_idx] = _merge_multivalue_cell(
+                existing[labels_idx], row[labels_idx]
+            )
+
+    rows = [header] + [id_to_row[rid] for rid in insertion_order]
     csv_file = create_csv_file(rows)
     files.append((f"{project_id}.csv", csv_file))
 
 
-def generate_json(header, project_id, issues, files):
-    rows = []
-    for issue in issues:
-        row = generate_json_row(issue)
-        update_json_row(rows, row)
-    json_file = create_json_file(rows)
-    files.append((f"{project_id}.json", json_file))
-
-
-def generate_xlsx(header, project_id, issues, files):
-    rows = [header]
-    for issue in issues:
-        row = generate_table_row(issue)
-        update_table_row(rows, row)
-    xlsx_file = create_xlsx_file(rows)
-    files.append((f"{project_id}.xlsx", xlsx_file))
-
-
-@shared_task
 def issue_export_task(
-    provider, workspace_id, project_ids, token_id, multiple, slug
+    workspace_id,
+    project_ids,
+    token_id,
+    multiple,
+    slug,
+    filters=None,
+    custom_properties=None,
+    order_by_param="-created_at",
+    display_properties=None,
 ):
     try:
         exporter_instance = ExporterHistory.objects.get(token=token_id)
         exporter_instance.status = "processing"
         exporter_instance.save(update_fields=["status"])
 
-        workspace_issues = (
-            (
-                Issue.objects.filter(
-                    workspace__id=workspace_id,
-                    project_id__in=project_ids,
-                    project__project_projectmember__member=exporter_instance.initiated_by_id,
-                    project__project_projectmember__is_active=True,
-                    project__archived_at__isnull=True,
-                )
-                .select_related(
-                    "project", "workspace", "state", "parent", "created_by"
-                )
-                .prefetch_related(
-                    "assignees",
-                    "labels",
-                    "issue_cycle__cycle",
-                    "issue_module__module",
-                )
-                .values(
-                    "id",
-                    "project__identifier",
-                    "project__name",
-                    "project__id",
-                    "sequence_id",
-                    "name",
-                    "description_stripped",
-                    "priority",
-                    "state__name",
-                    "created_at",
-                    "updated_at",
-                    "completed_at",
-                    "archived_at",
-                    "issue_cycle__cycle__name",
-                    "issue_cycle__cycle__start_date",
-                    "issue_cycle__cycle__end_date",
-                    "issue_module__module__name",
-                    "issue_module__module__start_date",
-                    "issue_module__module__target_date",
-                    "created_by__first_name",
-                    "created_by__last_name",
-                    "assignees__first_name",
-                    "assignees__last_name",
-                    "labels__name",
-                )
-            )
-            .order_by("project__identifier", "sequence_id")
-            .distinct()
+        # Use the same baseline queryset the list view uses so the export
+        # mirrors what the user sees on the page (drafts/archived/triage
+        # excluded, hub scoped, guest restrictions applied).
+        base_qs = _build_list_view_base_queryset(
+            slug=slug,
+            user=exporter_instance.initiated_by,
+            project_ids=project_ids,
         )
-        # CSV header
-        header = [
-            "ID",
-            "Project",
-            "Name",
-            "Description",
-            "State",
-            "Priority",
-            "Created By",
-            "Assignee",
-            "Labels",
-            "Cycle Name",
-            "Cycle Start Date",
-            "Cycle End Date",
-            "Module Name",
-            "Module Start Date",
-            "Module Target Date",
-            "Created At",
-            "Updated At",
-            "Completed At",
-            "Archived At",
-        ]
+        if custom_properties:
+            base_qs = base_qs.filter(*build_custom_property_q_objects(custom_properties))
+        if filters:
+            base_qs = base_qs.filter(**filters)
+        base_qs, _ = order_issue_queryset(
+            issue_queryset=base_qs,
+            order_by_param=order_by_param,
+        )
 
-        EXPORTER_MAPPER = {
-            "csv": generate_csv,
-            "json": generate_json,
-            "xlsx": generate_xlsx,
-        }
+        columns = resolve_export_columns(display_properties)
+        header = [r.label for r in columns]
+
+        # Cap the export to EXPORT_ROW_LIMIT distinct issues *before* the
+        # M2M-joined .values() fan-out. We slice the already-ordered base
+        # queryset's IDs, then re-filter so the value rows only fan out for
+        # the capped set.
+        capped_ids = list(
+            base_qs.values_list("id", flat=True).distinct()[: EXPORT_ROW_LIMIT + 1]
+        )
+        truncated = len(capped_ids) > EXPORT_ROW_LIMIT
+        if truncated:
+            capped_ids = capped_ids[:EXPORT_ROW_LIMIT]
+
+        workspace_issues = build_export_queryset(
+            base_qs.filter(id__in=capped_ids), columns
+        )
+
+        truncation_notice_row = (
+            [
+                f"NOTE: Export truncated to the first {EXPORT_ROW_LIMIT} "
+                f"issues. Narrow your filters to export the remaining rows."
+            ]
+            if truncated
+            else None
+        )
 
         files = []
         if multiple:
             for project_id in project_ids:
                 issues = workspace_issues.filter(project__id=project_id)
-                exporter = EXPORTER_MAPPER.get(provider)
-                if exporter is not None:
-                    exporter(
-                        header,
-                        project_id,
-                        issues,
-                        files,
-                    )
-
+                generate_csv(header, project_id, issues, files, columns)
         else:
-            exporter = EXPORTER_MAPPER.get(provider)
-            if exporter is not None:
-                exporter(
-                    header,
-                    workspace_id,
-                    workspace_issues,
-                    files,
-                )
+            generate_csv(header, workspace_id, workspace_issues, files, columns)
 
-        zip_buffer = create_zip_file(files)
-        upload_to_s3(zip_buffer, workspace_id, token_id, slug)
+        # Prepend a single-cell truncation notice to every generated CSV.
+        if truncation_notice_row:
+            notice_csv = create_csv_file([truncation_notice_row])
+            files = [(name, notice_csv + content) for name, content in files]
+
+        # Single file → upload the raw .csv. Multiple files → zip them.
+        if not multiple and len(files) == 1:
+            _filename, content = files[0]
+            payload = content if isinstance(content, (bytes, bytearray)) else content.encode("utf-8")
+            upload_to_s3(io.BytesIO(payload), workspace_id, token_id, slug, extension="csv")
+        else:
+            zip_buffer = create_zip_file(files)
+            upload_to_s3(zip_buffer, workspace_id, token_id, slug, extension="zip")
 
     except Exception as e:
         exporter_instance = ExporterHistory.objects.get(token=token_id)

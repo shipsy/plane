@@ -1,3 +1,6 @@
+import logging
+import threading
+
 # Third Party imports
 from rest_framework import status
 from rest_framework.response import Response
@@ -5,10 +8,19 @@ from rest_framework.response import Response
 from plane.app.permissions import allow_permission, ROLE
 from plane.app.serializers import ExporterHistorySerializer
 from plane.bgtasks.export_task import issue_export_task
-from plane.db.models import ExporterHistory, Project, Workspace
+
+from plane.db.models import (
+    ExporterHistory,
+    Project,
+    Workspace,
+)
+from plane.settings.storage import S3Storage
+from plane.utils.issue_filters import issue_filters
 
 # Module imports
 from .. import BaseAPIView
+
+logger = logging.getLogger("plane.exporter")
 
 
 class ExportIssuesEndpoint(BaseAPIView):
@@ -20,11 +32,11 @@ class ExportIssuesEndpoint(BaseAPIView):
         # Get the workspace
         workspace = Workspace.objects.get(slug=slug)
 
-        provider = request.data.get("provider", False)
+        provider = request.data.get("provider")
         multiple = request.data.get("multiple", False)
         project_ids = request.data.get("project", [])
 
-        if provider in ["csv", "xlsx", "json"]:
+        if provider == "csv":
             if not project_ids:
                 project_ids = Project.objects.filter(
                     workspace__slug=slug,
@@ -42,14 +54,52 @@ class ExportIssuesEndpoint(BaseAPIView):
                 type="issue_exports",
             )
 
-            issue_export_task.delay(
-                provider=exporter.provider,
-                workspace_id=workspace.id,
-                project_ids=project_ids,
-                token_id=exporter.token,
-                multiple=multiple,
-                slug=slug,
+            # Forward the same filters the user has applied on the frontend
+            # (assignees, state, labels, priority, sub_issue, cycle, module,
+            # start_date, target_date, search, hub/customer/vendor/worker/
+            # business fields, custom_properties, etc.) so the export matches
+            # the list view 1:1.
+            filters = issue_filters(request.query_params, "GET")
+            custom_properties = filters.pop("custom_properties", {}) or {}
+            order_by_param = request.query_params.get("order_by", "-created_at")
+            display_properties_raw = request.query_params.get("display_properties")
+            display_properties = (
+                [k.strip() for k in display_properties_raw.split(",") if k.strip()]
+                if display_properties_raw
+                else None
             )
+            # Run the export in a background daemon thread so the HTTP
+            # request can return immediately. The task writes progress and
+            # the final S3 URL back onto the ExporterHistory row, which the
+            # frontend polls via GET.
+            try:
+                threading.Thread(
+                    target=issue_export_task,
+                    kwargs={
+                        "workspace_id": workspace.id,
+                        "project_ids": project_ids,
+                        "token_id": exporter.token,
+                        "multiple": multiple,
+                        "slug": slug,
+                        "filters": filters,
+                        "custom_properties": custom_properties,
+                        "order_by_param": order_by_param,
+                        "display_properties": display_properties,
+                    },
+                    daemon=True,
+                ).start()
+            except Exception:
+                # If we can't even spawn the worker, don't leave the row
+                # stranded in its default state — flip it to failed so the
+                # frontend stops polling and the user sees an error.
+                logger.exception("Failed to start export thread for token=%s", exporter.token)
+                exporter.status = "failed"
+                exporter.reason = "Failed to start export worker"
+                exporter.save(update_fields=["status", "reason"])
+                return Response(
+                    {"error": "Failed to start export. Please try again."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
             return Response(
                 {
                     "message": "Once the export is ready you will be able to download it"
@@ -58,7 +108,7 @@ class ExportIssuesEndpoint(BaseAPIView):
             )
         else:
             return Response(
-                {"error": f"Provider '{provider}' not found."},
+                {"error": "Provider 'csv' is the only supported format."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -71,6 +121,35 @@ class ExportIssuesEndpoint(BaseAPIView):
             type="issue_exports",
         ).select_related("workspace", "initiated_by")
 
+        # Build one request-aware S3Storage. This is exactly the same pattern
+        # used by /api/.../assets/ for image downloads — endpoint_url is built
+        # from request.get_host(), so the resulting presigned URL points to
+        # whatever host the browser is already talking to (proxy port, public
+        # domain, etc.).
+        storage = S3Storage(request=request)
+
+        def _resign(row_data, row_obj):
+            """Override the stale `url` on each serialized row with a fresh
+            presigned URL minted against the current request host."""
+            key = row_obj.key
+            if not key:
+                row_data["url"] = None
+                return row_data
+            try:
+                fresh_url = storage.generate_presigned_url(
+                    object_name=key,
+                    expiration=7 * 24 * 60 * 60,
+                    disposition="attachment",
+                )
+                row_data["url"] = fresh_url
+            except Exception:
+                logger.exception("Failed to resign export URL for token=%s", row_obj.token)
+            return row_data
+
+        def _on_results(rows):
+            serialized = ExporterHistorySerializer(rows, many=True).data
+            return [_resign(d, r) for d, r in zip(serialized, rows)]
+
         if request.GET.get("per_page", False) and request.GET.get(
             "cursor", False
         ):
@@ -78,9 +157,7 @@ class ExportIssuesEndpoint(BaseAPIView):
                 order_by=request.GET.get("order_by", "-created_at"),
                 request=request,
                 queryset=exporter_history,
-                on_results=lambda exporter_history: ExporterHistorySerializer(
-                    exporter_history, many=True
-                ).data,
+                on_results=_on_results,
             )
         else:
             return Response(
