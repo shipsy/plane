@@ -344,6 +344,7 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
       filters: [
         "priority",
         "state_group",
+        "state",
         "labels",
         "assignees",
         "created_by",
@@ -379,6 +380,7 @@ export const ISSUE_DISPLAY_FILTERS_BY_LAYOUT: {
       filters: [
         "priority",
         "state_group",
+        "state",
         "labels",
         "assignees",
         "created_by",
