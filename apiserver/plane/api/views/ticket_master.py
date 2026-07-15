@@ -214,7 +214,7 @@ class TicketMasterAPIEndpoint(BaseAPIView):
             # assignee's writes (user / profile / memberships) without
             # poisoning the outer atomic() block.
             with transaction.atomic():
-                user = User.objects.filter(email=email).first()
+                user = User.objects.filter(email__iexact=email).first()
 
                 if not user:
                     user = ProjectMemberAPIEndpoint.create_user(
