@@ -143,7 +143,10 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
             )
 
         # Check if user exists
-        user = User.objects.filter(email=email.lower()).first()
+        # Case-insensitive match: existing users may have been stored with
+        # mixed-case emails, and an exact lowercase match would miss them,
+        # sending us into the create path for users that already exist.
+        user = User.objects.filter(email__iexact=email).first()
         workspace_member = None
         project_member = None
 
@@ -172,7 +175,7 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
         )
 
         user_data = {
-                "email": email,
+                "email": email.lower(),
                 "display_name": request.data.get("display_name"),
                 "first_name": request.data.get("first_name", ""),
                 "last_name": request.data.get("last_name", ""),
@@ -298,13 +301,16 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
 
     @staticmethod
     def create_user(data):
+        # data may contain an explicit None for username; dict.get's default
+        # only applies when the key is absent, so fall back with `or`.
+        username = data.get("username") or uuid.uuid4().hex
         user = User.objects.create(
             email=data.get("email"),
             display_name=data.get("display_name"),
             first_name=data.get("first_name", ""),
             last_name=data.get("last_name", ""),
-            username=data.get("username", uuid.uuid4().hex),
-            password=make_password(data.get("username", uuid.uuid4().hex)),
+            username=username,
+            password=make_password(username),
             is_password_autoset=False,
             is_active=True,
             hub_codes=data.get("hub_codes", []),
