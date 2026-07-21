@@ -266,8 +266,19 @@ STORAGES = {
 STORAGES["default"] = {
     "BACKEND": "plane.settings.storage.S3Storage",
 }
-AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "access-key")
-AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "secret-key")
+# Standard AWS credentials. When running with IRSA these are left unset so
+# boto3 falls back to the injected web-identity token. MinIO / self-host still
+# needs placeholder keys, so only default them when MinIO is in use.
+if USE_MINIO:
+    AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID", "access-key")
+    AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY", "secret-key")
+else:
+    AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+# Dedicated long-lived credentials used only to sign presigned GET URLs so
+# they can outlive short-lived IRSA session tokens.
+AWS_S3_ACCESS_KEY = os.environ.get("AWS_S3_ACCESS_KEY")
+AWS_S3_SECRET_KEY = os.environ.get("AWS_S3_SECRET_KEY")
 AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET_NAME", "uploads")
 AWS_REGION = os.environ.get("AWS_REGION", "")
 AWS_DEFAULT_ACL = "public-read"
