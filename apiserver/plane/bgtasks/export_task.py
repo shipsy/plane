@@ -3,13 +3,13 @@ import csv
 import io
 import zipfile
 
-import boto3
-from botocore.client import Config
-
 # Django imports
 from django.conf import settings
 from django.db.models import Exists, F, Func, OuterRef, Q
 from django.utils import timezone
+
+# Module imports
+from plane.utils.s3_client import get_s3_client
 
 # Module imports
 from plane.app.permissions import ROLE
@@ -133,13 +133,7 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
     expires_in = 7 * 24 * 60 * 60
 
     if settings.USE_MINIO:
-        upload_s3 = boto3.client(
-            "s3",
-            endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            config=Config(signature_version="s3v4"),
-        )
+        upload_s3 = get_s3_client(endpoint_url=settings.AWS_S3_ENDPOINT_URL)
         upload_s3.upload_fileobj(
             file_obj,
             settings.AWS_STORAGE_BUCKET_NAME,
@@ -148,12 +142,9 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
         )
 
         # Generate presigned url for the uploaded file with different base
-        presign_s3 = boto3.client(
-            "s3",
+        presign_s3 = get_s3_client(
             endpoint_url=f"{settings.AWS_S3_URL_PROTOCOL}//{str(settings.AWS_S3_CUSTOM_DOMAIN).replace('/uploads', '')}/",
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            config=Config(signature_version="s3v4"),
+            presign=True,
         )
 
         presigned_url = presign_s3.generate_presigned_url(
@@ -165,22 +156,18 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
             ExpiresIn=expires_in,
         )
     else:
-        # If endpoint url is present, use it
+        # If endpoint url is present, use it. The upload client relies on the
+        # default credential provider chain (IRSA) when static keys are unset,
+        # while the presign client uses the dedicated long-lived keys.
         if settings.AWS_S3_ENDPOINT_URL:
-            s3 = boto3.client(
-                "s3",
-                endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                config=Config(signature_version="s3v4"),
+            s3 = get_s3_client(endpoint_url=settings.AWS_S3_ENDPOINT_URL)
+            presign_s3 = get_s3_client(
+                endpoint_url=settings.AWS_S3_ENDPOINT_URL, presign=True
             )
         else:
-            s3 = boto3.client(
-                "s3",
-                region_name=settings.AWS_REGION,
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                config=Config(signature_version="s3v4"),
+            s3 = get_s3_client(region_name=settings.AWS_REGION)
+            presign_s3 = get_s3_client(
+                region_name=settings.AWS_REGION, presign=True
             )
 
         # Upload the file to S3
@@ -192,7 +179,7 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
         )
 
         # Generate presigned url for the uploaded file
-        presigned_url = s3.generate_presigned_url(
+        presigned_url = presign_s3.generate_presigned_url(
             "get_object",
             Params={
                 "Bucket": settings.AWS_STORAGE_BUCKET_NAME,

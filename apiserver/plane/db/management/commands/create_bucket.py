@@ -1,10 +1,12 @@
 # Python imports
 import os
-import boto3
 from botocore.exceptions import ClientError
 
 # Django imports
 from django.core.management import BaseCommand
+
+# Module imports
+from plane.utils.s3_client import get_s3_client
 
 
 class Command(BaseCommand):
@@ -13,19 +15,9 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         # Create a session using the credentials from Django settings
         try:
-            s3_client = boto3.client(
-                "s3",
-                endpoint_url=os.environ.get(
-                    "AWS_S3_ENDPOINT_URL"
-                ),  # MinIO endpoint
-                aws_access_key_id=os.environ.get(
-                    "AWS_ACCESS_KEY_ID"
-                ),  # MinIO access key
-                aws_secret_access_key=os.environ.get(
-                    "AWS_SECRET_ACCESS_KEY"
-                ),  # MinIO secret key
-                region_name=os.environ.get("AWS_REGION"),  # MinIO region
-                config=boto3.session.Config(signature_version="s3v4"),
+            s3_client = get_s3_client(
+                endpoint_url=os.environ.get("AWS_S3_ENDPOINT_URL"),
+                region_name=os.environ.get("AWS_REGION"),
             )
             # Get the bucket name from the environment
             bucket_name = os.environ.get("AWS_S3_BUCKET_NAME")

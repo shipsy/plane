@@ -225,6 +225,15 @@ export const SPREADSHEET_PROPERTY_DETAILS: {
     icon: Tags,
     Column: SpreadsheetStandardPropertyColumn,
   },
+  customer_category: {
+    title: "customer_category",
+    ascendingOrderKey: "customer_category",
+    ascendingOrderTitle: "A",
+    descendingOrderKey: "-customer_category",
+    descendingOrderTitle: "Z",
+    icon: Tags,
+    Column: SpreadsheetStandardPropertyColumn,
+  },
   customer_name: {
     title: "customer_name",
     ascendingOrderKey: "customer_name",
@@ -321,6 +330,7 @@ export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [
   "hub_code",
   "hub_name",
   "customer_code",
+  "customer_category",
   "customer_name",
   "vendor_name",
   "vendor_code",

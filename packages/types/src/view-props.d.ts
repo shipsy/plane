@@ -64,6 +64,8 @@ export type TIssueOrderByOptions =
   | "-hub_name"
   | "customer_code"
   | "-customer_code"
+  | "customer_category"
+  | "-customer_category"
   | "customer_name"
   | "-customer_name"
   | "vendor_name"
@@ -108,6 +110,7 @@ export type TIssueParams =
   | "layout"
   | "expand"
   | "customer_code"
+  | "customer_category"
   | "customer_name"
   | "worker_code"
   | "worker_name"
@@ -140,6 +143,7 @@ export interface IIssueFilterOptions {
   hub_code?: string[] | null;
   hub_name?: string[] | null;
   customer_code?: string[] | null;
+  customer_category?: string[] | null;
   customer_name?: string[] | null;
   worker_code?: string[] | null;
   worker_name?: string[] | null;
@@ -188,6 +192,7 @@ export interface IIssueDisplayProperties {
   hub_code?: boolean;
   hub_name?: boolean;
   customer_code?: boolean;
+  customer_category?: boolean;
   customer_name?: boolean;
   vendor_name?: boolean;
   vendor_code?: boolean;

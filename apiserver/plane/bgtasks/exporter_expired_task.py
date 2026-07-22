@@ -1,5 +1,4 @@
 # Python imports
-import boto3
 from datetime import timedelta
 
 # Django imports
@@ -9,10 +8,10 @@ from django.db.models import Q
 
 # Third party imports
 from celery import shared_task
-from botocore.client import Config
 
 # Module imports
 from plane.db.models import ExporterHistory
+from plane.utils.s3_client import get_s3_client
 
 
 @shared_task
@@ -23,21 +22,9 @@ def delete_old_s3_link():
         & Q(created_at__lte=timezone.now() - timedelta(days=8))
     ).values_list("key", "id")
     if settings.USE_MINIO:
-        s3 = boto3.client(
-            "s3",
-            endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            config=Config(signature_version="s3v4"),
-        )
+        s3 = get_s3_client(endpoint_url=settings.AWS_S3_ENDPOINT_URL)
     else:
-        s3 = boto3.client(
-            "s3",
-            region_name=settings.AWS_REGION,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            config=Config(signature_version="s3v4"),
-        )
+        s3 = get_s3_client(region_name=settings.AWS_REGION)
 
     for file_name, exporter_id in expired_exporter_history:
         # Delete object from S3

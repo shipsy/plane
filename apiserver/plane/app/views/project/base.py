@@ -1,5 +1,4 @@
 # Python imports
-import boto3
 from django.conf import settings
 from django.utils import timezone
 import json
@@ -51,6 +50,7 @@ from plane.db.models import (
     WorkspaceMember,
 )
 from plane.utils.cache import cache_response
+from plane.utils.s3_client import get_s3_client
 from plane.bgtasks.webhook_task import model_activity
 from plane.bgtasks.recent_visited_task import recent_visited_task
 from plane.utils.exception_logger import log_exception
@@ -704,18 +704,9 @@ class ProjectPublicCoverImagesEndpoint(BaseAPIView):
     def get(self, request):
         files = []
         if settings.USE_MINIO:
-            s3 = boto3.client(
-                "s3",
-                endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            )
+            s3 = get_s3_client(endpoint_url=settings.AWS_S3_ENDPOINT_URL)
         else:
-            s3 = boto3.client(
-                "s3",
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            )
+            s3 = get_s3_client()
         params = {
             "Bucket": settings.AWS_STORAGE_BUCKET_NAME,
             "Prefix": "static/project-cover/",

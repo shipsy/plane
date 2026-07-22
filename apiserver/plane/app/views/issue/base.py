@@ -256,7 +256,7 @@ class IssueViewSet(BaseViewSet):
         "created_at", "updated_at", "created_by", "updated_by",
         "attachment_count", "link_count", "is_draft", "archived_at",
         "state__group", "trip_reference_number", "reference_number",
-        "hub_code", "hub_name", "customer_code", "customer_name",
+        "hub_code", "hub_name", "customer_code", "customer_category", "customer_name",
         "vendor_name", "vendor_code", "worker_code", "worker_name",
         "business_type", "estimate_point", "source", "type_id",
     ]
@@ -1392,7 +1392,7 @@ class SearchAPIEndpoint(BaseAPIView):
     webhook_event = "issue"
     def get(self, request, slug):
         
-        allowed_fields = ["hub_code", "hub_name", "worker_code", "worker_name", "reference_number", "trip_reference_number", "customer_code", "customer_name", "vendor_code", "vendor_name", "business_type"]
+        allowed_fields = ["hub_code", "hub_name", "worker_code", "worker_name", "reference_number", "trip_reference_number", "customer_code", "customer_category", "customer_name", "vendor_code", "vendor_name", "business_type"]
 
         field = request.GET.get("field")  # Get the single field value
         query = request.GET.get("query")
@@ -1462,7 +1462,7 @@ class SearchAPIEndpoint(BaseAPIView):
 
 class SearchSingleValueAPI(BaseAPIView):
     model = Issue
-    allowed_fields = ["hub_code", "trip_reference_number", "reference_number", "worker_code", "vendor_code", "customer_code", "business_type"]
+    allowed_fields = ["hub_code", "trip_reference_number", "reference_number", "worker_code", "vendor_code", "customer_code", "customer_category", "business_type"]
 
     def get(self, request, slug, project_id):
         # Extract query parameters (only one should be provided)
