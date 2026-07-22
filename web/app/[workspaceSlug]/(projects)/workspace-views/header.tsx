@@ -5,13 +5,16 @@ import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // types
 import { Layers } from "lucide-react";
-import { IIssueDisplayFilterOptions, IIssueDisplayProperties, IIssueFilterOptions } from "@plane/types";
+import { IIssueDisplayFilterOptions, IIssueDisplayProperties, IIssueFilterOptions, TIssue } from "@plane/types";
+// services
+import { WorkspaceService } from "@/services/workspace.service";
 // ui
 import { useTranslation } from "@plane/i18n";
 import { Breadcrumbs, Button, Header } from "@plane/ui";
 // components
 import { BreadcrumbLink } from "@/components/common";
-import { DisplayFiltersSelection, FiltersDropdown, FilterSelection } from "@/components/issues";
+import { ALL_ISSUES } from "@plane/constants";
+import { DisplayFiltersSelection, DownloadIssuesButton, FiltersDropdown, FilterSelection } from "@/components/issues";
 import { CreateUpdateWorkspaceViewModal } from "@/components/workspace";
 // constants
 import { EIssueFilterType, EIssuesStoreType, ISSUE_DISPLAY_FILTERS_BY_LAYOUT } from "@/constants/issue";
@@ -28,8 +31,55 @@ export const GlobalIssuesHeader = observer(() => {
   const { workspaceSlug, globalViewId } = useParams();
   // store hooks
   const {
-    issuesFilter: { filters, updateFilters },
+    issuesFilter: { filters, updateFilters, getAppliedFilters },
+    issues: { groupedIssueIds },
+    issueMap,
   } = useIssues(EIssuesStoreType.GLOBAL);
+
+  const slug = Array.isArray(workspaceSlug) ? workspaceSlug[0] : workspaceSlug;
+  const viewId = Array.isArray(globalViewId) ? globalViewId[0] : globalViewId;
+
+  // Paginate the workspace issues endpoint with the current global-view filters
+  // so the CSV reflects the full filtered set rather than what's in memory.
+  // Returns `hitHardCap = true` when we stopped at the page cap while the server
+  // still had more results, so the UI can warn the user that the export is partial.
+  const fetchAllGlobalIssues = useCallback(async (): Promise<{
+    issues: TIssue[];
+    hitHardCap: boolean;
+  }> => {
+    if (!slug || !viewId) return { issues: [], hitHardCap: false };
+    const workspaceService = new WorkspaceService();
+    const appliedFilters = (getAppliedFilters?.(viewId) as Record<string, any>) || {};
+    const baseParams: Record<string, any> = { ...appliedFilters };
+    delete baseParams.group_by;
+    delete baseParams.sub_group_by;
+
+    const PER_PAGE = 500;
+    const HARD_CAP_PAGES = 50; // 25,000 issues max
+    const all: TIssue[] = [];
+    let cursor = `${PER_PAGE}:0:0`;
+    let hitHardCap = false;
+    for (let page = 0; page < HARD_CAP_PAGES; page++) {
+      const response = await workspaceService.getViewIssues(slug, {
+        ...baseParams,
+        cursor,
+        per_page: PER_PAGE,
+      });
+      const results = response?.results;
+      if (Array.isArray(results)) all.push(...(results as TIssue[]));
+
+      // Natural end: server has no more pages.
+      if (!response?.next_page_results || !response?.next_cursor) break;
+
+      // Last allowed iteration but server still has more → cap hit, flag it.
+      if (page === HARD_CAP_PAGES - 1) {
+        hitHardCap = true;
+        break;
+      }
+      cursor = response.next_cursor;
+    }
+    return { issues: all, hitHardCap };
+  }, [slug, viewId, getAppliedFilters]);
   const { getViewDetailsById } = useGlobalView();
   const { workspaceLabels } = useLabel();
   const { workspaceStates } = useProjectState();
@@ -143,6 +193,16 @@ export const GlobalIssuesHeader = observer(() => {
           ) : (
             <></>
           )}
+
+          <DownloadIssuesButton
+            issueIds={
+              (globalViewId && groupedIssueIds && (groupedIssueIds as any)[ALL_ISSUES]) || []
+            }
+            issueMap={issueMap}
+            displayProperties={issueFilters?.displayProperties ?? {}}
+            fileName={`${viewDetails?.name || viewId || "issues"}`}
+            fetchAllIssues={fetchAllGlobalIssues}
+          />
 
           <Button variant="primary" size="sm" onClick={() => setCreateViewModal(true)}>
           {t("add_view")}

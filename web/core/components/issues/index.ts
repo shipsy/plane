@@ -1,4 +1,5 @@
 export * from "./attachment";
+export * from "./download-issues-button";
 export * from "./bulk-operations";
 export * from "./issue-modal";
 export * from "./delete-issue-modal";

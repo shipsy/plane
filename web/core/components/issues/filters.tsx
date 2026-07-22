@@ -3,12 +3,14 @@
 import { useCallback, useState } from "react";
 import { observer } from "mobx-react";
 // types
-import { IIssueDisplayFilterOptions, IIssueDisplayProperties, IIssueFilterOptions } from "@plane/types";
+import { IIssueDisplayFilterOptions, IIssueDisplayProperties, IIssueFilterOptions, TIssue } from "@plane/types";
+// services
+import { IssueService } from "@/services/issue/issue.service";
 // ui
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/ui";
 
-import { DisplayFiltersSelection, FiltersDropdown, FilterSelection, LayoutSelection } from "@/components/issues";
+import { DisplayFiltersSelection, DownloadIssuesButton, FiltersDropdown, FilterSelection, LayoutSelection } from "@/components/issues";
 // constants
 import {
   EIssueFilterType,
@@ -40,8 +42,58 @@ const HeaderFilters = observer(({ currentProjectDetails, projectId, workspaceSlu
     project: { projectMemberIds },
   } = useMember();
   const {
-    issuesFilter: { issueFilters, updateFilters },
+    issuesFilter,
+    issues: { groupedIssueIds },
+    issueMap,
   } = useIssues(EIssuesStoreType.PROJECT);
+  const { issueFilters, updateFilters } = issuesFilter;
+
+  // Lazily build a fetcher that walks the issue list endpoint (one page at a time,
+  // ungrouped) with the current filters applied so the CSV reflects the full
+  // filtered set, not just what the on-screen layout has paginated in.
+  // Note: call `getAppliedFilters` off `issuesFilter` (not destructured) — it's a
+  // regular class method that uses `this`, so destructuring breaks the binding.
+  // Returns `hitHardCap = true` when we stopped at the page cap while the server
+  // still had more results, so the UI can warn the user that the export is partial.
+  const fetchAllProjectIssues = useCallback(async (): Promise<{
+    issues: TIssue[];
+    hitHardCap: boolean;
+  }> => {
+    if (!workspaceSlug || !projectId) return { issues: [], hitHardCap: false };
+    const issueService = new IssueService();
+    const appliedFilters = (issuesFilter.getAppliedFilters?.(projectId) as Record<string, any>) || {};
+    const baseParams: Record<string, any> = { ...appliedFilters };
+    // Force a flat (ungrouped) response and drop any layout-specific filters
+    // so we get every matching issue, not just the current group/page.
+    delete baseParams.group_by;
+    delete baseParams.sub_group_by;
+
+    const PER_PAGE = 500;
+    const HARD_CAP_PAGES = 50; // 25,000 issues max
+    const all: TIssue[] = [];
+    let cursor = `${PER_PAGE}:0:0`;
+    let hitHardCap = false;
+    for (let page = 0; page < HARD_CAP_PAGES; page++) {
+      const response = await issueService.getIssuesFromServer(workspaceSlug, projectId, {
+        ...baseParams,
+        cursor,
+        per_page: PER_PAGE,
+      });
+      const results = response?.results;
+      if (Array.isArray(results)) all.push(...(results as TIssue[]));
+
+      // Natural end: server has no more pages.
+      if (!response?.next_page_results || !response?.next_cursor) break;
+
+      // Last allowed iteration but server still has more → cap hit, flag it.
+      if (page === HARD_CAP_PAGES - 1) {
+        hitHardCap = true;
+        break;
+      }
+      cursor = response.next_cursor;
+    }
+    return { issues: all, hitHardCap };
+  }, [workspaceSlug, projectId, issuesFilter]);
 
   const { projectStates } = useProjectState();
   const { projectLabels } = useLabel();
@@ -134,6 +186,13 @@ const HeaderFilters = observer(({ currentProjectDetails, projectId, workspaceSlu
           moduleViewDisabled={!currentProjectDetails?.module_view}
         />
       </FiltersDropdown>
+      <DownloadIssuesButton
+        issueIds={(groupedIssueIds as any) ?? []}
+        issueMap={issueMap}
+        displayProperties={issueFilters?.displayProperties ?? {}}
+        fileName={currentProjectDetails?.identifier ? `${currentProjectDetails.identifier}-issues` : "issues"}
+        fetchAllIssues={fetchAllProjectIssues}
+      />
       {canUserCreateIssue ? (
         <Button className="hidden md:block" onClick={() => setAnalyticsModal(true)} variant="neutral-primary" size="sm">
           {t("analytics")}
