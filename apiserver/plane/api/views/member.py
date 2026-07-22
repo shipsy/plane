@@ -143,7 +143,7 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
             )
 
         # Check if user exists
-        user = User.objects.filter(email=email.lower()).first()
+        user = User.objects.filter(email__iexact=email).first()
         workspace_member = None
         project_member = None
 
@@ -172,7 +172,7 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
         )
 
         user_data = {
-                "email": email,
+                "email": email.lower(),
                 "display_name": request.data.get("display_name"),
                 "first_name": request.data.get("first_name", ""),
                 "last_name": request.data.get("last_name", ""),
@@ -296,21 +296,24 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    def create_user(self, data):
+    @staticmethod
+    def create_user(data):
+        username = data.get("username") or uuid.uuid4().hex
         user = User.objects.create(
             email=data.get("email"),
             display_name=data.get("display_name"),
             first_name=data.get("first_name", ""),
             last_name=data.get("last_name", ""),
-            username=data.get("username", uuid.uuid4().hex),
-            password=make_password(data.get("username", uuid.uuid4().hex)),
+            username=username,
+            password=make_password(username),
             is_password_autoset=False,
             is_active=True,
             hub_codes=data.get("hub_codes", []),
         )
         return user
 
-    def create_workspace_member(self, workspace_id, user, role=15):
+    @staticmethod
+    def create_workspace_member(workspace_id, user, role=15):
         # Create a workspace member for the user if not already a member
         workspace_member = WorkspaceMember.objects.create(
             workspace_id=workspace_id,
@@ -319,7 +322,8 @@ class ProjectMemberAPIEndpoint(BaseAPIView):
         )
         workspace_member.save()
 
-    def create_project_member(self, project_id, user, role=15):
+    @staticmethod
+    def create_project_member(project_id, user, role=15):
         # Create a project member for the user if not already a member
         project_member = ProjectMember.objects.create(
             project_id=project_id,

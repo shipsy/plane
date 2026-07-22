@@ -312,6 +312,7 @@ export const getComputedDisplayProperties = (
   hub_code: displayProperties?.hub_code ?? true,
   hub_name: displayProperties?.hub_name ?? true,
   customer_code: displayProperties?.customer_code ?? true,
+  customer_category: displayProperties?.customer_category ?? true,
   customer_name: displayProperties?.customer_name ?? true,
   vendor_name: displayProperties?.vendor_name ?? true,
   vendor_code: displayProperties?.vendor_code ?? true,

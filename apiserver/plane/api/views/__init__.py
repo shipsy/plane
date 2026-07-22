@@ -17,6 +17,7 @@ from .issue import (
     IssueBulkUpdateAPIEndpoint,
 )
 from .issue_type import IssueTypeAPIEndpoint,IssueTypeCustomPropertyAPIEndpoint
+from .ticket_master import TicketMasterAPIEndpoint
 from .attachment import IssueAttachmentV2Endpoint
 from .cycle import (
     CycleAPIEndpoint,

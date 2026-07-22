@@ -3,8 +3,8 @@ import csv
 import io
 import zipfile
 
-import boto3
-from botocore.client import Config
+# Third party imports
+from celery import shared_task
 
 # Django imports
 from django.conf import settings
@@ -12,17 +12,19 @@ from django.db.models import Exists, F, Func, OuterRef, Q
 from django.utils import timezone
 
 # Module imports
+from plane.utils.s3_client import get_s3_client
+from openpyxl import Workbook
+
+# Module imports
 from plane.app.permissions import ROLE
 from plane.db.models import (
     ExporterHistory,
     FileAsset,
     Issue,
-    IssueCustomProperty,
     IssueLink,
     ProjectMember,
     State,
 )
-from plane.utils.constants import ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP
 from plane.utils.exception_logger import log_exception
 from plane.utils.issue_filters import (
     apply_user_hub_filters,
@@ -133,13 +135,7 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
     expires_in = 7 * 24 * 60 * 60
 
     if settings.USE_MINIO:
-        upload_s3 = boto3.client(
-            "s3",
-            endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            config=Config(signature_version="s3v4"),
-        )
+        upload_s3 = get_s3_client(endpoint_url=settings.AWS_S3_ENDPOINT_URL)
         upload_s3.upload_fileobj(
             file_obj,
             settings.AWS_STORAGE_BUCKET_NAME,
@@ -148,12 +144,9 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
         )
 
         # Generate presigned url for the uploaded file with different base
-        presign_s3 = boto3.client(
-            "s3",
+        presign_s3 = get_s3_client(
             endpoint_url=f"{settings.AWS_S3_URL_PROTOCOL}//{str(settings.AWS_S3_CUSTOM_DOMAIN).replace('/uploads', '')}/",
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            config=Config(signature_version="s3v4"),
+            presign=True,
         )
 
         presigned_url = presign_s3.generate_presigned_url(
@@ -165,22 +158,18 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
             ExpiresIn=expires_in,
         )
     else:
-        # If endpoint url is present, use it
+        # If endpoint url is present, use it. The upload client relies on the
+        # default credential provider chain (IRSA) when static keys are unset,
+        # while the presign client uses the dedicated long-lived keys.
         if settings.AWS_S3_ENDPOINT_URL:
-            s3 = boto3.client(
-                "s3",
-                endpoint_url=settings.AWS_S3_ENDPOINT_URL,
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                config=Config(signature_version="s3v4"),
+            s3 = get_s3_client(endpoint_url=settings.AWS_S3_ENDPOINT_URL)
+            presign_s3 = get_s3_client(
+                endpoint_url=settings.AWS_S3_ENDPOINT_URL, presign=True
             )
         else:
-            s3 = boto3.client(
-                "s3",
-                region_name=settings.AWS_REGION,
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-                config=Config(signature_version="s3v4"),
+            s3 = get_s3_client(region_name=settings.AWS_REGION)
+            presign_s3 = get_s3_client(
+                region_name=settings.AWS_REGION, presign=True
             )
 
         # Upload the file to S3
@@ -192,7 +181,7 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
         )
 
         # Generate presigned url for the uploaded file
-        presigned_url = s3.generate_presigned_url(
+        presigned_url = presign_s3.generate_presigned_url(
             "get_object",
             Params={
                 "Bucket": settings.AWS_STORAGE_BUCKET_NAME,
@@ -423,39 +412,16 @@ def _introspect_field(key):
 # from the display-properties picker.
 EXCLUDED_EXPORT_KEYS = {"cycle", "modules", "estimate"}
 
+def resolve_export_columns(display_properties=None):
+    """Build the ordered list of `_Resolver` objects for this export.
 
-# Custom properties live in the `IssueCustomProperty` key/value table, not on
-# `Issue`, so they can't be introspected or joined through `.values(...)`
-# (joining would fan out one row per property, on top of the assignee/label
-# fan-out). Instead we fetch them in one extra query and append them as
-# trailing columns in `generate_csv`.
-def fetch_custom_property_map(issue_ids, keys):
-    """Build `issue_id → {key: cell}` for the given issues, rendering
-    whichever typed value column is populated."""
-    if not keys or not issue_ids:
-        return {}
-    cp_map = {}
-    rows = IssueCustomProperty.objects.filter(
-        issue_id__in=issue_ids,
-        key__in=keys,
-        deleted_at__isnull=True,
-    ).values("issue_id", "key", "value", "int_value", "bool_value", "date_value")
-    for row in rows:
-        if row["value"] not in (None, ""):
-            cell = row["value"]
-        elif row["int_value"] is not None:
-            cell = row["int_value"]
-        elif row["bool_value"] is not None:
-            cell = "Yes" if row["bool_value"] else "No"
-        elif row["date_value"] is not None:
-            cell = dateConverter(row["date_value"])
-        else:
-            cell = ""
-        # Default ordering is -created_at, so the first row seen per
-        # (issue, key) is the most recent one.
-        cp_map.setdefault(row["issue_id"], {}).setdefault(row["key"], cell)
-    return cp_map
-
+    Order:
+      1. ALWAYS_COLUMNS (ID, Name) — fixed.
+      2. For each key in `display_properties` (in the order the frontend
+         supplied them):
+            a. If it's in COMPLEX_RESOLVERS → use that.
+            b. Else, try `Issue._meta.get_field(key)` introspection.
+            c. Else, skip (unknown key).
 
 def resolve_export_columns(display_properties=None):
     """Build the ordered list of `_Resolver` objects for this export.
@@ -589,12 +555,8 @@ def _merge_multivalue_cell(existing_cell, incoming_cell):
     return f"{existing}, {incoming}"
 
 
-def generate_csv(
-    header, project_id, issues, files, columns, custom_keys=(), custom_property_map=None
-):
-    """Generate CSV export for the passed issues using `columns`, plus one
-    trailing column per key in `custom_keys` filled from
-    `custom_property_map` (issue_id → {key: cell}).
+def generate_csv(header, project_id, issues, files, columns):
+    """Generate CSV export for the passed issues using `columns`.
 
     Deduplicates M2M fan-out rows (assignees × labels) by issue ID in O(1)
     per input row using a dict keyed on the issue's ID cell.
@@ -602,15 +564,11 @@ def generate_csv(
     id_idx = _index_for(columns, "ID")
     assignee_idx = _index_for(columns, "Assignees")
     labels_idx = _index_for(columns, "Labels")
-    custom_property_map = custom_property_map or {}
 
     id_to_row = {}
     insertion_order = []
     for issue in issues:
         row = generate_table_row(issue, columns)
-        if custom_keys:
-            cells = custom_property_map.get(issue["id"], {})
-            row += [cells.get(key, "") for key in custom_keys]
         row_id = row[id_idx] if id_idx is not None else id(row)
         existing = id_to_row.get(row_id)
         if existing is None:
@@ -664,11 +622,8 @@ def issue_export_task(
             order_by_param=order_by_param,
         )
 
-        # Custom property columns (workspace-specific, e.g. heineken) always
-        # go at the end, after whatever the display-properties picker selected.
-        custom_keys = ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP.get(slug, [])
         columns = resolve_export_columns(display_properties)
-        header = [r.label for r in columns] + list(custom_keys)
+        header = [r.label for r in columns]
 
         # Cap the export to EXPORT_ROW_LIMIT distinct issues *before* the
         # M2M-joined .values() fan-out. We slice the already-ordered base
@@ -685,8 +640,6 @@ def issue_export_task(
             base_qs.filter(id__in=capped_ids), columns
         )
 
-        custom_property_map = fetch_custom_property_map(capped_ids, custom_keys)
-
         truncation_notice_row = (
             [
                 f"NOTE: Export truncated to the first {EXPORT_ROW_LIMIT} "
@@ -700,15 +653,9 @@ def issue_export_task(
         if multiple:
             for project_id in project_ids:
                 issues = workspace_issues.filter(project__id=project_id)
-                generate_csv(
-                    header, project_id, issues, files, columns,
-                    custom_keys, custom_property_map,
-                )
+                generate_csv(header, project_id, issues, files, columns)
         else:
-            generate_csv(
-                header, workspace_id, workspace_issues, files, columns,
-                custom_keys, custom_property_map,
-            )
+            generate_csv(header, workspace_id, workspace_issues, files, columns)
 
         # Prepend a single-cell truncation notice to every generated CSV.
         if truncation_notice_row:

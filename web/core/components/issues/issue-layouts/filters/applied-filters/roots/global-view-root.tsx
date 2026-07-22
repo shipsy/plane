@@ -21,7 +21,15 @@ import { DEFAULT_GLOBAL_VIEWS_LIST } from "@/constants/workspace";
 // helpers
 import { cn } from "@/helpers/common.helper";
 // hooks
-import { useEventTracker, useGlobalView, useIssues, useLabel, useUser, useUserPermissions } from "@/hooks/store";
+import {
+  useEventTracker,
+  useGlobalView,
+  useIssues,
+  useLabel,
+  useProjectState,
+  useUser,
+  useUserPermissions,
+} from "@/hooks/store";
 import { EUserPermissions, EUserPermissionsLevel } from "@/plane-web/constants/user-permissions";
 import { getAreFiltersEqual } from "../../../utils";
 
@@ -38,6 +46,7 @@ export const GlobalViewsAppliedFiltersRoot = observer((props: Props) => {
     issuesFilter: { filters, updateFilters },
   } = useIssues(EIssuesStoreType.GLOBAL);
   const { workspaceLabels } = useLabel();
+  const { workspaceStates } = useProjectState();
   const { globalViewMap, updateGlobalView } = useGlobalView();
   const { captureEvent } = useEventTracker();
   const { data } = useUser();
@@ -156,6 +165,7 @@ export const GlobalViewsAppliedFiltersRoot = observer((props: Props) => {
 
       <AppliedFiltersList
         labels={workspaceLabels ?? undefined}
+        states={workspaceStates}
         appliedFilters={appliedFilters ?? {}}
         handleClearAllFilters={handleClearAllFilters}
         handleRemoveFilter={handleRemoveFilter}

@@ -188,6 +188,8 @@ const ISSUE_ORDERBY_KEY: Record<TIssueOrderByOptions, keyof TIssue> = {
   "-hub_name": "hub_name",
   customer_code: "customer_code",
   "-customer_code": "customer_code",
+  customer_category: "customer_category",
+  "-customer_category": "customer_category",
   customer_name: "customer_name",
   "-customer_name": "customer_name",
   vendor_name: "vendor_name",
