@@ -3,9 +3,6 @@ import csv
 import io
 import zipfile
 
-# Third party imports
-from celery import shared_task
-
 # Django imports
 from django.conf import settings
 from django.db.models import Exists, F, Func, OuterRef, Q
@@ -13,7 +10,6 @@ from django.utils import timezone
 
 # Module imports
 from plane.utils.s3_client import get_s3_client
-from openpyxl import Workbook
 
 # Module imports
 from plane.app.permissions import ROLE
@@ -655,9 +651,16 @@ def issue_export_task(
             order_by_param=order_by_param,
         )
 
-        # Custom property columns (workspace-specific, e.g. heineken) always
-        # go at the end, after whatever the display-properties picker selected.
+        # Custom property columns (workspace-specific, e.g. heineken) go at
+        # the end, after whatever the display-properties picker selected.
+        # When the caller sends display_properties, only the custom keys
+        # present in it are exported; without it (plain API calls) all mapped
+        # keys are included.
         custom_keys = ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP.get(slug, [])
+        if display_properties is not None:
+            # Preserve the caller's ordering so the CSV columns match the
+            # order the columns are shown on the page.
+            custom_keys = [k for k in display_properties if k in custom_keys]
         columns = resolve_export_columns(display_properties)
         header = [r.label for r in columns] + list(custom_keys)
 
