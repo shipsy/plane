@@ -13,12 +13,13 @@ import { ExportHistory } from "./export-history";
 import { EIssuesStoreType } from "@/constants/issue";
 import { SPREADSHEET_PROPERTY_LIST } from "@/constants/spreadsheet";
 // hooks
-import { useIssues, useUser } from "@/hooks/store";
+import { useIssues, useUser, useUserPermissions } from "@/hooks/store";
 
 export const WorkspaceExportsPopover = observer(() => {
   const { data: currentUser } = useUser();
-  const { globalViewId } = useParams();
+  const { globalViewId, workspaceSlug } = useParams();
   const { issuesFilter } = useIssues(EIssuesStoreType.GLOBAL);
+  const { workspaceUserInfo } = useUserPermissions();
   const [exportProvider, setExportProvider] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -34,16 +35,25 @@ export const WorkspaceExportsPopover = observer(() => {
   const displayProperties = viewId
     ? (issuesFilter.getIssueFilters?.(viewId)?.displayProperties as Record<string, boolean> | undefined)
     : undefined;
-  // Preserve the visible column order from SPREADSHEET_PROPERTY_LIST so the
-  // CSV columns match the order shown in the spreadsheet view. Custom
-  // property keys (workspace-specific, not in the standard list) are
-  // appended after, so the server can filter its custom columns to the
-  // user's selection.
+  // Custom property columns in the same order the spreadsheet view renders
+  // them (workspaceUserInfo custom_properties key order — see
+  // spreadsheet-view.tsx), so the CSV column order matches the page.
+  const customPropertyKeys = Object.keys(
+    workspaceUserInfo[workspaceSlug?.toString() ?? ""]?.default_props?.display_properties?.custom_properties || {}
+  );
+  // Preserve the visible column order: standard columns follow
+  // SPREADSHEET_PROPERTY_LIST, then custom properties in on-screen order,
+  // then any remaining enabled keys (e.g. key, issue_type) the server
+  // resolves by its own registry order.
   const enabledDisplayProperties = displayProperties
     ? [
         ...SPREADSHEET_PROPERTY_LIST.filter((key) => !!displayProperties[key]),
+        ...customPropertyKeys.filter((key) => !!displayProperties[key]),
         ...Object.keys(displayProperties).filter(
-          (key) => !!displayProperties[key] && !SPREADSHEET_PROPERTY_LIST.includes(key as never)
+          (key) =>
+            !!displayProperties[key] &&
+            !SPREADSHEET_PROPERTY_LIST.includes(key as never) &&
+            !customPropertyKeys.includes(key)
         ),
       ].join(",")
     : undefined;

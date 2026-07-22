@@ -658,7 +658,9 @@ def issue_export_task(
         # keys are included.
         custom_keys = ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP.get(slug, [])
         if display_properties is not None:
-            custom_keys = [k for k in custom_keys if k in display_properties]
+            # Preserve the caller's ordering so the CSV columns match the
+            # order the columns are shown on the page.
+            custom_keys = [k for k in display_properties if k in custom_keys]
         columns = resolve_export_columns(display_properties)
         header = [r.label for r in columns] + list(custom_keys)
 
