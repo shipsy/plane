@@ -35,9 +35,17 @@ export const WorkspaceExportsPopover = observer(() => {
     ? (issuesFilter.getIssueFilters?.(viewId)?.displayProperties as Record<string, boolean> | undefined)
     : undefined;
   // Preserve the visible column order from SPREADSHEET_PROPERTY_LIST so the
-  // CSV columns match the order shown in the spreadsheet view.
+  // CSV columns match the order shown in the spreadsheet view. Custom
+  // property keys (workspace-specific, not in the standard list) are
+  // appended after, so the server can filter its custom columns to the
+  // user's selection.
   const enabledDisplayProperties = displayProperties
-    ? SPREADSHEET_PROPERTY_LIST.filter((key) => !!displayProperties[key]).join(",")
+    ? [
+        ...SPREADSHEET_PROPERTY_LIST.filter((key) => !!displayProperties[key]),
+        ...Object.keys(displayProperties).filter(
+          (key) => !!displayProperties[key] && !SPREADSHEET_PROPERTY_LIST.includes(key as never)
+        ),
+      ].join(",")
     : undefined;
 
   const filterParams = {

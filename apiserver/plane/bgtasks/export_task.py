@@ -651,9 +651,14 @@ def issue_export_task(
             order_by_param=order_by_param,
         )
 
-        # Custom property columns (workspace-specific, e.g. heineken) always
-        # go at the end, after whatever the display-properties picker selected.
+        # Custom property columns (workspace-specific, e.g. heineken) go at
+        # the end, after whatever the display-properties picker selected.
+        # When the caller sends display_properties, only the custom keys
+        # present in it are exported; without it (plain API calls) all mapped
+        # keys are included.
         custom_keys = ALLOWED_CUSTOM_PROPERTY_WORKSPACE_MAP.get(slug, [])
+        if display_properties is not None:
+            custom_keys = [k for k in custom_keys if k in display_properties]
         columns = resolve_export_columns(display_properties)
         header = [r.label for r in columns] + list(custom_keys)
 
