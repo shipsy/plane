@@ -2,12 +2,12 @@
 import os
 
 # Third party imports
-import boto3
 from botocore.exceptions import ClientError
 from urllib.parse import quote
 
 # Module imports
 from plane.utils.exception_logger import log_exception
+from plane.utils.s3_client import get_s3_client
 from storages.backends.s3boto3 import S3Boto3Storage
 
 
@@ -26,10 +26,6 @@ class S3Storage(S3Boto3Storage):
         return super().get_available_name(name, max_length=max_length)
 
     def __init__(self, request=None):
-        # Get the AWS credentials and bucket name from the environment
-        self.aws_access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
-        # Use the AWS_SECRET_ACCESS_KEY environment variable for the secret key
-        self.aws_secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
         # Use the AWS_S3_BUCKET_NAME environment variable for the bucket name
         self.aws_storage_bucket_name = os.environ.get("AWS_S3_BUCKET_NAME")
         # Use the AWS_REGION environment variable for the region
@@ -38,30 +34,29 @@ class S3Storage(S3Boto3Storage):
         self.aws_s3_endpoint_url = os.environ.get(
             "AWS_S3_ENDPOINT_URL"
         ) or os.environ.get("MINIO_ENDPOINT_URL")
+
         if os.environ.get("USE_MINIO") == "1":
-            # Create an S3 client for MinIO
-            self.s3_client = boto3.client(
-                "s3",
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-                region_name=self.aws_region,
-                endpoint_url=(
-                    f"https://{request.get_host()}"
-                    if request
-                    else self.aws_s3_endpoint_url
-                ),
-                config=boto3.session.Config(signature_version="s3v4"),
+            endpoint_url = (
+                f"https://{request.get_host()}"
+                if request
+                else self.aws_s3_endpoint_url
             )
         else:
-            # Create an S3 client
-            self.s3_client = boto3.client(
-                "s3",
-                aws_access_key_id=self.aws_access_key_id,
-                aws_secret_access_key=self.aws_secret_access_key,
-                region_name=self.aws_region,
-                endpoint_url=self.aws_s3_endpoint_url,
-                config=boto3.session.Config(signature_version="s3v4"),
-            )
+            endpoint_url = self.aws_s3_endpoint_url
+
+        # General-purpose S3 client. Resolves credentials via the default
+        # provider chain (IRSA) when static keys are absent.
+        self.s3_client = get_s3_client(
+            endpoint_url=endpoint_url,
+            region_name=self.aws_region,
+        )
+        # Dedicated client for signing presigned GET URLs with the long-lived
+        # AWS_S3_ACCESS_KEY / AWS_S3_SECRET_KEY credentials.
+        self.presigned_s3_client = get_s3_client(
+            endpoint_url=endpoint_url,
+            region_name=self.aws_region,
+            presign=True,
+        )
 
     def generate_presigned_post(
         self, object_name, file_type, file_size, expiration=3600
@@ -126,7 +121,7 @@ class S3Storage(S3Boto3Storage):
         )
         """Generate a presigned URL to share an S3 object"""
         try:
-            response = self.s3_client.generate_presigned_url(
+            response = self.presigned_s3_client.generate_presigned_url(
                 "get_object",
                 Params={
                     "Bucket": self.aws_storage_bucket_name,
