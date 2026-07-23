@@ -59,6 +59,9 @@ export const SingleExport: FC<Props> = ({ service, refreshing }) => {
           |
           <span>Exported by {service?.initiated_by_detail?.display_name}</span>
         </div>
+        {service.status === "failed" && service.reason && (
+          <p className="mt-1 break-all text-xs text-red-500">{service.reason}</p>
+        )}
       </div>
       {checkExpiry(service.created_at) ? (
         <>
