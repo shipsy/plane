@@ -124,6 +124,50 @@ EXPORT_CONTENT_TYPES = {
 EXPORT_ROW_LIMIT = 10000
 
 
+def _upload_with_credential_fallback(
+    file_obj, file_name, content_type, endpoint_url=None, region_name=None
+):
+    """Upload via the default credential chain (ECS task role / IRSA) and,
+    if that identity is rejected or lacks write access to the bucket, retry
+    once with the dedicated static keys (``AWS_S3_ACCESS_KEY`` /
+    ``AWS_S3_SECRET_KEY``). Those keys are kept long-lived for presigning
+    and were the working upload path before the role migration — exports run
+    in the API service now, whose role may not have bucket write access."""
+    from boto3.exceptions import S3UploadFailedError
+    from botocore.exceptions import BotoCoreError, ClientError
+
+    client_kwargs = {}
+    if endpoint_url:
+        client_kwargs["endpoint_url"] = endpoint_url
+    if region_name:
+        client_kwargs["region_name"] = region_name
+
+    extra_args = {"ContentType": content_type}
+    # boto3's transfer manager closes the file object when an upload fails,
+    # so snapshot the payload and hand each attempt its own buffer.
+    file_obj.seek(0)
+    payload = file_obj.read()
+    try:
+        get_s3_client(**client_kwargs).upload_fileobj(
+            io.BytesIO(payload),
+            settings.AWS_STORAGE_BUCKET_NAME,
+            file_name,
+            ExtraArgs=extra_args,
+        )
+        return
+    except (BotoCoreError, ClientError, S3UploadFailedError) as role_error:
+        log_exception(role_error)
+        # presign=True resolves the static AWS_S3_ACCESS_KEY / AWS_S3_SECRET_KEY
+        # pair; when those are unset this is the same default chain and the
+        # retry fails with the same (re-raised) error.
+        get_s3_client(presign=True, **client_kwargs).upload_fileobj(
+            io.BytesIO(payload),
+            settings.AWS_STORAGE_BUCKET_NAME,
+            file_name,
+            ExtraArgs=extra_args,
+        )
+
+
 def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
     content_type = EXPORT_CONTENT_TYPES.get(extension, "application/octet-stream")
     file_name = (
@@ -156,26 +200,24 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
             ExpiresIn=expires_in,
         )
     else:
-        # If endpoint url is present, use it. The upload client relies on the
-        # default credential provider chain (IRSA) when static keys are unset,
-        # while the presign client uses the dedicated long-lived keys.
+        # If endpoint url is present, use it. The presign client uses the
+        # dedicated long-lived keys so the URL survives role-session expiry.
         if settings.AWS_S3_ENDPOINT_URL:
-            s3 = get_s3_client(endpoint_url=settings.AWS_S3_ENDPOINT_URL)
             presign_s3 = get_s3_client(
                 endpoint_url=settings.AWS_S3_ENDPOINT_URL, presign=True
             )
         else:
-            s3 = get_s3_client(region_name=settings.AWS_REGION)
             presign_s3 = get_s3_client(
                 region_name=settings.AWS_REGION, presign=True
             )
 
-        # Upload the file to S3
-        s3.upload_fileobj(
+        # Upload the file to S3 (task role first, static keys as fallback)
+        _upload_with_credential_fallback(
             file_obj,
-            settings.AWS_STORAGE_BUCKET_NAME,
             file_name,
-            ExtraArgs={"ContentType": content_type},
+            content_type,
+            endpoint_url=settings.AWS_S3_ENDPOINT_URL or None,
+            region_name=None if settings.AWS_S3_ENDPOINT_URL else settings.AWS_REGION,
         )
 
         # Generate presigned url for the uploaded file

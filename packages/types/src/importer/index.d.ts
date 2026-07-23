@@ -40,6 +40,7 @@ export interface IExportData {
   project: string[];
   provider: string;
   status: string;
+  reason?: string;
   url: string;
   token: string;
   created_by: string;
