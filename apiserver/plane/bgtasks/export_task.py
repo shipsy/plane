@@ -234,9 +234,15 @@ def upload_to_s3(file_obj, workspace_id, token_id, slug, extension="zip"):
 
     # Update the exporter instance with the presigned url
     if presigned_url:
-        exporter_instance.url = presigned_url
         exporter_instance.status = "completed"
         exporter_instance.key = file_name
+        # URLs signed with role-session credentials (IRSA / task role) carry
+        # an X-Amz-Security-Token and blow past the url column's 800-char
+        # limit. The list endpoint re-signs a fresh URL from `key` on every
+        # request anyway, so only persist the URL when it fits.
+        exporter_instance.url = (
+            presigned_url if len(presigned_url) <= 800 else None
+        )
     else:
         exporter_instance.status = "failed"
 
