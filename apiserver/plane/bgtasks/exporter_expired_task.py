@@ -17,9 +17,11 @@ from plane.utils.s3_client import get_s3_client
 @shared_task
 def delete_old_s3_link():
     # Get a list of keys and IDs to process
+    # Completed exports are identified by `key` — `url` may be empty when the
+    # presigned URL was too long to persist (role-session credentials).
     expired_exporter_history = ExporterHistory.objects.filter(
-        Q(url__isnull=False)
-        & Q(created_at__lte=timezone.now() - timedelta(days=8))
+        Q(created_at__lte=timezone.now() - timedelta(days=8))
+        & (Q(url__isnull=False) | (Q(key__isnull=False) & ~Q(key="")))
     ).values_list("key", "id")
     if settings.USE_MINIO:
         s3 = get_s3_client(endpoint_url=settings.AWS_S3_ENDPOINT_URL)
@@ -38,4 +40,4 @@ def delete_old_s3_link():
                     Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=file_name
                 )
 
-        ExporterHistory.objects.filter(id=exporter_id).update(url=None)
+        ExporterHistory.objects.filter(id=exporter_id).update(url=None, key="")
