@@ -25,12 +25,22 @@ interface Props {
   referenceElement: HTMLButtonElement | null;
   placement: Placement | undefined;
   isOpen: boolean;
+  value?: string | string[] | null;
 }
 
+// maximum number of options rendered in the dropdown at once
+const OPTIONS_RENDER_LIMIT = 20;
+// minimum characters before the query is searched on the server
+const SERVER_SEARCH_MIN_CHARS = 3;
+// debounce interval for server search
+const SERVER_SEARCH_DEBOUNCE_MS = 300;
+
 export const MemberOptions: React.FC<Props> = observer((props: Props) => {
-  const { projectId, referenceElement, placement, isOpen, optionsClassName = "" } = props;
+  const { projectId, referenceElement, placement, isOpen, optionsClassName = "", value } = props;
   // states
   const [query, setQuery] = useState("");
+  const [searchedUserIds, setSearchedUserIds] = useState<string[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const [popperElement, setPopperElement] = useState<HTMLDivElement | null>(null);
   // refs
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -39,7 +49,7 @@ export const MemberOptions: React.FC<Props> = observer((props: Props) => {
   const { workspaceSlug } = useParams();
   const {
     getUserDetails,
-    project: { getProjectMemberIds, fetchProjectMembers },
+    project: { getProjectMemberIds, searchProjectMembers },
     workspace: { workspaceMemberIds },
   } = useMember();
   const { data: currentUser } = useUser();
@@ -68,8 +78,41 @@ export const MemberOptions: React.FC<Props> = observer((props: Props) => {
 
   const memberIds = projectId ? getProjectMemberIds(projectId) : workspaceMemberIds;
   const onOpen = () => {
-    if (!memberIds && workspaceSlug && projectId) fetchProjectMembers(workspaceSlug.toString(), projectId);
+    if (!memberIds && workspaceSlug && projectId)
+      searchProjectMembers(workspaceSlug.toString(), projectId, { per_page: OPTIONS_RENDER_LIMIT });
   };
+
+  // server-side member search for project dropdowns, debounced and
+  // triggered only once the query is long enough
+  const trimmedQuery = query.trim();
+  useEffect(() => {
+    if (!workspaceSlug || !projectId || trimmedQuery.length < SERVER_SEARCH_MIN_CHARS) {
+      setSearchedUserIds(null);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      searchProjectMembers(workspaceSlug.toString(), projectId, {
+        search: trimmedQuery,
+        per_page: OPTIONS_RENDER_LIMIT,
+      })
+        .then((userIds) => {
+          if (!cancelled) setSearchedUserIds(userIds);
+        })
+        .catch(() => {
+          if (!cancelled) setSearchedUserIds(null);
+        })
+        .finally(() => {
+          if (!cancelled) setIsSearching(false);
+        });
+    }, SERVER_SEARCH_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [trimmedQuery, workspaceSlug, projectId, searchProjectMembers]);
 
   const searchInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (query !== "" && e.key === "Escape") {
@@ -78,12 +121,43 @@ export const MemberOptions: React.FC<Props> = observer((props: Props) => {
     }
   };
 
-  const options = memberIds?.map((userId) => {
+  const isServerSearchActive = !!projectId && searchedUserIds !== null;
+  const baseIds = isServerSearchActive ? searchedUserIds : memberIds;
+
+  // pin the currently selected member(s) to the top of the list
+  const selectedIds = Array.isArray(value) ? value : value ? [value] : [];
+  let optionIds = baseIds;
+  if (baseIds) {
+    if (isServerSearchActive) {
+      optionIds = [...baseIds].sort(
+        (a, b) => Number(selectedIds.includes(b)) - Number(selectedIds.includes(a))
+      );
+    } else {
+      optionIds = [
+        ...selectedIds.filter((userId) => getUserDetails(userId)),
+        ...baseIds.filter((userId) => !selectedIds.includes(userId)),
+      ];
+    }
+  }
+
+  // filter at the id level and only build option objects for the rendered
+  // slice, so a large member list never causes a heavy render
+  const queryLowerCase = query.toLowerCase();
+  const matchingIds =
+    isServerSearchActive || query === ""
+      ? optionIds
+      : optionIds?.filter((userId) => {
+          const userDetails = getUserDetails(userId);
+          return `${userDetails?.display_name} ${userDetails?.first_name} ${userDetails?.last_name}`
+            .toLowerCase()
+            .includes(queryLowerCase);
+        });
+
+  const visibleOptions = matchingIds?.slice(0, OPTIONS_RENDER_LIMIT).map((userId) => {
     const userDetails = getUserDetails(userId);
 
     return {
       value: userId,
-      query: `${userDetails?.display_name} ${userDetails?.first_name} ${userDetails?.last_name}`,
       content: (
         <div className="flex items-center gap-2">
           <Avatar name={userDetails?.display_name} src={getFileURL(userDetails?.avatar_url ?? "")} />
@@ -92,9 +166,6 @@ export const MemberOptions: React.FC<Props> = observer((props: Props) => {
       ),
     };
   });
-
-  const filteredOptions =
-    query === "" ? options : options?.filter((o) => o.query.toLowerCase().includes(query.toLowerCase()));
 
   return createPortal(
     <Combobox.Options data-prevent-outside-click static>
@@ -123,9 +194,11 @@ export const MemberOptions: React.FC<Props> = observer((props: Props) => {
           />
         </div>
         <div className="mt-2 max-h-48 space-y-1 overflow-y-scroll">
-          {filteredOptions ? (
-            filteredOptions.length > 0 ? (
-              filteredOptions.map((option) => (
+          {isSearching ? (
+            <p className="px-1.5 py-1 italic text-custom-text-400">{t("loading")}</p>
+          ) : visibleOptions ? (
+            visibleOptions.length > 0 ? (
+              visibleOptions.map((option) => (
                 <Combobox.Option
                   key={option.value}
                   value={option.value}

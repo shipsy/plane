@@ -174,6 +174,7 @@ export const MemberDropdown: React.FC<Props> = observer((props) => {
           projectId={projectId}
           placement={placement}
           referenceElement={referenceElement}
+          value={value}
         />
       )}
     </ComboDropDown>

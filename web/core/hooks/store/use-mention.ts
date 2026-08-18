@@ -22,16 +22,18 @@ export const useMention = ({ workspaceSlug, projectId, members, user }: Props) =
   const userRef = useRef<IUser | undefined>();
 
   const {
-    project: { fetchProjectMembers },
+    project: { searchProjectMembers },
   } = useMember();
 
   useEffect(() => {
     if (members) projectMembersRef.current = members;
     else {
       if (!workspaceSlug || !projectId) return;
-      fetchProjectMembers(workspaceSlug.toString(), projectId.toString());
+      // load a capped member list for mention suggestions instead of the
+      // full project member list
+      searchProjectMembers(workspaceSlug.toString(), projectId.toString(), { per_page: 20 });
     }
-  }, [fetchProjectMembers, members, projectId, workspaceSlug]);
+  }, [searchProjectMembers, members, projectId, workspaceSlug]);
 
   useEffect(() => {
     if (userRef) userRef.current = user;
@@ -71,7 +73,8 @@ export const useMention = ({ workspaceSlug, projectId, members, user }: Props) =
   const mentionSuggestions = async (): Promise<IMentionSuggestion[]> => {
     if (members && projectMembersRef.current && projectMembersRef.current.length > 0) {
       // If data is already available, return it immediately
-      return projectMembersRef.current.map((memberDetails) => ({
+      // cap the suggestions so the mention popup never renders a huge list
+      return projectMembersRef.current.slice(0, 20).map((memberDetails) => ({
         entity_name: "user_mention",
         entity_identifier: `${memberDetails?.id}`,
         id: `${memberDetails?.id}`,
@@ -84,7 +87,7 @@ export const useMention = ({ workspaceSlug, projectId, members, user }: Props) =
     } else {
       // Wait for data to be available
       const membersList = await waitForData();
-      return membersList.map((memberDetails) => ({
+      return membersList.slice(0, 20).map((memberDetails) => ({
         entity_name: "user_mention",
         entity_identifier: `${memberDetails?.id}`,
         id: `${memberDetails?.id}`,

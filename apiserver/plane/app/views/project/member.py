@@ -1,3 +1,6 @@
+# Django imports
+from django.db.models import Q
+
 # Third Party imports
 from rest_framework.response import Response
 from rest_framework import status
@@ -210,6 +213,34 @@ class ProjectMemberViewSet(BaseViewSet):
             member__is_bot=False,
             is_active=True,
         ).select_related("project", "member", "workspace")
+
+        # Opt-in server-side search and limit for large projects; without
+        # these params the full member list is returned as before.
+        search = request.query_params.get("search")
+        if search:
+            project_members = project_members.filter(
+                Q(member__display_name__icontains=search)
+                | Q(member__first_name__icontains=search)
+                | Q(member__last_name__icontains=search)
+            )
+
+        per_page = request.query_params.get("per_page")
+        if per_page:
+            try:
+                per_page = int(per_page)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid per_page parameter."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if per_page <= 0:
+                return Response(
+                    {"error": "Invalid per_page parameter."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            project_members = project_members.order_by(
+                "member__display_name"
+            )[:per_page]
 
         serializer = ProjectMemberRoleSerializer(
             project_members, fields=("id", "member", "role"), many=True

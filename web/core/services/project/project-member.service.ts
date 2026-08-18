@@ -9,8 +9,12 @@ export class ProjectMemberService extends APIService {
     super(API_BASE_URL);
   }
 
-  async fetchProjectMembers(workspaceSlug: string, projectId: string): Promise<IProjectMembership[]> {
-    return this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/members/`)
+  async fetchProjectMembers(
+    workspaceSlug: string,
+    projectId: string,
+    params?: { search?: string; per_page?: number }
+  ): Promise<IProjectMembership[]> {
+    return this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/members/`, { params })
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

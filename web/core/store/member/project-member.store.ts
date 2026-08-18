@@ -40,6 +40,11 @@ export interface IProjectMemberStore {
   getProjectMemberIds: (projectId: string) => string[] | null;
   // fetch actions
   fetchProjectMembers: (workspaceSlug: string, projectId: string) => Promise<IProjectMembership[]>;
+  searchProjectMembers: (
+    workspaceSlug: string,
+    projectId: string,
+    params?: { search?: string; per_page?: number }
+  ) => Promise<string[]>;
   // bulk operation actions
   bulkAddMembersToProject: (
     workspaceSlug: string,
@@ -77,6 +82,7 @@ export class ProjectMemberStore implements IProjectMemberStore {
       projectMemberIds: computed,
       // actions
       fetchProjectMembers: action,
+      searchProjectMembers: action,
       bulkAddMembersToProject: action,
       updateMember: action,
       removeMemberFromProject: action,
@@ -152,6 +158,26 @@ export class ProjectMemberStore implements IProjectMemberStore {
         });
       });
       return response;
+    });
+
+  /**
+   * @description search project members on the server, merge them into the store and return the matching user ids
+   * @param workspaceSlug
+   * @param projectId
+   * @param params search term and/or result limit
+   */
+  searchProjectMembers = async (
+    workspaceSlug: string,
+    projectId: string,
+    params?: { search?: string; per_page?: number }
+  ) =>
+    await this.projectMemberService.fetchProjectMembers(workspaceSlug, projectId, params).then((response) => {
+      runInAction(() => {
+        response.forEach((member) => {
+          set(this.projectMemberMap, [projectId, member.member], member);
+        });
+      });
+      return response.map((membership) => membership.member);
     });
 
   /**
