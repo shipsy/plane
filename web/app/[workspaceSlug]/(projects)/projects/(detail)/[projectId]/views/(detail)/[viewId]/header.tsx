@@ -12,6 +12,7 @@ import { useTranslation } from "@plane/i18n";
 import { Breadcrumbs, Button, CustomMenu, Tooltip, Header } from "@plane/ui";
 // components
 import { BreadcrumbLink, Logo } from "@/components/common";
+import { WorkspaceExportsPopover } from "@/components/exporter";
 import { DisplayFiltersSelection, FiltersDropdown, FilterSelection, LayoutSelection } from "@/components/issues";
 // constants
 import {
@@ -288,6 +289,11 @@ export const ProjectViewIssuesHeader: React.FC = observer(() => {
         ) : (
           <></>
         )}
+        <WorkspaceExportsPopover
+          storeType={EIssuesStoreType.PROJECT_VIEW}
+          entityId={viewId?.toString()}
+          projectId={projectId?.toString()}
+        />
         {canUserCreateIssue ? (
           <Button
             onClick={() => {

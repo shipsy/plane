@@ -15,25 +15,41 @@ import { SPREADSHEET_PROPERTY_LIST } from "@/constants/spreadsheet";
 // hooks
 import { useIssues, useUser, useUserPermissions } from "@/hooks/store";
 
-export const WorkspaceExportsPopover = observer(() => {
+type Props = {
+  // Which issue store the current page renders from; filters/columns are read
+  // from it so the export matches the page. Defaults to the workspace-level
+  // global store.
+  storeType?: EIssuesStoreType;
+  // The id the store keys its filters by: globalViewId (default), projectId
+  // (project issues page) or viewId (project view page).
+  entityId?: string;
+  // When set, the export modal opens pre-scoped to this project.
+  projectId?: string;
+};
+
+export const WorkspaceExportsPopover = observer((props: Props) => {
+  const { storeType = EIssuesStoreType.GLOBAL, entityId, projectId } = props;
   const { data: currentUser } = useUser();
   const { globalViewId, workspaceSlug } = useParams();
-  const { issuesFilter } = useIssues(EIssuesStoreType.GLOBAL);
+  const { issuesFilter } = useIssues(storeType);
   const { workspaceUserInfo } = useUserPermissions();
   const [exportProvider, setExportProvider] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
 
+  const filterKeyId = entityId ?? globalViewId?.toString();
+
   // Mirror the same query params the issues list call sends so the export
   // server-side queryset matches what the user sees on the page.
-  const appliedFilters = globalViewId
-    ? (issuesFilter.getAppliedFilters?.(globalViewId.toString()) as Record<string, any> | undefined)
+  const appliedFilters = filterKeyId
+    ? ((issuesFilter as any).getAppliedFilters?.(filterKeyId) as Record<string, any> | undefined)
     : undefined;
 
   // Forward the view's displayProperties so the CSV only contains the
   // columns the user has toggled on.
-  const viewId = globalViewId?.toString();
-  const displayProperties = viewId
-    ? (issuesFilter.getIssueFilters?.(viewId)?.displayProperties as Record<string, boolean> | undefined)
+  const displayProperties = filterKeyId
+    ? ((issuesFilter as any).getIssueFilters?.(filterKeyId)?.displayProperties as
+        | Record<string, boolean>
+        | undefined)
     : undefined;
   // Custom property columns in the same order the spreadsheet view renders
   // them (workspaceUserInfo custom_properties key order — see
@@ -97,6 +113,7 @@ export const WorkspaceExportsPopover = observer(() => {
             () => {}
           }
           filterParams={filterParams}
+          initialProjectIds={projectId ? [projectId] : undefined}
         />
       )}
 
