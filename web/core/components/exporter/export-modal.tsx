@@ -21,12 +21,15 @@ type Props = {
   provider: string | string[];
   mutateServices: () => void;
   filterParams?: Record<string, any>;
+  // Pre-selects projects in the picker (e.g. the current project on
+  // project-level pages); the user can still change the selection.
+  initialProjectIds?: string[];
 };
 
 const projectExportService = new ProjectExportService();
 
 export const Exporter: React.FC<Props> = observer((props) => {
-  const { isOpen, handleClose, user, provider, mutateServices, filterParams } = props;
+  const { isOpen, handleClose, user, provider, mutateServices, filterParams, initialProjectIds } = props;
   // states
   const [exportLoading, setExportLoading] = useState(false);
   const [isSelectOpen, setIsSelectOpen] = useState(false);
@@ -55,7 +58,7 @@ export const Exporter: React.FC<Props> = observer((props) => {
     };
   });
 
-  const [value, setValue] = React.useState<string[]>([]);
+  const [value, setValue] = React.useState<string[]>(initialProjectIds ?? []);
   const [multiple, setMultiple] = React.useState<boolean>(false);
   const onChange = (val: any) => {
     setValue(val);

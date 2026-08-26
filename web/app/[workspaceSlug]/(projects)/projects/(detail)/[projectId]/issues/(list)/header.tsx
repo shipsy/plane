@@ -9,6 +9,7 @@ import { useTranslation } from "@plane/i18n";
 import { Breadcrumbs, Button, LayersIcon, Tooltip, Header } from "@plane/ui";
 // components
 import { BreadcrumbLink, CountChip, Logo } from "@/components/common";
+import { WorkspaceExportsPopover } from "@/components/exporter";
 // constants
 import HeaderFilters from "@/components/issues/filters";
 import { EIssuesStoreType } from "@/constants/issue";
@@ -119,6 +120,7 @@ export const ProjectIssuesHeader = observer(() => {
             canUserCreateIssue={canUserCreateIssue}
           />
         </div>
+        <WorkspaceExportsPopover storeType={EIssuesStoreType.PROJECT} entityId={projectId} projectId={projectId} />
         {canUserCreateIssue ? (
           <Button
             onClick={() => {

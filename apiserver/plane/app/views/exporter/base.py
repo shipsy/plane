@@ -119,6 +119,7 @@ class ExportIssuesEndpoint(BaseAPIView):
         exporter_history = ExporterHistory.objects.filter(
             workspace__slug=slug,
             type="issue_exports",
+            initiated_by=request.user,
         ).select_related("workspace", "initiated_by")
 
         # Build one request-aware S3Storage. This is exactly the same pattern
