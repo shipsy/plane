@@ -14,6 +14,9 @@ import { EIssuesStoreType } from "@/constants/issue";
 import { SPREADSHEET_PROPERTY_LIST } from "@/constants/spreadsheet";
 // hooks
 import { useIssues, useUser, useUserPermissions } from "@/hooks/store";
+// plane web helpers
+import { shouldRenderDisplayProperty } from "@/plane-web/helpers/issue-filter.helper";
+import { EUserPermissions, EUserPermissionsLevel } from "@/plane-web/constants/user-permissions";
 
 type Props = {
   // Which issue store the current page renders from; filters/columns are read
@@ -32,9 +35,17 @@ export const WorkspaceExportsPopover = observer((props: Props) => {
   const { data: currentUser } = useUser();
   const { globalViewId, workspaceSlug } = useParams();
   const { issuesFilter } = useIssues(storeType);
-  const { workspaceUserInfo } = useUserPermissions();
+  const { workspaceUserInfo, allowPermissions } = useUserPermissions();
   const [exportProvider, setExportProvider] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  // Mirror the export endpoint's permission rule (workspace ADMIN/MEMBER,
+  // see ExportIssuesEndpoint) — workspace guests can reach project pages via
+  // project membership, and showing them the button only leads to a 403.
+  const canExport = allowPermissions(
+    [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
+    EUserPermissionsLevel.WORKSPACE
+  );
 
   const filterKeyId = entityId ?? globalViewId?.toString();
 
@@ -59,17 +70,26 @@ export const WorkspaceExportsPopover = observer((props: Props) => {
   );
   // Preserve the visible column order: standard columns follow
   // SPREADSHEET_PROPERTY_LIST, then custom properties in on-screen order,
-  // then any remaining enabled keys (e.g. key, issue_type) the server
-  // resolves by its own registry order.
+  // then any remaining enabled keys (e.g. key) the server resolves by its
+  // own registry order.
   const enabledDisplayProperties = displayProperties
     ? [
         ...SPREADSHEET_PROPERTY_LIST.filter((key) => !!displayProperties[key]),
         ...customPropertyKeys.filter((key) => !!displayProperties[key]),
+        // Stored displayProperties can carry keys whose toggle is no longer
+        // shown (e.g. issue_type, hidden since the picker gates on
+        // shouldRenderDisplayProperty). Those never render on the page, so
+        // apply the same gate here to keep them out of the CSV.
         ...Object.keys(displayProperties).filter(
           (key) =>
             !!displayProperties[key] &&
             !SPREADSHEET_PROPERTY_LIST.includes(key as never) &&
-            !customPropertyKeys.includes(key)
+            !customPropertyKeys.includes(key) &&
+            shouldRenderDisplayProperty({
+              workspaceSlug: workspaceSlug?.toString() ?? "",
+              projectId,
+              key: key as never,
+            })
         ),
       ].join(",")
     : undefined;
@@ -78,6 +98,8 @@ export const WorkspaceExportsPopover = observer((props: Props) => {
     ...(appliedFilters ?? {}),
     ...(enabledDisplayProperties ? { display_properties: enabledDisplayProperties } : {}),
   };
+
+  if (!canExport) return null;
 
   return (
     <>
