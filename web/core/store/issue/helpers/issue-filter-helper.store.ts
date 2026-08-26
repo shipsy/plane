@@ -35,6 +35,11 @@ export interface IBaseIssueFilterStore {
   //computed
   appliedFilters: Partial<Record<TIssueParams, string | boolean>> | undefined;
   issueFilters: IIssueFilters | undefined;
+  // helper actions — every filter store keys its filters by an entity id
+  // (globalViewId, projectId, viewId, moduleId, ...) and implements these
+  // two lookups; declared here so consumers can call them on any store.
+  getIssueFilters(entityId: string): IIssueFilters | undefined;
+  getAppliedFilters(entityId: string): Partial<Record<TIssueParams, string | boolean>> | undefined;
 }
 
 export interface IIssueFilterHelperStore {

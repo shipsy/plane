@@ -22,7 +22,7 @@ type Props = {
   // Which issue store the current page renders from; filters/columns are read
   // from it so the export matches the page. Defaults to the workspace-level
   // global store.
-  storeType?: EIssuesStoreType;
+  storeType?: EIssuesStoreType.GLOBAL | EIssuesStoreType.PROJECT | EIssuesStoreType.PROJECT_VIEW;
   // The id the store keys its filters by: globalViewId (default), projectId
   // (project issues page) or viewId (project view page).
   entityId?: string;
@@ -51,16 +51,12 @@ export const WorkspaceExportsPopover = observer((props: Props) => {
 
   // Mirror the same query params the issues list call sends so the export
   // server-side queryset matches what the user sees on the page.
-  const appliedFilters = filterKeyId
-    ? ((issuesFilter as any).getAppliedFilters?.(filterKeyId) as Record<string, any> | undefined)
-    : undefined;
+  const appliedFilters = filterKeyId ? issuesFilter.getAppliedFilters(filterKeyId) : undefined;
 
   // Forward the view's displayProperties so the CSV only contains the
   // columns the user has toggled on.
   const displayProperties = filterKeyId
-    ? ((issuesFilter as any).getIssueFilters?.(filterKeyId)?.displayProperties as
-        | Record<string, boolean>
-        | undefined)
+    ? (issuesFilter.getIssueFilters(filterKeyId)?.displayProperties as Record<string, boolean> | undefined)
     : undefined;
   // Custom property columns in the same order the spreadsheet view renders
   // them (workspaceUserInfo custom_properties key order — see
