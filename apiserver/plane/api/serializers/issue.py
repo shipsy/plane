@@ -2,6 +2,7 @@
 from django.utils import timezone
 from lxml import html
 import uuid
+import zoneinfo
 
 #  Third party imports
 from rest_framework import serializers
@@ -17,6 +18,7 @@ from plane.db.models import (
     IssueLabel,
     IssueLink,
     Label,
+    Project,
     ProjectMember,
     State,
     User,
@@ -104,6 +106,27 @@ class IssueSerializer(BaseSerializer):
         ]
     
     def validate(self, data):
+        # The date-only fields must match the calendar date of the datetime
+        # fields in the project's timezone; callers computing them in UTC
+        # produce off-by-one dates for timezones ahead of UTC.
+        project_tz = None
+        if data.get("start_date_time") or data.get("target_date_time"):
+            project = Project.objects.filter(
+                pk=self.context.get("project_id")
+            ).first()
+            if project and project.timezone and project.timezone != "UTC":
+                project_tz = zoneinfo.ZoneInfo(project.timezone)
+        if data.get("start_date_time") is not None:
+            dt = data["start_date_time"]
+            data["start_date"] = (
+                dt.astimezone(project_tz).date() if project_tz else dt.date()
+            )
+        if data.get("target_date_time") is not None:
+            dt = data["target_date_time"]
+            data["target_date"] = (
+                dt.astimezone(project_tz).date() if project_tz else dt.date()
+            )
+
         if (
             data.get("start_date", None) is not None
             and data.get("target_date", None) is not None
