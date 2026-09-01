@@ -218,11 +218,15 @@ class ProjectMemberViewSet(BaseViewSet):
         # these params the full member list is returned as before.
         search = request.query_params.get("search")
         if search:
-            project_members = project_members.filter(
-                Q(member__display_name__icontains=search)
-                | Q(member__first_name__icontains=search)
-                | Q(member__last_name__icontains=search)
-            )
+            # AND each whitespace-separated term across the name fields so
+            # multi-word queries like "john sm" match the way the client's
+            # concatenated-name filter does.
+            for term in search.split():
+                project_members = project_members.filter(
+                    Q(member__display_name__icontains=term)
+                    | Q(member__first_name__icontains=term)
+                    | Q(member__last_name__icontains=term)
+                )
 
         per_page = request.query_params.get("per_page")
         if per_page:
