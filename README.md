@@ -2,137 +2,86 @@
 
 <p align="center">
 <a href="https://plane.so">
-  <img src="https://plane-marketing.s3.ap-south-1.amazonaws.com/plane-readme/plane_logo_.webp" alt="Plane Logo" width="70">
+  <img src="https://media.docs.plane.so/logo/plane_github_readme.png" alt="Plane Logo" width="400">
 </a>
 </p>
-
-<h3 align="center"><b>Plane</b></h3>
-<p align="center"><b>Open-source project management that unlocks customer value</b></p>
+<p align="center"><b>Modern project management for all teams</b></p>
 
 <p align="center">
-<a href="https://discord.com/invite/A92xrEGCge">
-<img alt="Discord online members" src="https://img.shields.io/discord/1031547764020084846?color=5865F2&label=Discord&style=for-the-badge" />
-</a>
-<img alt="Commit activity per month" src="https://img.shields.io/github/commit-activity/m/makeplane/plane?style=for-the-badge" />
-</p>
-
-<p align="center">
-    <a href="https://dub.sh/plane-website-readme"><b>Website</b></a> •
-    <a href="https://git.new/releases"><b>Releases</b></a> •
-    <a href="https://dub.sh/planepowershq"><b>Twitter</b></a> •
-    <a href="https://dub.sh/planedocs"><b>Documentation</b></a>
+    <a href="https://plane.so/"><b>Website</b></a> •
+    <a href="https://forum.plane.so"><b>Forum</b></a> •
+    <a href="https://x.com/planepowers"><b>X</b></a> •
+    <a href="https://docs.plane.so/"><b>Documentation</b></a>
 </p>
 
 <p>
     <a href="https://app.plane.so/#gh-light-mode-only" target="_blank">
       <img
-        src="https://plane-marketing.s3.ap-south-1.amazonaws.com/plane-readme/plane_screen.webp"
-        alt="Plane Screens"
-        width="100%"
-      />
-    </a>
-    <a href="https://app.plane.so/#gh-dark-mode-only" target="_blank">
-      <img
-        src="https://plane-marketing.s3.ap-south-1.amazonaws.com/plane-readme/plane_screens_dark_mode.webp"
+        src="https://media.docs.plane.so/GitHub-readme/github-top.webp"
         alt="Plane Screens"
         width="100%"
       />
     </a>
 </p>
 
-Meet [Plane](https://dub.sh/plane-website-readme), an open-source project management tool to track issues, run ~sprints~ cycles, and manage product roadmaps without the chaos of managing the tool itself. 🧘‍♀️
+Meet [Plane](https://plane.so/), an open-source project management tool to track issues, run ~sprints~ cycles, and manage product roadmaps without the chaos of managing the tool itself. 🧘‍♀️
 
-> Plane is evolving every day. Your suggestions, ideas, and reported bugs help us immensely. Do not hesitate to join in the conversation on [Discord](https://discord.com/invite/A92xrEGCge) or raise a GitHub issue. We read everything and respond to most.
+> Plane is evolving every day. Your suggestions, ideas, and reported bugs help us immensely. Do not hesitate to join in the conversation on [Forum](https://forum.plane.so) or raise a GitHub issue. We read everything and respond to most.
 
-## ⚡ Installation
+## 🚀 Installation
 
-The easiest way to get started with Plane is by creating a [Plane Cloud](https://app.plane.so) account.
+Getting started with Plane is simple. Choose the setup that works best for you:
 
-If you would like to self-host Plane, please see our [deployment guide](https://docs.plane.so/docker-compose).
+- **Plane Cloud**
+  Sign up for a free account on [Plane Cloud](https://app.plane.so)—it's the fastest way to get up and running without worrying about infrastructure.
 
-| Installation methods | Docs link                                                                                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Docker               | [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://docs.plane.so/self-hosting/methods/docker-compose)         |
-| Kubernetes           | [![Kubernetes](https://img.shields.io/badge/kubernetes-%23326ce5.svg?style=for-the-badge&logo=kubernetes&logoColor=white)](https://docs.plane.so/kubernetes) |
+- **Self-host Plane**
+  Prefer full control over your data and infrastructure? Install and run Plane on your own servers. Follow our detailed [deployment guides](https://developers.plane.so/self-hosting/overview) to get started.
 
-`Instance admins` can configure instance settings with [God-mode](https://docs.plane.so/instance-admin).
+| Installation methods | Docs link                                                                                                                                                                               |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Docker               | [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://developers.plane.so/self-hosting/methods/docker-compose)         |
+| Kubernetes           | [![Kubernetes](https://img.shields.io/badge/kubernetes-%23326ce5.svg?style=for-the-badge&logo=kubernetes&logoColor=white)](https://developers.plane.so/self-hosting/methods/kubernetes) |
 
-## 🚀 Features
+`Instance admins` can configure instance settings with [God mode](https://developers.plane.so/self-hosting/govern/instance-admin).
 
-- **Issues**: Quickly create issues and add details using a powerful rich text editor that supports file uploads. Add sub-properties and references to problems for better organization and tracking.
+## 🌟 Features
 
-- **Cycles**:
-  Keep up your team's momentum with Cycles. Gain insights into your project's progress with burn-down charts and other valuable features.
+- **Work Items**
+  Efficiently create and manage tasks with a robust rich text editor that supports file uploads. Enhance organization and tracking by adding sub-properties and referencing related issues.
 
-- **Modules**: Break down your large projects into smaller, more manageable modules. Assign modules between teams to track and plan your project's progress easily.
+- **Cycles**
+  Maintain your team’s momentum with Cycles. Track progress effortlessly using burn-down charts and other insightful tools.
 
-- **Views**: Create custom filters to display only the issues that matter to you. Save and share your filters in just a few clicks.
+- **Modules**
+  Simplify complex projects by dividing them into smaller, manageable modules.
 
-- **Pages**: Plane pages, equipped with AI and a rich text editor, let you jot down your thoughts on the fly. Format your text, upload images, hyperlink, or sync your existing ideas into an actionable item or issue.
+- **Views**
+  Customize your workflow by creating filters to display only the most relevant issues. Save and share these views with ease.
 
-- **Analytics**: Get insights into all your Plane data in real-time. Visualize issue data to spot trends, remove blockers, and progress your work.
+- **Pages**
+  Capture and organize ideas using Plane Pages, complete with AI capabilities and a rich text editor. Format text, insert images, add hyperlinks, or convert your notes into actionable items.
 
-- **Drive** (_coming soon_): The drive helps you share documents, images, videos, or any other files that make sense to you or your team and align on the problem/solution.
+- **Analytics**
+  Access real-time insights across all your Plane data. Visualize trends, remove blockers, and keep your projects moving forward.
 
-## 🛠️ Quick start for contributors
+## 🛠️ Local development
 
-> Development system must have docker engine installed and running.
+See [CONTRIBUTING](./CONTRIBUTING.md)
 
-Setting up local environment is extremely easy and straight forward. Follow the below step and you will be ready to contribute - 
+## ⚙️ Built with
 
-1. Clone the code locally using:
-   ```
-   git clone https://github.com/makeplane/plane.git
-   ```
-2. Switch to the code folder:
-   ```
-   cd plane
-   ```
-3. Create your feature or fix branch you plan to work on using:
-   ```
-   git checkout -b <feature-branch-name>
-   ```
-4. Open terminal and run:
-   ```
-   ./setup.sh
-   ```
-5. Open the code on VSCode or similar equivalent IDE.
-6. Review the `.env` files available in various folders.
-   Visit [Environment Setup](./ENV_SETUP.md) to know about various environment variables used in system.
-7. Run the docker command to initiate services:
-   ```
-   docker compose -f docker-compose-local.yml up -d
-   ```
-
-You are ready to make changes to the code. Do not forget to refresh the browser (in case it does not auto-reload).
-
-Thats it!
-
-## ❤️ Community
-
-The Plane community can be found on [GitHub Discussions](https://github.com/orgs/makeplane/discussions), and our [Discord server](https://discord.com/invite/A92xrEGCge). Our [Code of conduct](https://github.com/makeplane/plane/blob/master/CODE_OF_CONDUCT.md) applies to all Plane community chanels.
-
-Ask questions, report bugs, join discussions, voice ideas, make feature requests, or share your projects.
-
-### Repo Activity
-
-![Plane Repo Activity](https://repobeats.axiom.co/api/embed/2523c6ed2f77c082b7908c33e2ab208981d76c39.svg "Repobeats analytics image")
+[![React Router](https://img.shields.io/badge/-React%20Router-CA4245?logo=react-router&style=for-the-badge&logoColor=white)](https://reactrouter.com/)
+[![Django](https://img.shields.io/badge/Django-092E20?style=for-the-badge&logo=django&logoColor=green)](https://www.djangoproject.com/)
+[![Node JS](https://img.shields.io/badge/node.js-339933?style=for-the-badge&logo=Node.js&logoColor=white)](https://nodejs.org/en)
 
 ## 📸 Screenshots
 
-<p>
+  <p>
     <a href="https://plane.so" target="_blank">
       <img
-        src="https://ik.imagekit.io/w2okwbtu2/Issues_rNZjrGgFl.png?updatedAt=1709298765880"
+        src="https://media.docs.plane.so/GitHub-readme/github-work-items.webp"
         alt="Plane Views"
-        width="100%"
-      />
-    </a>
-  </p>
-<p>
-    <a href="https://plane.so" target="_blank">
-      <img
-        src="https://ik.imagekit.io/w2okwbtu2/Cycles_jCDhqmTl9.png?updatedAt=1709298780697"
         width="100%"
       />
     </a>
@@ -140,7 +89,15 @@ Ask questions, report bugs, join discussions, voice ideas, make feature requests
   <p>
     <a href="https://plane.so" target="_blank">
       <img
-        src="https://ik.imagekit.io/w2okwbtu2/Modules_PSCVsbSfI.png?updatedAt=1709298796783"
+        src="https://media.docs.plane.so/GitHub-readme/github-cycles.webp"
+        width="100%"
+      />
+    </a>
+  </p>
+  <p>
+    <a href="https://plane.so" target="_blank">
+      <img
+        src="https://media.docs.plane.so/GitHub-readme/github-modules.webp"
         alt="Plane Cycles and Modules"
         width="100%"
       />
@@ -149,7 +106,7 @@ Ask questions, report bugs, join discussions, voice ideas, make feature requests
   <p>
     <a href="https://plane.so" target="_blank">
       <img
-        src="https://ik.imagekit.io/w2okwbtu2/Views_uxXsRatS4.png?updatedAt=1709298834522"
+        src="https://media.docs.plane.so/GitHub-readme/github-views.webp"
         alt="Plane Analytics"
         width="100%"
       />
@@ -158,41 +115,51 @@ Ask questions, report bugs, join discussions, voice ideas, make feature requests
    <p>
     <a href="https://plane.so" target="_blank">
       <img
-        src="https://ik.imagekit.io/w2okwbtu2/Analytics_0o22gLRtp.png?updatedAt=1709298834389"
+        src="https://media.docs.plane.so/GitHub-readme/github-analytics.webp"
         alt="Plane Pages"
         width="100%"
       />
     </a>
   </p>
 </p>
-   <p>
-    <a href="https://plane.so" target="_blank">
-      <img
-        src="https://ik.imagekit.io/w2okwbtu2/Drive_LlfeY4xn3.png?updatedAt=1709298837917"
-        alt="Plane Command Menu"
-        width="100%"
-      />
-    </a>
-  </p>
-</p>
 
-## ⛓️ Security
+## 📝 Documentation
 
-If you believe you have found a security vulnerability in Plane, we encourage you to responsibly disclose this and not open a public issue. We will investigate all legitimate reports.
+Explore Plane's [product documentation](https://docs.plane.so/) and [developer documentation](https://developers.plane.so/) to learn about features, setup, and usage.
 
-Email squawk@plane.so to disclose any security vulnerabilities.
+## ❤️ Community
 
-## ❤️ Contribute
+Join the Plane community on [GitHub Discussions](https://github.com/orgs/makeplane/discussions) and our [Forum](https://forum.plane.so). We follow a [Code of conduct](https://github.com/makeplane/plane/blob/master/CODE_OF_CONDUCT.md) in all our community channels.
 
-There are many ways to contribute to Plane, including:
+Feel free to ask questions, report bugs, participate in discussions, share ideas, request features, or showcase your projects. We’d love to hear from you!
 
-- Submitting [bugs](https://github.com/makeplane/plane/issues/new?assignees=srinivaspendem%2Cpushya22&labels=%F0%9F%90%9Bbug&projects=&template=--bug-report.yaml&title=%5Bbug%5D%3A+) and [feature requests](https://github.com/makeplane/plane/issues/new?assignees=srinivaspendem%2Cpushya22&labels=%E2%9C%A8feature&projects=&template=--feature-request.yaml&title=%5Bfeature%5D%3A+) for various components.
-- Reviewing [the documentation](https://docs.plane.so/) and submitting [pull requests](https://github.com/makeplane/plane), from fixing typos to adding new features.
-- Speaking or writing about Plane or any other ecosystem integration and [letting us know](https://discord.com/invite/A92xrEGCge)!
-- Upvoting [popular feature requests](https://github.com/makeplane/plane/issues) to show your support.
+## 🛡️ Security
+
+If you discover a security vulnerability in Plane, please report it responsibly instead of opening a public issue. We take all legitimate reports seriously and will investigate them promptly. See [Security policy](https://github.com/makeplane/plane/blob/master/SECURITY.md) for more info.
+
+To disclose any security issues, please email us at security@plane.so.
+
+## 🤝 Contributing
+
+There are many ways you can contribute to Plane:
+
+- Report [bugs](https://github.com/makeplane/plane/issues/new?assignees=srinivaspendem%2Cpushya22&labels=%F0%9F%90%9Bbug&projects=&template=--bug-report.yaml&title=%5Bbug%5D%3A+) or submit [feature requests](https://github.com/makeplane/plane/issues/new?assignees=srinivaspendem%2Cpushya22&labels=%E2%9C%A8feature&projects=&template=--feature-request.yaml&title=%5Bfeature%5D%3A+).
+- Review the [documentation](https://docs.plane.so/) and submit [pull requests](https://github.com/makeplane/docs) to improve it—whether it's fixing typos or adding new content.
+- Talk or write about Plane or any other ecosystem integration and [let us know](https://forum.plane.so)!
+- Show your support by upvoting [popular feature requests](https://github.com/makeplane/plane/issues).
+
+Please read [CONTRIBUTING.md](https://github.com/makeplane/plane/blob/master/CONTRIBUTING.md) for details on the process for submitting pull requests to us.
+
+### Repo activity
+
+![Plane Repo Activity](https://repobeats.axiom.co/api/embed/2523c6ed2f77c082b7908c33e2ab208981d76c39.svg "Repobeats analytics image")
 
 ### We couldn't have done this without you.
 
 <a href="https://github.com/makeplane/plane/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=makeplane/plane" />
 </a>
+
+## License
+
+This project is licensed under the [GNU Affero General Public License v3.0](https://github.com/makeplane/plane/blob/master/LICENSE.txt).
