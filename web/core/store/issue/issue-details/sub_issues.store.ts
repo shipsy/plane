@@ -324,10 +324,11 @@ export class IssueSubIssuesStore implements IIssueSubIssuesStore {
       for (const projectId of projectIds) {
         // fetching other project states
         this.rootIssueDetailStore.rootIssueStore.rootStore.state.fetchProjectStates(workspaceSlug, projectId);
-        // fetching other project members
-        this.rootIssueDetailStore.rootIssueStore.rootStore.memberRoot.project.fetchProjectMembers(
+        // fetching other project members (capped — dropdowns search the rest server-side)
+        this.rootIssueDetailStore.rootIssueStore.rootStore.memberRoot.project.searchProjectMembers(
           workspaceSlug,
-          projectId
+          projectId,
+          { per_page: 20 }
         );
         // fetching other project labels
         this.rootIssueDetailStore.rootIssueStore.rootStore.label.fetchProjectLabels(workspaceSlug, projectId);
