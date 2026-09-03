@@ -80,9 +80,9 @@ export class IssueFilterStore implements IIssueFilterStore {
         if (Array.isArray(filters[currentFilterKey]))
           computedFilters[currentFilterKey] = filters[currentFilterKey]?.join(",");
         else if (filters[currentFilterKey] && typeof filters[currentFilterKey] === "string")
-          computedFilters[currentFilterKey] = filters[currentFilterKey]?.toString();
+          computedFilters[currentFilterKey] = (filters[currentFilterKey] as any)?.toString();
         else if (typeof filters[currentFilterKey] === "boolean")
-          computedFilters[currentFilterKey] = filters[currentFilterKey]?.toString();
+          computedFilters[currentFilterKey] = (filters[currentFilterKey] as any)?.toString();
       }
     });
 
