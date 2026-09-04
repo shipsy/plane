@@ -2,11 +2,11 @@
 
 import React from "react";
 // icons
-import { SquareArrowOutUpRight } from "lucide-react";
+// import { SquareArrowOutUpRight } from "lucide-react";
 // ui
-import { getButtonStyling } from "@plane/ui";
+// import { getButtonStyling } from "@plane/ui";
 // helpers
-import { cn } from "@/helpers/common.helper";
+// import { cn } from "@/helpers/common.helper";
 
 export const UpgradeButton: React.FC = () => (
   <a />
