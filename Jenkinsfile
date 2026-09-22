@@ -30,9 +30,15 @@ def dockerBuildLevelArguments = [
     ENV_FILE_PATH: "${configStoragePath}/.env"
 ]
 
-def webImageName = "prod-plane-frontend:latest"
-def adminImageName = "prod-plane-adminpanel:latest"
-def apiImageName = "prod-plane-apiserver:latest"
+// Tags are "prod-<sha><cfgver>" (generateDockerImageName) — unique per build so
+// updateTaskDefinition always registers a new revision.
+def credentialsId = "ext_jenkins_login_user_vault"
+def webImageNamePrefix   = "prod-plane-frontend"
+def adminImageNamePrefix = "prod-plane-adminpanel"
+def apiImageNamePrefix   = "prod-plane-apiserver"
+def webImageName
+def adminImageName
+def apiImageName
 
 // ECS Based Configurations
 def clusterName = "logistics-applications-cluster"
@@ -45,6 +51,18 @@ def celeryServiceName  = "prod-plane-celery"
 def cbeatServiceName  = "prod-plane-celery-beat"
 def frontEndServiceName  = "prod-plane-frontend"
 def adminPanelServiceName  = "prod-plane-admin-panel"
+
+def apiTaskDefinitionName    = "prod-plane-apiserver"
+def celeryTaskDefinitionName = "prod-plane-apiserver-celery"
+def cbeatTaskDefinitionName  = "prod-plane-apiserver-celery-beat"
+def webTaskDefinitionName    = "prod-plane-frontend"
+def adminTaskDefinitionName  = "prod-plane-admin-panel"
+
+def apiCurrentTaskRevision
+def celeryCurrentTaskRevision
+def cbeatCurrentTaskRevision
+def webCurrentTaskRevision
+def adminCurrentTaskRevision
 
 pipeline {
     agent any
@@ -90,6 +108,24 @@ pipeline {
                 }
             }
         }
+        stage ("Create Docker Image Names") {
+            steps {
+                script {
+                    webImageName = generateDockerImageName (
+                        credentialsId : credentialsId,
+                        dockerImageNamePrefix : webImageNamePrefix,
+                        repository : repository,
+                        projectEnv : projectEnv
+                    ).toString()
+                    // One checkout + one vault config for all three images,
+                    // so reuse the web image's tag instead of three vault logins.
+                    def uniqueTag = webImageName.split(':')[1]
+                    adminImageName = "${adminImageNamePrefix}:${uniqueTag}".toString()
+                    apiImageName   = "${apiImageNamePrefix}:${uniqueTag}".toString()
+                }
+            }
+        }
+
         stage ("Build docker image") {
             parallel {
                 stage ("Build Web Image") {
@@ -160,12 +196,17 @@ pipeline {
                 stage("Deploy Frontend") {
                     steps {
                         script {
-                            deployServiceOnECS (
-                                awsRegion : awsRegion,
-                                imageName : webImageName,
+                            webCurrentTaskRevision = updateTaskDefinition (
+                                taskDefinitionName : webTaskDefinitionName,
+                                dockerImageName : webImageName,
+                                awsRegion : awsRegion
+                            )
+                            updateServiceOnECS (
                                 ecsClusterName : clusterName,
                                 ecsServiceName : frontEndServiceName,
-                                timeout : 300
+                                taskDefinitionName : webTaskDefinitionName,
+                                currentTaskRevision : webCurrentTaskRevision,
+                                awsRegion : awsRegion
                             )
                         }
                     }
@@ -174,12 +215,17 @@ pipeline {
                 stage("Deploy Admin") {
                     steps {
                         script {
-                            deployServiceOnECS (
-                                awsRegion : awsRegion,
-                                imageName : adminImageName,
+                            adminCurrentTaskRevision = updateTaskDefinition (
+                                taskDefinitionName : adminTaskDefinitionName,
+                                dockerImageName : adminImageName,
+                                awsRegion : awsRegion
+                            )
+                            updateServiceOnECS (
                                 ecsClusterName : clusterName,
                                 ecsServiceName : adminPanelServiceName,
-                                timeout : 300
+                                taskDefinitionName : adminTaskDefinitionName,
+                                currentTaskRevision : adminCurrentTaskRevision,
+                                awsRegion : awsRegion
                             )
                         }
                     }
@@ -188,12 +234,17 @@ pipeline {
                 stage("Deploy API") {
                     steps {
                         script {
-                            deployServiceOnECS (
-                                awsRegion : awsRegion,
-                                imageName : apiImageName,
+                            apiCurrentTaskRevision = updateTaskDefinition (
+                                taskDefinitionName : apiTaskDefinitionName,
+                                dockerImageName : apiImageName,
+                                awsRegion : awsRegion
+                            )
+                            updateServiceOnECS (
                                 ecsClusterName : clusterName,
                                 ecsServiceName : apiServiceName,
-                                timeout : 300
+                                taskDefinitionName : apiTaskDefinitionName,
+                                currentTaskRevision : apiCurrentTaskRevision,
+                                awsRegion : awsRegion
                             )
                         }
                     }
@@ -201,12 +252,17 @@ pipeline {
                 stage("Deploy Celery") {
                     steps {
                         script {
-                            deployServiceOnECS (
-                                awsRegion : awsRegion,
-                                imageName : apiImageName,
+                            celeryCurrentTaskRevision = updateTaskDefinition (
+                                taskDefinitionName : celeryTaskDefinitionName,
+                                dockerImageName : apiImageName,
+                                awsRegion : awsRegion
+                            )
+                            updateServiceOnECS (
                                 ecsClusterName : clusterName,
                                 ecsServiceName : celeryServiceName,
-                                timeout : 300
+                                taskDefinitionName : celeryTaskDefinitionName,
+                                currentTaskRevision : celeryCurrentTaskRevision,
+                                awsRegion : awsRegion
                             )
                         }
                     }
@@ -214,12 +270,17 @@ pipeline {
                 stage("Deploy Beat") {
                     steps {
                         script {
-                            deployServiceOnECS (
-                                awsRegion : awsRegion,
-                                imageName : apiImageName,
+                            cbeatCurrentTaskRevision = updateTaskDefinition (
+                                taskDefinitionName : cbeatTaskDefinitionName,
+                                dockerImageName : apiImageName,
+                                awsRegion : awsRegion
+                            )
+                            updateServiceOnECS (
                                 ecsClusterName : clusterName,
                                 ecsServiceName : cbeatServiceName,
-                                timeout : 300
+                                taskDefinitionName : cbeatTaskDefinitionName,
+                                currentTaskRevision : cbeatCurrentTaskRevision,
+                                awsRegion : awsRegion
                             )
                         }
                     }
