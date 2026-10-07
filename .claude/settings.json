@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users -name \"dateparse.py\" -path \"*/django/*\" 2>/dev/null | head -3)",
+      "Read(//Users/**)",
+      "Bash(git fetch *)"
+    ]
+  }
+}

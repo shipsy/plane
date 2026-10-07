@@ -81,7 +81,8 @@ class WorkSpaceMemberViewSet(BaseViewSet):
 
         # Get all active workspace members
         workspace_members = self.get_queryset()
-        if workspace_member.role > 5:
+        # Only workspace admins see member email addresses
+        if workspace_member.role == ROLE.ADMIN.value:
             serializer = WorkspaceMemberAdminSerializer(
                 workspace_members,
                 fields=("id", "member", "role"),
