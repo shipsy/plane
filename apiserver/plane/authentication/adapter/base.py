@@ -86,6 +86,10 @@ class Adapter:
             )
         return
 
+    def is_trusted_signup(self):
+        """Whether this login may create a user even when sign up is disabled"""
+        return False
+
     def __check_signup(self, email):
         """Check if sign up is enabled or not and raise exception if not enabled"""
 
@@ -146,8 +150,10 @@ class Adapter:
         is_signup = bool(user)
         # If user is not present, create a new user
         if not user:
-            # New user
-            self.__check_signup(email)
+            # New user; providers vouched for by a trusted service skip the
+            # public sign up check
+            if not self.is_trusted_signup():
+                self.__check_signup(email)
 
             # Initialize user
             username = self.user_data.get("user").get("username")

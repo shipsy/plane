@@ -27,6 +27,8 @@ class MagicCodeProvider(CredentialAdapter):
         code=None,
         callback=None,
         timezone=None,
+        claims=None,
+        trusted=False,
     ):
 
         (
@@ -67,6 +69,12 @@ class MagicCodeProvider(CredentialAdapter):
         self.key = key
         self.code = code
         self.timezone = timezone
+        # Login claims (workspace, hubs, permissions) bound to the code by the
+        # Ops Dashboard backend; read back on sign-in
+        self.claims = claims
+        # Codes issued to a trusted service may create users even when sign
+        # up is disabled
+        self.trusted = trusted
 
     def initiate(self):
         ## Generate a random token
@@ -110,7 +118,9 @@ class MagicCodeProvider(CredentialAdapter):
                 "current_attempt": current_attempt,
                 "email": str(self.key),
                 "token": token,
-                "username": username
+                "username": username,
+                "claims": self.claims,
+                "trusted": self.trusted,
             }
             expiry = 30
             print(key, value)
@@ -121,12 +131,17 @@ class MagicCodeProvider(CredentialAdapter):
                 "current_attempt": 0, 
                 "email": self.key, 
                 "token": token,
-                "username": username
+                "username": username,
+                "claims": self.claims,
+                "trusted": self.trusted,
             }
             expiry = 600
 
             ri.set(key, json.dumps(value), ex=expiry)
         return key, token
+
+    def is_trusted_signup(self):
+        return self.trusted
 
     def set_user_data(self):
         ri = redis_instance()
@@ -140,6 +155,8 @@ class MagicCodeProvider(CredentialAdapter):
             username = data["username"]
 
             if str(token) == str(self.code):
+                self.claims = data.get("claims")
+                self.trusted = bool(data.get("trusted", False))
                 user_data = {
                     "email": email,
                     "user": {

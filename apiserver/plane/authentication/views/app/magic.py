@@ -3,6 +3,7 @@ import json
 from urllib.parse import urlencode, urljoin
 
 # Django imports
+from django.conf import settings
 from django.core.validators import validate_email
 from django.http import HttpResponseRedirect
 from django.views import View
@@ -27,7 +28,7 @@ from plane.bgtasks.magic_link_code_task import magic_link
 from plane.license.models import Instance
 from plane.authentication.utils.host import base_host
 from plane.db.models import (
-    User, Profile, Workspace, WorkspaceMember, Project,
+    APIToken, User, Profile, Workspace, WorkspaceMember, Project,
     ProjectMember
 )
 from plane.app.serializers import ProjectSerializer
@@ -40,6 +41,27 @@ from plane.authentication.rate_limit import AuthenticationThrottle
 from plane.api.views.base import BaseAPIView
 from plane.api.views.project import create_project
 
+# Login claims the Ops Dashboard backend binds to a magic code
+LOGIN_CLAIM_FIELDS = (
+    "workspace",
+    "hub_list",
+    "is_super_admin",
+    "employee_permissions",
+    "scoped_issue_access",
+)
+
+
+def is_service_caller(request):
+    """True when the request carries the static token or a service API token"""
+    token = request.headers.get("X-Api-Key")
+    if not token:
+        return False
+    if settings.STATIC_API_TOKEN and token == settings.STATIC_API_TOKEN:
+        return True
+    return APIToken.objects.filter(
+        token=token, is_service=True, is_active=True
+    ).exists()
+
 class MagicGenerateEndpoint(BaseAPIView):
     # permission_classes = [
     #     AllowAny,
@@ -50,6 +72,13 @@ class MagicGenerateEndpoint(BaseAPIView):
     ]
 
     def post(self, request):
+        # A code lets the caller sign in as the given user, so only the
+        # Ops Dashboard backend (static or service token) may issue one
+        if not is_service_caller(request):
+            return Response(
+                {"error": "Not allowed"}, status=status.HTTP_403_FORBIDDEN
+            )
+
         # Check if instance is configured
         instance = Instance.objects.first()
         if instance is None or not instance.is_setup_done:
@@ -74,7 +103,16 @@ class MagicGenerateEndpoint(BaseAPIView):
             # Clean up the email
             email = email.strip().lower()
             validate_email(email)
-            adapter = MagicCodeProvider(request=request, key=email)
+            # Bind the login claims to the code so sign-in does not trust the
+            # values posted by the browser
+            claims = {
+                field: request.data.get(field)
+                for field in LOGIN_CLAIM_FIELDS
+                if field in request.data
+            } or None
+            adapter = MagicCodeProvider(
+                request=request, key=email, claims=claims, trusted=True
+            )
             key, token = adapter.initiate()
             # If the smtp is configured send through here
             # magic_link.delay(email, key, token, origin)
@@ -156,6 +194,49 @@ class MagicSignInEndpoint(BaseAPIView):
             print(f"Error parsing hub_list for names: {e}")
             return []
     
+    def parse_server_claims(self, claims):
+        """Parse claims bound to the code by the Ops Dashboard backend"""
+        workspace = str(claims.get("workspace") or "").strip().lower()
+
+        hub_codes = None
+        hub_names = None
+        hub_list = claims.get("hub_list")
+        if hub_list is not None:
+            if not isinstance(hub_list, str):
+                hub_list = json.dumps(hub_list)
+            hub_codes = self.extract_hub_codes_from_hub_list(hub_list)
+            hub_names = self.extract_hub_names_from_hub_list(hub_list)
+
+        is_super_admin = claims.get("is_super_admin")
+        if is_super_admin is not None:
+            is_super_admin = str(is_super_admin).strip().lower() == "true"
+
+        employee_permissions = claims.get("employee_permissions")
+        if isinstance(employee_permissions, str):
+            try:
+                employee_permissions = json.loads(employee_permissions)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                employee_permissions = []
+        if employee_permissions is not None and not isinstance(
+            employee_permissions, list
+        ):
+            employee_permissions = []
+
+        scoped_issue_access = claims.get("scoped_issue_access")
+        if scoped_issue_access is not None:
+            scoped_issue_access = (
+                str(scoped_issue_access).strip().lower() == "true"
+            )
+
+        return (
+            workspace,
+            hub_codes,
+            hub_names,
+            is_super_admin,
+            employee_permissions,
+            scoped_issue_access,
+        )
+
     def add_user_to_workspace(self, user, workspace_slug):
         admin_user = User.objects.filter(is_superuser=True).first()
         workspace, base_project = self.get_workspace(workspace_slug, admin_user)
@@ -324,6 +405,16 @@ class MagicSignInEndpoint(BaseAPIView):
                     timezone=timezone,
                 )
                 user = provider.authenticate()
+                # Claims bound to the code take precedence over the form
+                if provider.claims is not None:
+                    (
+                        workspace,
+                        hub_codes,
+                        hub_names,
+                        is_super_admin,
+                        employee_permissions,
+                        scoped_issue_access,
+                    ) = self.parse_server_claims(provider.claims)
                 
                 profile, _ = Profile.objects.get_or_create(user=user)
                 profile.language = language
@@ -366,6 +457,16 @@ class MagicSignInEndpoint(BaseAPIView):
                     timezone=timezone,
                 )
                 user = provider.authenticate()
+                # Claims bound to the code take precedence over the form
+                if provider.claims is not None:
+                    (
+                        workspace,
+                        hub_codes,
+                        hub_names,
+                        is_super_admin,
+                        employee_permissions,
+                        scoped_issue_access,
+                    ) = self.parse_server_claims(provider.claims)
                 
                 profile, _ = Profile.objects.get_or_create(user=user)
                 profile.language = language

@@ -157,6 +157,11 @@ class StateAPIEndpoint(BaseAPIView):
         state = State.objects.get(
             workspace__slug=slug, project_id=project_id, pk=state_id
         )
+        if state.is_protected:
+            return Response(
+                {"error": "Protected states cannot be modified"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         serializer = StateSerializer(state, data=request.data, partial=True)
         if serializer.is_valid():
             if (
