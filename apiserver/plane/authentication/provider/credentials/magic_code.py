@@ -123,7 +123,6 @@ class MagicCodeProvider(CredentialAdapter):
                 "trusted": self.trusted,
             }
             expiry = 30
-            print(key, value)
             ri.set(key, json.dumps(value), ex=expiry)
         else:
             username = self.key.replace("@plane-shipsy.com", "", 1)
@@ -145,9 +144,6 @@ class MagicCodeProvider(CredentialAdapter):
 
     def set_user_data(self):
         ri = redis_instance()
-        keys = ri.keys('*')
-        print("All keys in redis:", keys)
-        print("Key to be checked:", self.key)
         if ri.exists(self.key):
             data = json.loads(ri.get(self.key))
             token = data["token"]

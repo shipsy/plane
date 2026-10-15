@@ -13,20 +13,28 @@ from rest_framework.test import APIClient
 # Module imports
 from plane.api.serializers import StateSerializer as V1StateSerializer
 from plane.app.serializers import WebhookSerializer
-from plane.bgtasks.webhook_task import post_webhook
+import requests
+
+from plane.bgtasks.webhook_task import deactivate_blocked_webhook, post_webhook
 from plane.db.models import (
     IssueComment,
     Project,
     ProjectMember,
     State,
     User,
+    Webhook,
+    WebhookLog,
     Workspace,
     WorkspaceMember,
 )
 from plane.license.models import Instance
 from plane.settings.redis import redis_instance
 from plane.utils.html_sanitizer import sanitize_html
-from plane.utils.url_validator import BlockedURLError, validate_outbound_url
+from plane.utils.url_validator import (
+    BlockedURLError,
+    is_blocked_ip,
+    validate_outbound_url,
+)
 
 
 class OutboundURLValidationTest(SimpleTestCase):
@@ -70,6 +78,21 @@ class OutboundURLValidationTest(SimpleTestCase):
             post_webhook("https://8.8.8.8/hook", {}, {})
             self.assertFalse(post.call_args.kwargs["allow_redirects"])
 
+    def test_nat64_address_of_internal_ip_is_blocked(self):
+        self.assertTrue(is_blocked_ip("64:ff9b::a9fe:a9fe"))
+        with self.assertRaises(BlockedURLError):
+            validate_outbound_url("http://[64:ff9b::a9fe:a9fe]/latest/meta-data/")
+        self.assertFalse(is_blocked_ip("64:ff9b::808:808"))
+
+    def test_dns_failure_is_retried_not_blocked(self):
+        with mock.patch(
+            "plane.utils.url_validator.socket.getaddrinfo",
+            side_effect=__import__("socket").gaierror("temporary failure"),
+        ), mock.patch("plane.bgtasks.webhook_task.requests.post") as post:
+            with self.assertRaises(requests.ConnectionError):
+                post_webhook("https://hooks.example.com/x", {}, {})
+            post.assert_not_called()
+
     def test_serializer_rejects_internal_url(self):
         serializer = WebhookSerializer(data={"url": "http://169.254.169.254/"})
         self.assertFalse(serializer.is_valid())
@@ -94,6 +117,18 @@ class HTMLSanitizerTest(SimpleTestCase):
         ]:
             with self.subTest(payload=payload):
                 self.assertNotIn(forbidden, sanitize_html(payload))
+
+    def test_unsafe_mention_link_is_removed(self):
+        mention = (
+            '<mention-component id="1" target="users" entity_identifier="u1" '
+            'redirect_uri="{}"></mention-component>'
+        )
+        for uri in ["javascript:alert(1)", " JavaScript:alert(1)", "data:text/html,x", "//evil.com"]:
+            with self.subTest(uri=uri):
+                self.assertNotIn("redirect_uri", sanitize_html(mention.format(uri)))
+        for uri in ["/ws/profile/u1", "https://planedemo.shipsy.io/ws/profile/u1"]:
+            with self.subTest(uri=uri):
+                self.assertIn(f'redirect_uri="{uri}"', sanitize_html(mention.format(uri)))
 
     def test_editor_markup_is_kept(self):
         for html in [
@@ -316,3 +351,17 @@ class MagicLoginTrustTest(WorkspaceFixtureMixin, TestCase):
         self.assertFalse(
             WorkspaceMember.objects.filter(member=user, workspace__slug="other-org").exists()
         )
+
+
+class BlockedWebhookTest(WorkspaceFixtureMixin, TestCase):
+    """Blocked webhook deliveries are explained in the logs (VAPT 3.1)"""
+
+    def test_blocked_webhook_is_logged_and_deactivated(self):
+        webhook = Webhook.objects.create(
+            workspace=self.workspace, url="https://8.8.8.8/hook", issue=True
+        )
+        deactivate_blocked_webhook(webhook, "issue", "update", {}, {}, 0)
+        webhook.refresh_from_db()
+        self.assertFalse(webhook.is_active)
+        log = WebhookLog.objects.get(webhook=webhook)
+        self.assertIn("blocked", log.response_body)

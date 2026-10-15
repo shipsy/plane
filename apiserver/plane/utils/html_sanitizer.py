@@ -45,6 +45,17 @@ ALLOWED_ATTRIBUTES = {
 ALLOWED_STYLE_PROPERTIES = {"color", "background-color", "width", "height"}
 
 
+def _filter_attribute(element, attribute, value):
+    # The editor renders a mention's redirect_uri as a link, so it gets the
+    # same protection as href: only paths inside the app or http(s) URLs
+    if attribute == "redirect_uri":
+        uri = value.strip()
+        is_app_path = uri.startswith("/") and not uri.startswith("//")
+        if not (is_app_path or uri.lower().startswith(("http://", "https://"))):
+            return None
+    return value
+
+
 def sanitize_html(value):
     """Return editor HTML with everything outside the allowlist removed"""
     if not value:
@@ -58,4 +69,5 @@ def sanitize_html(value):
         url_schemes={"http", "https", "mailto"},
         filter_style_properties=ALLOWED_STYLE_PROPERTIES,
         link_rel="noopener noreferrer nofollow",
+        attribute_filter=_filter_attribute,
     )
