@@ -31,8 +31,17 @@ from plane.db.models import (
 )
 from plane.settings.redis import redis_instance
 from plane.utils.exception_logger import log_exception
+from plane.utils.html_sanitizer import sanitize_html
 from plane.bgtasks.webhook_task import webhook_activity
 from plane.utils.issue_relation_mapper import get_inverse_relation
+
+
+def sanitize_activity_html(issue_activities):
+    # Comment and description activities store HTML taken from the request
+    for activity in issue_activities:
+        if activity.field in ("comment", "description"):
+            activity.old_value = sanitize_html(activity.old_value)
+            activity.new_value = sanitize_html(activity.new_value)
 
 
 # Track Changes in name
@@ -1870,6 +1879,9 @@ def issue_activity(
                 issue_activities=issue_activities,
                 epoch=epoch,
             )
+
+        # Clean HTML like the comment/issue itself (bulk_create skips save())
+        sanitize_activity_html(issue_activities)
 
         # Save all the values to database
         issue_activities_created = IssueActivity.objects.bulk_create(

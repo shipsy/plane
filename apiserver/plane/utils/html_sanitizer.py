@@ -50,7 +50,9 @@ def _filter_attribute(element, attribute, value):
     # same protection as href: only paths inside the app or http(s) URLs
     if attribute == "redirect_uri":
         uri = value.strip()
-        is_app_path = uri.startswith("/") and not uri.startswith("//")
+        is_app_path = (
+            uri.startswith("/") and not uri.startswith("//") and "\\" not in uri
+        )
         if not (is_app_path or uri.lower().startswith(("http://", "https://"))):
             return None
     return value

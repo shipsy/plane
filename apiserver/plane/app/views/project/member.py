@@ -252,6 +252,12 @@ class ProjectMemberViewSet(BaseViewSet):
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     @allow_permission([ROLE.ADMIN])
+    def retrieve(self, request, slug, project_id, pk):
+        return super().retrieve(
+            request, slug=slug, project_id=project_id, pk=pk
+        )
+
+    @allow_permission([ROLE.ADMIN])
     def partial_update(self, request, slug, project_id, pk):
         project_member = ProjectMember.objects.get(
             pk=pk,

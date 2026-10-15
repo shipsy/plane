@@ -123,7 +123,13 @@ class HTMLSanitizerTest(SimpleTestCase):
             '<mention-component id="1" target="users" entity_identifier="u1" '
             'redirect_uri="{}"></mention-component>'
         )
-        for uri in ["javascript:alert(1)", " JavaScript:alert(1)", "data:text/html,x", "//evil.com"]:
+        for uri in [
+            "javascript:alert(1)",
+            " JavaScript:alert(1)",
+            "data:text/html,x",
+            "//evil.com",
+            "/\\evil.example",
+        ]:
             with self.subTest(uri=uri):
                 self.assertNotIn("redirect_uri", sanitize_html(mention.format(uri)))
         for uri in ["/ws/profile/u1", "https://planedemo.shipsy.io/ws/profile/u1"]:
@@ -225,6 +231,24 @@ class ProtectedStateTest(WorkspaceFixtureMixin, TestCase):
         self.assertEqual(self.state.name, "Closed")
         self.assertTrue(self.state.is_protected)
 
+    def test_app_patch_of_protected_state_is_forbidden(self):
+        member = self.create_member("ops@shipsy.io", 15)
+        normal = State.objects.create(
+            name="Open", group="backlog", project=self.project, workspace=self.workspace
+        )
+        client = APIClient()
+        client.force_authenticate(member)
+        url = f"/api/workspaces/delta/projects/{self.project.id}/states/{{}}/"
+
+        response = client.patch(url.format(self.state.id), {"name": "Renamed"}, format="json")
+        self.assertEqual(response.status_code, 403)
+        self.state.refresh_from_db()
+        self.assertEqual(self.state.name, "Closed")
+
+        # Normal states are still editable
+        response = client.patch(url.format(normal.id), {"color": "#ff0000"}, format="json")
+        self.assertEqual(response.status_code, 200)
+
 
 class MemberEmailDisclosureTest(WorkspaceFixtureMixin, TestCase):
     """Members API discloses emails (VAPT 3.10)"""
@@ -246,9 +270,44 @@ class MemberEmailDisclosureTest(WorkspaceFixtureMixin, TestCase):
         admin = self.create_member("admin@shipsy.io", 20)
         self.assertTrue(all("email" in row["member"] for row in self.list_members(admin)))
 
+    def test_project_member_detail_is_admin_only(self):
+        member = self.create_member("ops@shipsy.io", 15)
+        admin = self.create_member("admin@shipsy.io", 20)
+        other = self.create_member("other@shipsy.io", 15)
+        other_pm = ProjectMember.objects.get(project=self.project, member=other)
+        url = f"/api/workspaces/delta/projects/{self.project.id}/members/{other_pm.id}/"
+
+        client = APIClient()
+        client.force_authenticate(member)
+        self.assertEqual(client.get(url).status_code, 403)
+
+        client.force_authenticate(admin)
+        response = client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["member"]["email"], "other@shipsy.io")
+
 
 class CommentSanitizationTest(WorkspaceFixtureMixin, TestCase):
     """Stored XSS is removed before comments are saved (VAPT 3.7)"""
+
+    def test_comment_activity_html_is_sanitized(self):
+        from plane.bgtasks.issue_activities_task import sanitize_activity_html
+        from plane.db.models import IssueActivity
+
+        payload = "<p>hi</p><iframe srcdoc='<body onload=prompt(1)>'></iframe>"
+        activities = [
+            IssueActivity(field="comment", old_value=payload, new_value=payload),
+            IssueActivity(field="description", old_value=None, new_value=payload),
+            IssueActivity(field="name", old_value="a<b", new_value="c<d"),
+        ]
+        sanitize_activity_html(activities)
+
+        self.assertEqual(activities[0].old_value, "<p>hi</p>")
+        self.assertEqual(activities[0].new_value, "<p>hi</p>")
+        self.assertIsNone(activities[1].old_value)
+        self.assertEqual(activities[1].new_value, "<p>hi</p>")
+        # Non-HTML fields are untouched
+        self.assertEqual(activities[2].new_value, "c<d")
 
     def test_comment_html_is_sanitized_on_save(self):
         from plane.db.models import Issue
