@@ -31,6 +31,10 @@ class Session(AbstractBaseSession):
 
     class Meta(AbstractBaseSession.Meta):
         db_table = "sessions"
+        # Used to end all sessions of a user (logout from the Ops Dashboard)
+        indexes = [
+            models.Index(fields=["user_id"], name="sessions_user_id_idx"),
+        ]
 
 
 class SessionStore(DBSessionStore):

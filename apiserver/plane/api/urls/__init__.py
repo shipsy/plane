@@ -8,6 +8,7 @@ from .inbox import urlpatterns as inbox_patterns
 from .member import urlpatterns as member_patterns
 from .search import urlpatterns as search_patters
 from .webhook import urlpatterns as webhook_patters
+from .session import urlpatterns as session_patterns
 
 urlpatterns = [
     *project_patterns,
@@ -20,4 +21,5 @@ urlpatterns = [
     *issue_type_patterns,
     *search_patters,
     *webhook_patters,
+    *session_patterns,
 ]

@@ -317,6 +317,7 @@ CELERY_IMPORTS = (
     "plane.bgtasks.file_asset_task",
     "plane.bgtasks.email_notification_task",
     "plane.bgtasks.api_logs_task",
+    "plane.bgtasks.session_cleanup_task",
     "plane.license.bgtasks.tracer",
     # management tasks
     "plane.bgtasks.dummy_data_task",
@@ -376,7 +377,8 @@ SESSION_COOKIE_SECURE = secure_origins
 # SESSION_COOKIE_SAMESITE = "None"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_ENGINE = "plane.db.models.session"
-SESSION_COOKIE_AGE = os.environ.get("SESSION_COOKIE_AGE", 604800)
+# 30 minutes, renewed while the user is active (see SessionMiddleware)
+SESSION_COOKIE_AGE = int(os.environ.get("SESSION_COOKIE_AGE", 1800))
 SESSION_COOKIE_NAME = os.environ.get("SESSION_COOKIE_NAME", "session-id")
 SESSION_COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN", None)
 SESSION_SAVE_EVERY_REQUEST = (
