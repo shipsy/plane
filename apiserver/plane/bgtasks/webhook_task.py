@@ -44,6 +44,11 @@ from plane.db.models import (
 )
 from plane.license.utils.instance_value import get_email_configuration
 from plane.utils.exception_logger import log_exception
+from plane.utils.url_validator import (
+    BlockedURLError,
+    HostResolutionError,
+    validate_outbound_url,
+)
 
 SERIALIZER_MAPPER = {
     "project": ProjectSerializer,
@@ -78,6 +83,43 @@ def get_model_data(event, event_id, many=False):
         queryset = model.objects.get(pk=event_id)
     serializer = SERIALIZER_MAPPER.get(event)
     return serializer(queryset, many=many).data
+
+
+def post_webhook(url, headers, payload):
+    """
+    Deliver a webhook. The destination is re-validated right before sending
+    (the DNS answer may have changed since the webhook was saved) and
+    redirects are not followed, so deliveries cannot reach internal hosts.
+    """
+    try:
+        validate_outbound_url(url)
+    except HostResolutionError as e:
+        # A DNS failure may be temporary: retry like any network error
+        raise requests.ConnectionError(str(e)) from e
+    return requests.post(
+        url,
+        headers=headers,
+        json=payload,
+        timeout=30,
+        allow_redirects=False,
+    )
+
+
+def deactivate_blocked_webhook(webhook, event, action, headers, payload, retries):
+    # The destination is not allowed; record why and deactivate (no retry)
+    WebhookLog.objects.create(
+        workspace_id=str(webhook.workspace_id),
+        webhook_id=str(webhook.id),
+        event_type=str(event),
+        request_method=str(action),
+        request_headers=str(headers),
+        request_body=str(payload),
+        response_status=400,
+        response_headers="",
+        response_body="Webhook deactivated: the URL points to a blocked address",
+        retry_count=str(retries),
+    )
+    Webhook.objects.filter(pk=webhook.id).update(is_active=False)
 
 
 @shared_task(
@@ -131,12 +173,7 @@ def webhook_task(self, webhook, slug, event, event_data, action, current_site):
             headers["X-Plane-Signature"] = signature
 
         # Send the webhook event
-        response = requests.post(
-            webhook.url,
-            headers=headers,
-            json=payload,
-            timeout=30,
-        )
+        response = post_webhook(webhook.url, headers, payload)
 
         # Log the webhook request
         WebhookLog.objects.create(
@@ -153,6 +190,11 @@ def webhook_task(self, webhook, slug, event, event_data, action, current_site):
         )
 
     except Webhook.DoesNotExist:
+        return
+    except BlockedURLError:
+        deactivate_blocked_webhook(
+            webhook, event, action, headers, payload, self.request.retries
+        )
         return
     except requests.RequestException as e:
         # Log the failed webhook request
@@ -315,12 +357,7 @@ def webhook_send_task(
             headers["X-Plane-Signature"] = signature
 
         # Send the webhook event
-        response = requests.post(
-            webhook.url,
-            headers=headers,
-            json=payload,
-            timeout=30,
-        )
+        response = post_webhook(webhook.url, headers, payload)
 
         # Log the webhook request
         WebhookLog.objects.create(
@@ -336,6 +373,11 @@ def webhook_send_task(
             retry_count=str(self.request.retries),
         )
 
+    except BlockedURLError:
+        deactivate_blocked_webhook(
+            webhook, event, action, headers, payload, self.request.retries
+        )
+        return
     except requests.RequestException as e:
         # Log the failed webhook request
         WebhookLog.objects.create(

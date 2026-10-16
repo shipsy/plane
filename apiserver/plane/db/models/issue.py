@@ -12,6 +12,7 @@ from django.db.models import Q
 
 # Module imports
 from plane.utils.html_processor import strip_tags
+from plane.utils.html_sanitizer import sanitize_html
 from plane.db.mixins import SoftDeletionManager
 
 from .project import ProjectBaseModel
@@ -210,6 +211,9 @@ class Issue(ProjectBaseModel):
         ordering = ("-created_at",)
 
     def save(self, *args, **kwargs):
+        # Remove scripts and other unsafe markup before storing; every client
+        # that renders this HTML relies on it
+        self.description_html = sanitize_html(self.description_html)
         if self.state is None:
             try:
                 from plane.db.models import State
@@ -537,6 +541,9 @@ class IssueComment(ProjectBaseModel):
     external_id = models.CharField(max_length=255, blank=True, null=True)
 
     def save(self, *args, **kwargs):
+        # Remove scripts and other unsafe markup before storing; every client
+        # that renders this HTML relies on it
+        self.comment_html = sanitize_html(self.comment_html)
         self.comment_stripped = (
             strip_tags(self.comment_html) if self.comment_html != "" else ""
         )

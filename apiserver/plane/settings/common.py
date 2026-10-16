@@ -185,8 +185,6 @@ else:
 
 # Redis Config
 REDIS_URL = os.environ.get("REDIS_URL")
-for key, value in os.environ.items():
-    print(f"Env Variable {key}: {value}")
 REDIS_SSL = REDIS_URL and "rediss" in REDIS_URL
 
 if REDIS_SSL:
@@ -402,7 +400,7 @@ CSRF_FAILURE_VIEW = "plane.authentication.views.common.csrf_failure"
 ADMIN_BASE_URL = os.environ.get("ADMIN_BASE_URL", None)
 SPACE_BASE_URL = os.environ.get("SPACE_BASE_URL", None)
 APP_BASE_URL = os.environ.get("APP_BASE_URL")
-STATIC_API_TOKEN = os.environ.get("STATIC_API_TOKEN", "TEST_API_TOKEN")
+STATIC_API_TOKEN = os.environ.get("STATIC_API_TOKEN")
 HARD_DELETE_AFTER_DAYS = int(os.environ.get("HARD_DELETE_AFTER_DAYS", 60))
 
 # Instance Changelog URL

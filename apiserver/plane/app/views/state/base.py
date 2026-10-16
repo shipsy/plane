@@ -79,6 +79,19 @@ class StateViewSet(BaseViewSet):
     @invalidate_cache(
         path="workspaces/:slug/states/", url_params=True, user=False
     )
+    def partial_update(self, request, slug, project_id, pk):
+        if self.get_queryset().filter(pk=pk, is_protected=True).exists():
+            return Response(
+                {"error": "Protected states cannot be modified"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().partial_update(
+            request, slug=slug, project_id=project_id, pk=pk
+        )
+
+    @invalidate_cache(
+        path="workspaces/:slug/states/", url_params=True, user=False
+    )
     @allow_permission([ROLE.ADMIN])
     def destroy(self, request, slug, project_id, pk):
         state = State.objects.get(

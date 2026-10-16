@@ -48,6 +48,10 @@ class UserSerializer(BaseSerializer):
             "is_email_verified",
             "is_active",
             "token_updated_at",
+            "is_super_admin",
+            "hub_codes",
+            "hub_names",
+            "employee_permissions",
         ]
 
         # If the user has already filled first name or last name then he is onboarded

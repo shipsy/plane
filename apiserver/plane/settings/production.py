@@ -5,7 +5,10 @@ import os
 from .common import *  # noqa
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = int(os.environ.get("DEBUG", 0)) == 1
+# Django debug pages (stack traces, URL listings) are never served here; the
+# DEBUG env var only raises the log verbosity
+VERBOSE_LOGGING = int(os.environ.get("DEBUG", 0)) == 1
+DEBUG = False
 
 # Honor the 'X-Forwarded-Proto' header for request.is_secure()
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -47,7 +50,7 @@ LOGGING = {
             "class": "plane.utils.logging.SizedTimedRotatingFileHandler",
             "filename": (
                 os.path.join(BASE_DIR, "logs", "plane-debug.log")  # noqa
-                if DEBUG
+                if VERBOSE_LOGGING
                 else os.path.join(BASE_DIR, "logs", "plane-error.log")  # noqa
             ),
             "when": "s",
@@ -55,7 +58,7 @@ LOGGING = {
             "interval": 1,
             "backupCount": 5,
             "formatter": "json",
-            "level": "DEBUG" if DEBUG else "ERROR",
+            "level": "DEBUG" if VERBOSE_LOGGING else "ERROR",
         },
     },
     "loggers": {
@@ -70,7 +73,7 @@ LOGGING = {
             "propagate": False,
         },
         "plane": {
-            "level": "DEBUG" if DEBUG else "ERROR",
+            "level": "DEBUG" if VERBOSE_LOGGING else "ERROR",
             "handlers": ["console", "file"],
             "propagate": False,
         },
