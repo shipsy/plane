@@ -19,7 +19,7 @@ export const CustomMention = ({
   mentionSuggestions,
   readonly,
 }: {
-  mentionSuggestions?: () => Promise<IMentionSuggestion[]>;
+  mentionSuggestions?: (query: string) => Promise<IMentionSuggestion[]>;
   mentionHighlights?: () => Promise<IMentionHighlight[]>;
   readonly: boolean;
 }) =>

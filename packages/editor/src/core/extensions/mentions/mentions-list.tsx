@@ -21,7 +21,8 @@ interface MentionListProps {
   }) => void;
   query: string;
   editor: Editor;
-  mentionSuggestions: () => Promise<IMentionSuggestion[]>;
+  // must return suggestions already filtered by the query, the list renders them as is
+  mentionSuggestions: (query: string) => Promise<IMentionSuggestion[]>;
 }
 
 export const MentionList = forwardRef((props: MentionListProps, ref) => {
@@ -31,10 +32,14 @@ export const MentionList = forwardRef((props: MentionListProps, ref) => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    // ignore responses for a query the user has already typed past
+    let cancelled = false;
     const fetchSuggestions = async () => {
       setIsLoading(true);
       try {
-        const suggestions = await mentionSuggestions();
+        // the query is passed down so filtering happens before the result cap
+        const suggestions = await mentionSuggestions(query);
+        if (cancelled) return;
         const mappedSuggestions: IMentionSuggestion[] = suggestions.map((suggestion): IMentionSuggestion => {
           const transactionId = uuidv4();
           return {
@@ -43,19 +48,18 @@ export const MentionList = forwardRef((props: MentionListProps, ref) => {
           };
         });
 
-        const filteredSuggestions = mappedSuggestions.filter((suggestion) =>
-          suggestion.title.toLowerCase().startsWith(query.toLowerCase())
-        );
-
-        setItems(filteredSuggestions);
+        setItems(mappedSuggestions);
       } catch (error) {
         console.error("Failed to fetch suggestions:", error);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     fetchSuggestions();
+    return () => {
+      cancelled = true;
+    };
   }, [query, mentionSuggestions]);
 
   const selectItem = (index: number) => {
