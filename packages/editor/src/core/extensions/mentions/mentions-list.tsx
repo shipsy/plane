@@ -21,6 +21,7 @@ interface MentionListProps {
   }) => void;
   query: string;
   editor: Editor;
+  // must return suggestions already filtered by the query, the list renders them as is
   mentionSuggestions: (query: string) => Promise<IMentionSuggestion[]>;
 }
 
