@@ -42,3 +42,5 @@ from .webhook import (
     WebhookEndpoint, WebhookLogsEndpoint,
     WebhookSecretRegenerateEndpoint
 )
+
+from .session import UserSessionRevokeEndpoint

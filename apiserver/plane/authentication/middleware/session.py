@@ -24,12 +24,27 @@ class SessionMiddleware(MiddlewareMixin):
             session_key = request.COOKIES.get(settings.SESSION_COOKIE_NAME)
         request.session = self.SessionStore(session_key)
 
+    def refresh_session_expiry(self, request):
+        """
+        Keep active users signed in: renew the expiry of a logged in session
+        once half of its lifetime has passed. Idle sessions still expire.
+        """
+        session = getattr(request, "session", None)
+        if session is None or "instances" in request.path:
+            return
+        if not session.get("_auth_user_id"):
+            return
+        now = int(time.time())
+        if now - session.get("_expiry_refreshed_at", 0) >= settings.SESSION_COOKIE_AGE // 2:
+            session["_expiry_refreshed_at"] = now
+
     def process_response(self, request, response):
         """
         If request.session was modified, or if the configuration is to save the
         session every time, save the changes and set a session cookie or delete
         the session cookie if the session has been emptied.
         """
+        self.refresh_session_expiry(request)
         try:
             accessed = request.session.accessed
             modified = request.session.modified
