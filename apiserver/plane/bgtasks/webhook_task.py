@@ -44,7 +44,11 @@ from plane.db.models import (
 )
 from plane.license.utils.instance_value import get_email_configuration
 from plane.utils.exception_logger import log_exception
-from plane.utils.url_validator import BlockedURLError, validate_outbound_url
+from plane.utils.url_validator import (
+    BlockedURLError,
+    HostResolutionError,
+    validate_outbound_url,
+)
 
 SERIALIZER_MAPPER = {
     "project": ProjectSerializer,
@@ -87,7 +91,11 @@ def post_webhook(url, headers, payload):
     (the DNS answer may have changed since the webhook was saved) and
     redirects are not followed, so deliveries cannot reach internal hosts.
     """
-    validate_outbound_url(url)
+    try:
+        validate_outbound_url(url)
+    except HostResolutionError as e:
+        # A DNS failure may be temporary: retry like any network error
+        raise requests.ConnectionError(str(e)) from e
     return requests.post(
         url,
         headers=headers,
@@ -95,6 +103,23 @@ def post_webhook(url, headers, payload):
         timeout=30,
         allow_redirects=False,
     )
+
+
+def deactivate_blocked_webhook(webhook, event, action, headers, payload, retries):
+    # The destination is not allowed; record why and deactivate (no retry)
+    WebhookLog.objects.create(
+        workspace_id=str(webhook.workspace_id),
+        webhook_id=str(webhook.id),
+        event_type=str(event),
+        request_method=str(action),
+        request_headers=str(headers),
+        request_body=str(payload),
+        response_status=400,
+        response_headers="",
+        response_body="Webhook deactivated: the URL points to a blocked address",
+        retry_count=str(retries),
+    )
+    Webhook.objects.filter(pk=webhook.id).update(is_active=False)
 
 
 @shared_task(
@@ -167,8 +192,9 @@ def webhook_task(self, webhook, slug, event, event_data, action, current_site):
     except Webhook.DoesNotExist:
         return
     except BlockedURLError:
-        # The destination is not allowed; deactivate instead of retrying
-        Webhook.objects.filter(pk=webhook.id).update(is_active=False)
+        deactivate_blocked_webhook(
+            webhook, event, action, headers, payload, self.request.retries
+        )
         return
     except requests.RequestException as e:
         # Log the failed webhook request
@@ -348,8 +374,9 @@ def webhook_send_task(
         )
 
     except BlockedURLError:
-        # The destination is not allowed; deactivate instead of retrying
-        Webhook.objects.filter(pk=webhook.id).update(is_active=False)
+        deactivate_blocked_webhook(
+            webhook, event, action, headers, payload, self.request.retries
+        )
         return
     except requests.RequestException as e:
         # Log the failed webhook request
