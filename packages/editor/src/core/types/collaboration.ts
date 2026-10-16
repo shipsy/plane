@@ -28,7 +28,7 @@ type TCollaborativeEditorHookProps = {
   id: string;
   mentionHandler: {
     highlights: () => Promise<IMentionHighlight[]>;
-    suggestions?: () => Promise<IMentionSuggestion[]>;
+    suggestions?: (query: string) => Promise<IMentionSuggestion[]>;
   };
   realtimeConfig: TRealtimeConfig;
   serverHandler?: TServerHandler;

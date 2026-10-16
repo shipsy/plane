@@ -70,11 +70,22 @@ export const useMention = ({ workspaceSlug, projectId, members, user }: Props) =
       checkData();
     });
 
-  const mentionSuggestions = async (): Promise<IMentionSuggestion[]> => {
+  // filter by the typed query first and only then cap, so members beyond the
+  // first 20 are still reachable; the cap keeps the popup render small
+  const filterAndCap = (list: IUserLite[], query: string) => {
+    const queryLowerCase = query.trim().toLowerCase();
+    const matches = queryLowerCase
+      ? list.filter((member) =>
+          `${member?.display_name} ${member?.first_name} ${member?.last_name}`.toLowerCase().includes(queryLowerCase)
+        )
+      : list;
+    return matches.slice(0, 20);
+  };
+
+  const mentionSuggestions = async (query: string = ""): Promise<IMentionSuggestion[]> => {
     if (members && projectMembersRef.current && projectMembersRef.current.length > 0) {
       // If data is already available, return it immediately
-      // cap the suggestions so the mention popup never renders a huge list
-      return projectMembersRef.current.slice(0, 20).map((memberDetails) => ({
+      return filterAndCap(projectMembersRef.current, query).map((memberDetails) => ({
         entity_name: "user_mention",
         entity_identifier: `${memberDetails?.id}`,
         id: `${memberDetails?.id}`,
@@ -87,7 +98,7 @@ export const useMention = ({ workspaceSlug, projectId, members, user }: Props) =
     } else {
       // Wait for data to be available
       const membersList = await waitForData();
-      return membersList.slice(0, 20).map((memberDetails) => ({
+      return filterAndCap(membersList, query).map((memberDetails) => ({
         entity_name: "user_mention",
         entity_identifier: `${memberDetails?.id}`,
         id: `${memberDetails?.id}`,

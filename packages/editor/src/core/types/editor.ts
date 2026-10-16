@@ -79,7 +79,7 @@ export interface IEditorProps {
   initialValue: string;
   mentionHandler: {
     highlights: () => Promise<IMentionHighlight[]>;
-    suggestions?: () => Promise<IMentionSuggestion[]>;
+    suggestions?: (query: string) => Promise<IMentionSuggestion[]>;
   };
   onChange?: (json: object, html: string) => void;
   onTransaction?: () => void;

@@ -37,7 +37,7 @@ type TArguments = {
   enableHistory: boolean;
   fileHandler: TFileHandler;
   mentionConfig: {
-    mentionSuggestions?: () => Promise<IMentionSuggestion[]>;
+    mentionSuggestions?: (query: string) => Promise<IMentionSuggestion[]>;
     mentionHighlights?: () => Promise<IMentionHighlight[]>;
   };
   placeholder?: string | ((isFocused: boolean, value: string) => string);
