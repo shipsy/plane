@@ -7,6 +7,7 @@ import { useForm, Controller } from "react-hook-form";
 import { EditorRefApi } from "@plane/editor";
 import { useTranslation } from "@plane/i18n";
 // ui
+import { useTranslation } from "@plane/i18n";
 import { TOAST_TYPE, setToast } from "@plane/ui";
 // editor components
 import { LiteTextEditor } from "@/components/editor/lite-text-editor";
