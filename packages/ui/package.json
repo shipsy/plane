@@ -34,7 +34,7 @@
     "@plane/helpers": "*",
     "clsx": "^2.0.0",
     "emoji-picker-react": "^4.5.16",
-    "lodash": "^4.17.21",
+    "lodash": "^4.17.23",
     "lucide-react": "^0.379.0",
     "react-color": "^2.19.3",
     "react-popper": "^2.3.0",
