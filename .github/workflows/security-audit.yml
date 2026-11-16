@@ -1,0 +1,20 @@
+# Copy to <your-repo>/.github/workflows/security-audit.yml. Nothing to change.
+#
+# Audits each PR's diff with the AI security audit, posts one sticky PR comment and archives the run to S3.
+# Report only, unless the SECURITY_AUDIT_BLOCKING variable (org or repo) is "true". Docs:
+# https://github.com/shipsy/devops/tree/master/github-actions/security-audit
+name: Security audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch: # audits the selected branch against the default branch
+
+jobs:
+  security-audit:
+    uses: shipsy/devops/.github/workflows/security-audit.yml@v1 # a tag or commit SHA, never a branch
+    secrets: inherit # KIRO_API_KEY, NPM_AUTH_TOKEN
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
