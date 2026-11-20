@@ -1,0 +1,628 @@
+# Copyright (c) 2023-present Plane Software, Inc. and contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+# See the LICENSE file for details.
+
+"""Global Settings"""
+
+# Python imports
+import ipaddress
+import logging
+import os
+from urllib.parse import parse_qs
+from urllib.parse import urlparse
+from urllib.parse import urljoin
+
+# Third party imports
+import dj_database_url
+
+# Django imports
+from django.core.management.utils import get_random_secret_key
+from corsheaders.defaults import default_headers
+
+
+# Module imports
+from plane.utils.url import is_valid_url
+
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+_logger = logging.getLogger("plane")
+
+# Secret Key — use `or` so an explicitly empty env var is treated the same as unset,
+# falling back to a random key rather than passing "" to Django (GHSA-cmwv-pjmw-8483).
+SECRET_KEY = os.environ.get("SECRET_KEY") or get_random_secret_key()
+# Refuse to run silently with a publicly-known or placeholder SECRET_KEY
+# (GHSA-cmwv-pjmw-8483). Emit a critical log so operators notice immediately.
+# The `or get_random_secret_key()` above means the only way to reach this branch
+# is if the environment explicitly passes one of the flagged values.
+_INSECURE_SECRET_KEYS = {
+    "60gp0byfz2dvffa45cxl20p1scy9xbpf6d8c5y0geejgkyp1b5",  # old publicly-known default
+    "change-this-key-on-deployment",  # placeholder shipped in community templates
+}
+if SECRET_KEY in _INSECURE_SECRET_KEYS:
+    _logger.critical(
+        "SECURITY: SECRET_KEY is set to a known insecure or placeholder value. "
+        "This makes your installation vulnerable to session forgery, CSRF bypass, and "
+        "password-reset token forging. Set a unique SECRET_KEY before deploying to production. "
+        "Generate one with: "
+        "python3 -c \"from django.utils.crypto import get_random_secret_key; print(get_random_secret_key())\""
+    )
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = int(os.environ.get("DEBUG", "0"))
+
+# Self-hosted mode
+IS_SELF_MANAGED = True
+
+# Webhook IP allowlist — comma-separated IPs or CIDR ranges that are allowed as
+# webhook targets even if they resolve to private networks.
+# Example: "10.0.0.0/8,192.168.1.0/24,172.16.0.5"
+_webhook_allowed_ips_raw = os.environ.get("WEBHOOK_ALLOWED_IPS", "")
+WEBHOOK_ALLOWED_IPS = []
+for _cidr in _webhook_allowed_ips_raw.split(","):
+    _cidr = _cidr.strip()
+    if not _cidr:
+        continue
+    try:
+        WEBHOOK_ALLOWED_IPS.append(ipaddress.ip_network(_cidr, strict=False))
+    except ValueError:
+        _logger.warning("WEBHOOK_ALLOWED_IPS: skipping invalid entry %r", _cidr)
+
+# Webhook hostname allowlist — comma-separated hostnames that bypass the
+# private-IP SSRF check. Useful for trusted internal services whose IPs are
+# dynamic in containerised deployments (e.g. docker-compose service DNS,
+# kubernetes service hostnames).
+# Example: "silo,silo.namespace.svc.cluster.local,internal-api.lan"
+_webhook_allowed_hosts_raw = os.environ.get("WEBHOOK_ALLOWED_HOSTS", "")
+WEBHOOK_ALLOWED_HOSTS = [
+    _host.strip().rstrip(".").lower()
+    for _host in _webhook_allowed_hosts_raw.split(",")
+    if _host.strip()
+]
+
+# Webhook disallowed domains — comma-separated hostnames. Webhooks targeting
+# these domains or any of their subdomains are rejected (the request host is
+# always appended at validation time as a loop-back guard). Empty by default
+# for self-hosted deployments; set to e.g. "plane.so" to block specific domains.
+_webhook_disallowed_domains_raw = os.environ.get("WEBHOOK_DISALLOWED_DOMAINS", "")
+WEBHOOK_DISALLOWED_DOMAINS = [
+    _d.strip().rstrip(".").lower()
+    for _d in _webhook_disallowed_domains_raw.split(",")
+    if _d.strip()
+]
+
+# Allowed Hosts
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
+
+# Application definition
+INSTALLED_APPS = [
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.staticfiles",
+    # Inhouse apps
+    "plane.analytics",
+    "plane.app",
+    "plane.space",
+    "plane.bgtasks",
+    "plane.db",
+    "plane.utils",
+    "plane.web",
+    "plane.middleware",
+    "plane.license",
+    "plane.api",
+    "plane.authentication",
+    # Third-party things
+    "rest_framework",
+    "corsheaders",
+    "django_celery_beat",
+]
+
+# Middlewares
+MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "plane.authentication.middleware.session.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "crum.CurrentRequestUserMiddleware",
+    "django.middleware.gzip.GZipMiddleware",
+    "plane.middleware.request_body_size.RequestBodySizeLimitMiddleware",
+    "plane.middleware.logger.APITokenLogMiddleware",
+    "plane.middleware.logger.RequestLoggerMiddleware",
+]
+
+# Rest Framework settings
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": ("rest_framework.authentication.SessionAuthentication",),
+    "DEFAULT_THROTTLE_CLASSES": ("rest_framework.throttling.AnonRateThrottle",),
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "30/minute",
+        "asset_id": "5/minute",
+    },
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
+    "DEFAULT_RENDERER_CLASSES": ("rest_framework.renderers.JSONRenderer",),
+    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+    "EXCEPTION_HANDLER": "plane.authentication.adapter.exception.auth_exception_handler",
+    # Preserve original Django URL parameter names (pk) instead of converting to 'id'
+    "SCHEMA_COERCE_PATH_PK": False,
+}
+
+# Number of reverse proxies in front of the API. DRF throttles use it to pick the
+# client IP from X-Forwarded-For. Unset keeps DRF's default (None).
+_num_proxies_raw = os.environ.get("NUM_PROXIES", "").strip()
+if _num_proxies_raw.isdecimal() and len(_num_proxies_raw) <= 3:
+    REST_FRAMEWORK["NUM_PROXIES"] = int(_num_proxies_raw)
+elif _num_proxies_raw:
+    _logger.warning("NUM_PROXIES: ignoring invalid value %r", _num_proxies_raw)
+
+# API key throttle rate (DRF SimpleRateThrottle format, e.g. "60/minute")
+API_KEY_RATE_LIMIT = os.environ.get("API_KEY_RATE_LIMIT", "60/minute")
+
+# Django Auth Backend
+AUTHENTICATION_BACKENDS = ("django.contrib.auth.backends.ModelBackend",)  # default
+
+# Root Urls
+ROOT_URLCONF = "plane.urls"
+
+# Templates
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": ["templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ]
+        },
+    }
+]
+
+
+def _cors_settings(cors_allowed_origins, base_urls):
+    """
+    Returns (CORS_ALLOWED_ORIGINS, CORS_ALLOW_ALL_ORIGINS, CORS_ALLOW_CREDENTIALS).
+
+    The configured CORS origins are used as they are. Without any, the allowed
+    origins are those of the instance's own base URLs that are set and valid.
+    Only when there are none of those either is every origin allowed, and then
+    without credentials.
+    """
+    origins = list(cors_allowed_origins)
+    if not origins:
+        for base_url in base_urls:
+            try:
+                parsed_url = urlparse((base_url or "").strip())
+            except ValueError:
+                continue
+            origin = f"{parsed_url.scheme}://{parsed_url.netloc}".lower()
+            if parsed_url.scheme and parsed_url.netloc and origin not in origins:
+                origins.append(origin)
+    return origins, not origins, bool(origins)
+
+
+# CORS Settings
+cors_origins_raw = os.environ.get("CORS_ALLOWED_ORIGINS", "")
+# filter out empty strings
+cors_allowed_origins = [origin.strip() for origin in cors_origins_raw.split(",") if origin.strip()]
+CORS_ALLOWED_ORIGINS, CORS_ALLOW_ALL_ORIGINS, CORS_ALLOW_CREDENTIALS = _cors_settings(
+    cors_allowed_origins,
+    [os.environ.get(name) for name in ("WEB_URL", "APP_BASE_URL", "ADMIN_BASE_URL", "SPACE_BASE_URL", "LIVE_BASE_URL")],
+)
+
+CORS_ALLOW_HEADERS = [*default_headers, "X-API-Key"]
+
+# Application Settings
+WSGI_APPLICATION = "plane.wsgi.application"
+ASGI_APPLICATION = "plane.asgi.application"
+
+# Django Sites
+SITE_ID = 1
+
+# User Model
+AUTH_USER_MODEL = "db.User"
+
+# Database
+if bool(os.environ.get("DATABASE_URL")):
+    # Parse database configuration from $DATABASE_URL
+    DATABASES = {"default": dj_database_url.config()}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("POSTGRES_DB"),
+            "USER": os.environ.get("POSTGRES_USER"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD"),
+            "HOST": os.environ.get("POSTGRES_HOST"),
+            "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        }
+    }
+
+
+if os.environ.get("ENABLE_READ_REPLICA", "0") == "1":
+    if bool(os.environ.get("DATABASE_READ_REPLICA_URL")):
+        # Parse database configuration from $DATABASE_URL
+        DATABASES["replica"] = dj_database_url.parse(os.environ.get("DATABASE_READ_REPLICA_URL"))
+    else:
+        DATABASES["replica"] = {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("POSTGRES_READ_REPLICA_DB"),
+            "USER": os.environ.get("POSTGRES_READ_REPLICA_USER"),
+            "PASSWORD": os.environ.get("POSTGRES_READ_REPLICA_PASSWORD"),
+            "HOST": os.environ.get("POSTGRES_READ_REPLICA_HOST"),
+            "PORT": os.environ.get("POSTGRES_READ_REPLICA_PORT", "5432"),
+        }
+
+    # Database Routers
+    DATABASE_ROUTERS = ["plane.utils.core.dbrouters.ReadReplicaRouter"]
+    # Add middleware at the end for read replica routing
+    MIDDLEWARE.append("plane.middleware.db_routing.ReadReplicaRoutingMiddleware")
+
+
+# Redis Config
+REDIS_URL = os.environ.get("REDIS_URL")
+REDIS_SSL = REDIS_URL and "rediss" in REDIS_URL
+
+
+def _redis_ssl_kwargs(url=None):
+    """
+    TLS options for rediss:// connections. The server certificate and hostname are
+    verified against the system CA bundle, or REDIS_SSL_CA_CERTS when set.
+    REDIS_SSL_CERT_REQS=none turns verification off.
+
+    Query options in the URL override these kwargs in redis-py, so an ssl_cert_reqs
+    there takes precedence over REDIS_SSL_CERT_REQS. The hostname is checked unless
+    verification is off (none); an explicit ssl_check_hostname in the URL still wins.
+    """
+    url_cert_reqs = parse_qs(urlparse(url or "").query).get("ssl_cert_reqs", [""])[0]
+    cert_reqs = (url_cert_reqs or os.environ.get("REDIS_SSL_CERT_REQS", "")).strip().lower() or "required"
+    kwargs = {"ssl_cert_reqs": cert_reqs, "ssl_check_hostname": cert_reqs != "none"}
+    if os.environ.get("REDIS_SSL_CA_CERTS"):
+        kwargs["ssl_ca_certs"] = os.environ["REDIS_SSL_CA_CERTS"]
+    return kwargs
+
+
+REDIS_SSL_KWARGS = _redis_ssl_kwargs(REDIS_URL)
+
+if REDIS_SSL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "CONNECTION_POOL_KWARGS": REDIS_SSL_KWARGS,
+            },
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": REDIS_URL,
+            "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"},
+        }
+    }
+
+# Password validations
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+# Password reset time the number of seconds the uniquely generated uid will be valid
+PASSWORD_RESET_TIMEOUT = 3600
+
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "static-assets", "collected-static")
+STATICFILES_DIRS = (os.path.join(BASE_DIR, "static"),)
+
+# Media Settings
+MEDIA_ROOT = "mediafiles"
+MEDIA_URL = "/media/"
+
+# Internationalization
+LANGUAGE_CODE = "en-us"
+USE_I18N = True
+
+# Timezones
+USE_TZ = True
+TIME_ZONE = "UTC"
+
+# Default Auto Field
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Email settings
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+# Storage Settings
+# Use Minio settings
+USE_MINIO = int(os.environ.get("USE_MINIO", 0)) == 1
+
+STORAGES = {"staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"}}
+STORAGES["default"] = {"BACKEND": "plane.settings.storage.S3Storage"}
+# No fallback: when unset, boto3 resolves credentials through its default chain, as S3Storage does.
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+# Warn when the storage credentials are still the template values.
+if USE_MINIO and AWS_SECRET_ACCESS_KEY == "secret-key":
+    _logger.critical(
+        "SECURITY: AWS_SECRET_ACCESS_KEY is set to the placeholder value from the env templates "
+        "while USE_MINIO is on. Set unique object-storage credentials (the latest CLI setup.sh "
+        "generates them on install and upgrade) and restart MinIO and Plane."
+    )
+AWS_STORAGE_BUCKET_NAME = os.environ.get("AWS_S3_BUCKET_NAME", "uploads")
+AWS_REGION = os.environ.get("AWS_REGION", "")
+AWS_DEFAULT_ACL = "public-read"
+AWS_QUERYSTRING_AUTH = False
+AWS_S3_FILE_OVERWRITE = False
+AWS_S3_ENDPOINT_URL = os.environ.get("AWS_S3_ENDPOINT_URL", None) or os.environ.get("MINIO_ENDPOINT_URL", None)
+if AWS_S3_ENDPOINT_URL and USE_MINIO:
+    parsed_url = urlparse(os.environ.get("WEB_URL", "http://localhost"))
+    AWS_S3_CUSTOM_DOMAIN = f"{parsed_url.netloc}/{AWS_STORAGE_BUCKET_NAME}"
+    AWS_S3_URL_PROTOCOL = f"{parsed_url.scheme}:"
+
+# RabbitMQ connection settings
+RABBITMQ_HOST = os.environ.get("RABBITMQ_HOST", "localhost")
+RABBITMQ_PORT = os.environ.get("RABBITMQ_PORT", "5672")
+RABBITMQ_USER = os.environ.get("RABBITMQ_USER", "guest")
+RABBITMQ_PASSWORD = os.environ.get("RABBITMQ_PASSWORD", "guest")
+RABBITMQ_VHOST = os.environ.get("RABBITMQ_VHOST", "/")
+AMQP_URL = os.environ.get("AMQP_URL")
+
+# Celery Configuration
+if AMQP_URL:
+    CELERY_BROKER_URL = AMQP_URL
+else:
+    CELERY_BROKER_URL = f"amqp://{RABBITMQ_USER}:{RABBITMQ_PASSWORD}@{RABBITMQ_HOST}:{RABBITMQ_PORT}/{RABBITMQ_VHOST}"
+
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_ACCEPT_CONTENT = ["application/json"]
+
+
+CELERY_IMPORTS = (
+    # scheduled tasks
+    "plane.bgtasks.issue_automation_task",
+    "plane.bgtasks.exporter_expired_task",
+    "plane.bgtasks.file_asset_task",
+    "plane.bgtasks.email_notification_task",
+    "plane.bgtasks.cleanup_task",
+    "plane.license.bgtasks.telemetry_metrics",
+    # management tasks
+    "plane.bgtasks.dummy_data_task",
+    # issue version tasks
+    "plane.bgtasks.issue_version_sync",
+    "plane.bgtasks.issue_description_version_sync",
+)
+
+FILE_SIZE_LIMIT = int(os.environ.get("FILE_SIZE_LIMIT", 5242880))
+
+# Unsplash Access key
+UNSPLASH_ACCESS_KEY = os.environ.get("UNSPLASH_ACCESS_KEY")
+# Github Access Token
+GITHUB_ACCESS_TOKEN = os.environ.get("GITHUB_ACCESS_TOKEN", False)
+
+# Analytics
+ANALYTICS_SECRET_KEY = os.environ.get("ANALYTICS_SECRET_KEY", False)
+ANALYTICS_BASE_API = os.environ.get("ANALYTICS_BASE_API", False)
+
+# Skip environment variable configuration
+SKIP_ENV_VAR = os.environ.get("SKIP_ENV_VAR", "1") == "1"
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.environ.get("FILE_SIZE_LIMIT", 5242880))
+
+
+def _cookies_secure(web_url, cors_allowed_origins, app_base_url=None):
+    """
+    Cookies are Secure when Plane is served over https, or when every configured
+    CORS origin is https. Plain-http installs keep non-Secure cookies.
+
+    The serving URL is WEB_URL, falling back to APP_BASE_URL when WEB_URL is
+    unset or empty, matching the precedence used by base_host().
+    """
+    if (web_url or app_base_url or "").strip().lower().startswith("https://"):
+        return True
+    return bool(cors_allowed_origins) and not any("http:" in origin for origin in cors_allowed_origins)
+
+
+# Cookie Settings
+SESSION_COOKIE_SECURE = _cookies_secure(
+    os.environ.get("WEB_URL"), cors_allowed_origins, app_base_url=os.environ.get("APP_BASE_URL")
+)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_ENGINE = "plane.db.models.session"
+SESSION_COOKIE_AGE = int(os.environ.get("SESSION_COOKIE_AGE", 604800))
+SESSION_COOKIE_NAME = os.environ.get("SESSION_COOKIE_NAME", "session-id")
+SESSION_COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN", None)
+SESSION_SAVE_EVERY_REQUEST = os.environ.get("SESSION_SAVE_EVERY_REQUEST", "0") == "1"
+
+# Admin Cookie
+ADMIN_SESSION_COOKIE_NAME = "admin-session-id"
+ADMIN_SESSION_COOKIE_AGE = int(os.environ.get("ADMIN_SESSION_COOKIE_AGE", 3600))
+
+# CSRF cookies
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
+CSRF_COOKIE_HTTPONLY = True
+CSRF_TRUSTED_ORIGINS = cors_allowed_origins
+CSRF_COOKIE_DOMAIN = os.environ.get("COOKIE_DOMAIN", None)
+CSRF_FAILURE_VIEW = "plane.authentication.views.common.csrf_failure"
+
+######  Base URLs ######
+
+# Admin Base URL
+ADMIN_BASE_URL = os.environ.get("ADMIN_BASE_URL", None)
+if ADMIN_BASE_URL and not is_valid_url(ADMIN_BASE_URL):
+    ADMIN_BASE_URL = None
+ADMIN_BASE_PATH = os.environ.get("ADMIN_BASE_PATH", "/god-mode/")
+
+# Space Base URL
+SPACE_BASE_URL = os.environ.get("SPACE_BASE_URL", None)
+if SPACE_BASE_URL and not is_valid_url(SPACE_BASE_URL):
+    SPACE_BASE_URL = None
+SPACE_BASE_PATH = os.environ.get("SPACE_BASE_PATH", "/spaces/")
+
+# App Base URL
+APP_BASE_URL = os.environ.get("APP_BASE_URL", None)
+if APP_BASE_URL and not is_valid_url(APP_BASE_URL):
+    APP_BASE_URL = None
+APP_BASE_PATH = os.environ.get("APP_BASE_PATH", "/")
+
+# Live Base URL
+LIVE_BASE_URL = os.environ.get("LIVE_BASE_URL", None)
+if LIVE_BASE_URL and not is_valid_url(LIVE_BASE_URL):
+    LIVE_BASE_URL = None
+LIVE_BASE_PATH = os.environ.get("LIVE_BASE_PATH", "/live/")
+
+LIVE_URL = urljoin(LIVE_BASE_URL, LIVE_BASE_PATH) if LIVE_BASE_URL else None
+
+# WEB URL
+WEB_URL = os.environ.get("WEB_URL")
+
+HARD_DELETE_AFTER_DAYS = int(os.environ.get("HARD_DELETE_AFTER_DAYS", 60))
+
+
+def _retention_days(env_var, default):
+    """
+    Read a retention window (in days) from the environment, falling back to the
+    default when the variable is unset, unparseable, or negative — a negative
+    window would otherwise select rows with a future cutoff and delete everything.
+    """
+    raw = os.environ.get(env_var)
+    if raw is None:
+        return default
+    try:
+        days = int(raw)
+    except ValueError:
+        return default
+    return days if days >= 0 else default
+
+
+# API activity logs hold request/response payloads, so they are retained for a
+# shorter window than other logs.
+API_ACTIVITY_LOG_RETENTION_DAYS = _retention_days("API_ACTIVITY_LOG_RETENTION_DAYS", 14)
+
+# Webhook delivery logs are retained on their own window, independent of the
+# generic HARD_DELETE_AFTER_DAYS.
+WEBHOOK_LOG_RETENTION_DAYS = _retention_days("WEBHOOK_LOG_RETENTION_DAYS", 14)
+
+# Email notification logs are retained on their own window.
+EMAIL_LOG_RETENTION_DAYS = _retention_days("EMAIL_LOG_RETENTION_DAYS", 7)
+
+# Instance Changelog URL
+INSTANCE_CHANGELOG_URL = os.environ.get("INSTANCE_CHANGELOG_URL", "")
+
+ATTACHMENT_MIME_TYPES = [
+    # Images
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/svg+xml",
+    "image/webp",
+    "image/tiff",
+    "image/bmp",
+    # Documents
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "text/plain",
+    "text/markdown",
+    "application/rtf",
+    "application/vnd.oasis.opendocument.spreadsheet",
+    "application/vnd.oasis.opendocument.text",
+    "application/vnd.oasis.opendocument.presentation",
+    "application/vnd.oasis.opendocument.graphics",
+    # Microsoft Visio
+    "application/vnd.visio",
+    # Netpbm format
+    "image/x-portable-graymap",
+    "image/x-portable-bitmap",
+    "image/x-portable-pixmap",
+    # Open Office Bae
+    "application/vnd.oasis.opendocument.database",
+    # Audio
+    "audio/mpeg",
+    "audio/wav",
+    "audio/ogg",
+    "audio/midi",
+    "audio/x-midi",
+    "audio/aac",
+    "audio/flac",
+    "audio/x-m4a",
+    # Video
+    "video/mp4",
+    "video/mpeg",
+    "video/ogg",
+    "video/webm",
+    "video/quicktime",
+    "video/x-msvideo",
+    "video/x-ms-wmv",
+    # Archives
+    "application/zip",
+    "application/x-rar",
+    "application/x-rar-compressed",
+    "application/x-tar",
+    "application/gzip",
+    "application/x-zip",
+    "application/x-zip-compressed",
+    "application/x-7z-compressed",
+    "application/x-compressed",
+    "application/x-compressed-tar",
+    "application/x-compressed-tar-gz",
+    "application/x-compressed-tar-bz2",
+    "application/x-compressed-tar-zip",
+    "application/x-compressed-tar-7z",
+    "application/x-compressed-tar-rar",
+    "application/x-compressed-tar-zip",
+    # 3D Models
+    "model/gltf-binary",
+    "model/gltf+json",
+    "application/octet-stream",  # for .obj files, but be cautious
+    # Fonts
+    "font/ttf",
+    "font/otf",
+    "font/woff",
+    "font/woff2",
+    # Other
+    "text/css",
+    "text/javascript",
+    "application/json",
+    "text/xml",
+    "text/csv",
+    "application/xml",
+    # SQL
+    "application/x-sql",
+    # Gzip
+    "application/x-gzip",
+    # Markdown
+    "text/markdown",
+]
+
+# The only MIME types ever served inline (S3Storage.generate_presigned_url pins the
+# type on the response). Everything else, including SVG and HTML, downloads.
+INLINE_SAFE_MIME_TYPES: frozenset[str] = frozenset(["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"])
+
+# Seed directory path
+SEED_DIR = os.path.join(BASE_DIR, "seeds")
+
+ENABLE_DRF_SPECTACULAR = os.environ.get("ENABLE_DRF_SPECTACULAR", "0") == "1"
+
+if ENABLE_DRF_SPECTACULAR:
+    REST_FRAMEWORK["DEFAULT_SCHEMA_CLASS"] = "drf_spectacular.openapi.AutoSchema"
+    INSTALLED_APPS.append("drf_spectacular")
+    from .openapi import SPECTACULAR_SETTINGS  # noqa: F401
