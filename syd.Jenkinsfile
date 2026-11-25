@@ -212,6 +212,41 @@ pipeline {
             }
         }
 
+        // Sydney EKS runs the same images as ECS (ISS-297449). Before the ECS deploy so a slow or failed
+        // ECS rollout cannot skip it. One gitops PR per service, one after another: each auto-merges
+        // into shipsy-deployments main, and five merging in parallel would race each other.
+        // plane-celery and plane-celery-beat stay at replicas 0 on EKS while ECS runs them (a second beat
+        // enqueues every periodic task twice), but their manifests must still track the current build so the
+        // cutover starts the image ECS was running.
+        stage ("ArgoCD commit") {
+            steps {
+                script {
+                    // "Restart from Stage" skips the stage that sets the image names: never commit an empty/"null" image.
+                    def ecrHost = "989674740158.dkr.ecr.${awsRegion}.amazonaws.com"
+                    def eksImages = [
+                        "plane-frontend"    : webImageName,
+                        "plane-admin-panel" : adminImageName,
+                        "plane-apiserver"   : apiImageName,
+                        "plane-celery"      : celeryImageName,
+                        "plane-celery-beat" : beatImageName,
+                    ]
+                    // Plain for loops, not .each closures: CPS-safe around pipeline steps.
+                    for (String app : eksImages.keySet()) {
+                        def image = eksImages[app]
+                        if (!image || image == "null") { error("${app} image name is empty: restarting from this stage is not supported, run the whole pipeline") }
+                    }
+                    for (String app : eksImages.keySet()) {
+                        argocdCommit(
+                            dockerImageUri: "${ecrHost}/${eksImages[app]}".toString(),
+                            deploymentYamlPath: "accounts/shipsy-syd/${app}/deployment.yaml",
+                            credentialsId: "shipsy-tech-user",
+                            autoMerge: true
+                        )
+                    }
+                }
+            }
+        }
+
         stage("Deploy Plane") {
             parallel {
                 stage("Deploy Frontend") {
