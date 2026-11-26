@@ -65,12 +65,7 @@ def webCurrentTaskRevision
 def adminCurrentTaskRevision
 
 pipeline {
-    // Pinned to the controller: `agent any` can land on jenkins-oregon-node, which has
-    // no [default] AWS profile, so jenkins-library's `aws ecr get-login-password
-    // --profile default` fails ("password is empty"). The controller has the profile
-    // (api-gateway's EU/Sydney jobs build there fine). Revert to `agent any` once the
-    // Oregon node has AWS credentials.
-    agent { label 'master' }   // pre-2.307 Jenkins: the controller's label is 'master', not 'built-in'
+    agent any
 
     stages {
         stage("Send Build started message") {
