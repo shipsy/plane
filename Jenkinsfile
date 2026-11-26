@@ -65,186 +65,164 @@ def webCurrentTaskRevision
 def adminCurrentTaskRevision
 
 pipeline {
-    agent any
+    // Pinned to the controller: `agent any` can land on jenkins-oregon-node, which has
+    // no [default] AWS profile, so jenkins-library's `aws ecr get-login-password
+    // --profile default` fails ("password is empty"). The controller has the profile
+    // (api-gateway's EU/Sydney jobs build there fine). Revert to `agent any` once the
+    // Oregon node has AWS credentials.
+    agent { label 'built-in' }
 
     stages {
-        // stage ("Send Build started message") {
-        //     steps{
-        //         sendSlackMessage (
-        //             messageType: "start",
-        //             slackEnvironment: "demo"
-        //         )
-        //     }
-        // }
-
-        stage ("Generate configs from vault") {
-            steps {
-                // define vault secret path and env var
-                script {
-                    def secret = [
-                        [
-                        path: "${repository}/${projectEnv}", 
-                        secretValues: [
-                                [envVar: 'CONFIG', vaultKey: 'config.json']
-                            ]
-                        ]
-                    ]
-                    // sh "echo ${secret}"
-                    withVault(configuration: configuration, vaultSecrets: secret) {
-                        sh """
-                            set +x
-                            echo "Vault CONFIG: \${CONFIG}"   # Debugging, remove in production
-                            pwd
-                            mkdir -p apiserver/${configStoragePath}
-                            echo "\${CONFIG}" > apiserver/${configStoragePath}/.env
-                        """
-
-                        // Debugging: Show the contents of the .env file (optional for development only)
-                        sh "cat apiserver/${configStoragePath}/.env"
-
-                        // Verify the file has been created
-                        sh "ls -l apiserver/${configStoragePath}/.env"
-                    }
-                }
-            }
+        stage("Send Build started message") {
+            steps { sendSlackMessage(messageType: "start", slackEnvironment: projectEnv) }
         }
-        stage ("Create Docker Image Names") {
+
+        stage("Create Docker Image Names") {
             steps {
                 script {
-                    webImageName = generateDockerImageName (
-                        credentialsId : credentialsId,
-                        dockerImageNamePrefix : webImageNamePrefix,
-                        repository : repository,
-                        projectEnv : projectEnv
+                    // generateDockerImageName returns "<prefix>:prod-<sha><cfgver>". One checkout and
+                    // one Vault config feed all three images, so reuse the web tag instead of three
+                    // Vault logins. .toString() on purpose: these are read in later stages and get
+                    // CPS-serialized, so keep plain Strings, not GStrings.
+                    webImageName = generateDockerImageName(
+                        credentialsId        : credentialsId,
+                        dockerImageNamePrefix: webImageNamePrefix,
+                        repository           : repository,
+                        projectEnv           : projectEnv
                     ).toString()
-                    // One checkout + one vault config for all three images,
-                    // so reuse the web image's tag instead of three vault logins.
                     def uniqueTag = webImageName.split(':')[1]
                     adminImageName = "${adminImageNamePrefix}:${uniqueTag}".toString()
                     apiImageName   = "${apiImageNamePrefix}:${uniqueTag}".toString()
+                    echo "Images: ${webImageName}, ${adminImageName}, ${apiImageName}"
                 }
             }
         }
 
-        stage ("Build docker image") {
-            parallel {
-                stage ("Build Web Image") {
-                    steps {
-                        buildDockerImage (
-                            awsRegion : awsRegion,
-                            imageName : webImageName,
-                            directoryPath : ".",
-                            dockerfilePath : "web/Dockerfile.web"
-                        )
-                    }
-                }
-                stage ("Build Admin Image") {
-                    steps {
-                        buildDockerImage (
-                            awsRegion : awsRegion,
-                            imageName : adminImageName,
-                            directoryPath : ".",
-                            dockerfilePath : "admin/Dockerfile.admin"
-                        )
-                    }
-                }
-                stage ("Build API Image") {
-                    steps {
-                        buildDockerImage (
-                            awsRegion : awsRegion,
-                            dockerBuildArgs : dockerBuildLevelArguments,
-                            imageName : apiImageName,
-                            directoryPath : "apiserver",
-                            dockerfilePath : "apiserver/Dockerfile.api"
-                        )
+        stage("Generate configs from vault") {
+            steps {
+                script {
+                    def configFile = "apiserver/${configStoragePath}/.env"
+                    def secret = [[
+                        path        : "${repository}/${projectEnv}",
+                        secretValues: [[envVar: 'CONFIG', vaultKey: 'config.json']]
+                    ]]
+                    withVault(configuration: configuration, vaultSecrets: secret) {
+                        // Never echo/cat the config: it holds prod secrets and lands in the build log.
+                        // Check the VALUE, not the file: `echo` of an empty variable still writes a
+                        // newline, so a non-empty-file test passes and we'd ship a config-less image.
+                        sh """
+                            set +x
+                            mkdir -p \$(dirname ${configFile})
+                            if [ -z "\${CONFIG}" ]; then
+                              echo "FATAL: required Vault key 'config.json' missing or empty at '${repository}/${projectEnv}'" >&2
+                              exit 1
+                            fi
+                            printf '%s\\n' "\${CONFIG}" > ${configFile}
+                        """
                     }
                 }
             }
         }
 
-        stage("Push to registry") {
-            parallel {
-                stage ("Push Web Image") {
-                    steps {
-                        pushDockerImage (
-                            awsRegion : awsRegion,
-                            imageName : webImageName
-                        )
-                    }
-                }
-                stage ("Push Admin Image") {
-                    steps {
-                        pushDockerImage (
-                            awsRegion : awsRegion,
-                            imageName : adminImageName
-                        )
-                    }
-                }
-                stage ("Push API Image") {
-                    steps {
-                        pushDockerImage (
-                            awsRegion : awsRegion,
-                            imageName : apiImageName
-                        )
-                    }
-                }
+        // Build and push run sequentially, not in parallel: three concurrent
+        // `aws ecr get-login-password | docker login` calls on one agent race on
+        // ~/.docker/config.json and interleave their logs, which hid the real error.
+        stage("Build Web image") {
+            steps {
+                buildDockerImage(
+                    awsRegion     : awsRegion,
+                    imageName     : webImageName,
+                    directoryPath : ".",
+                    dockerfilePath: "web/Dockerfile.web"
+                )
             }
         }
 
+        stage("Build Admin image") {
+            steps {
+                buildDockerImage(
+                    awsRegion     : awsRegion,
+                    imageName     : adminImageName,
+                    directoryPath : ".",
+                    dockerfilePath: "admin/Dockerfile.admin"
+                )
+            }
+        }
+
+        stage("Build API image") {
+            steps {
+                buildDockerImage(
+                    awsRegion      : awsRegion,
+                    imageName      : apiImageName,
+                    directoryPath  : "apiserver",
+                    dockerfilePath : "apiserver/Dockerfile.api",
+                    dockerBuildArgs: dockerBuildLevelArguments
+                )
+            }
+        }
+
+        stage("Push images to registry") {
+            steps {
+                pushDockerImage(awsRegion: awsRegion, imageName: webImageName)
+                pushDockerImage(awsRegion: awsRegion, imageName: adminImageName)
+                pushDockerImage(awsRegion: awsRegion, imageName: apiImageName)
+            }
+        }
+
+        // Deploys stay parallel: they're independent ECS API calls (no docker login), and
+        // celery/beat must roll out alongside the API image they share.
         stage("Deploy Plane") {
             parallel {
                 stage("Deploy Frontend") {
                     steps {
                         script {
-                            webCurrentTaskRevision = updateTaskDefinition (
-                                taskDefinitionName : webTaskDefinitionName,
-                                dockerImageName : webImageName,
-                                awsRegion : awsRegion
+                            webCurrentTaskRevision = updateTaskDefinition(
+                                taskDefinitionName: webTaskDefinitionName,
+                                dockerImageName   : webImageName,
+                                awsRegion         : awsRegion
                             )
-                            updateServiceOnECS (
-                                ecsClusterName : clusterName,
-                                ecsServiceName : frontEndServiceName,
+                            updateServiceOnECS(
+                                ecsClusterName     : clusterName,
+                                ecsServiceName     : frontEndServiceName,
                                 taskDefinitionName : webTaskDefinitionName,
-                                currentTaskRevision : webCurrentTaskRevision,
-                                awsRegion : awsRegion
+                                currentTaskRevision: webCurrentTaskRevision,
+                                awsRegion          : awsRegion
                             )
                         }
                     }
                 }
-
                 stage("Deploy Admin") {
                     steps {
                         script {
-                            adminCurrentTaskRevision = updateTaskDefinition (
-                                taskDefinitionName : adminTaskDefinitionName,
-                                dockerImageName : adminImageName,
-                                awsRegion : awsRegion
+                            adminCurrentTaskRevision = updateTaskDefinition(
+                                taskDefinitionName: adminTaskDefinitionName,
+                                dockerImageName   : adminImageName,
+                                awsRegion         : awsRegion
                             )
-                            updateServiceOnECS (
-                                ecsClusterName : clusterName,
-                                ecsServiceName : adminPanelServiceName,
+                            updateServiceOnECS(
+                                ecsClusterName     : clusterName,
+                                ecsServiceName     : adminPanelServiceName,
                                 taskDefinitionName : adminTaskDefinitionName,
-                                currentTaskRevision : adminCurrentTaskRevision,
-                                awsRegion : awsRegion
+                                currentTaskRevision: adminCurrentTaskRevision,
+                                awsRegion          : awsRegion
                             )
                         }
                     }
                 }
-
                 stage("Deploy API") {
                     steps {
                         script {
-                            apiCurrentTaskRevision = updateTaskDefinition (
-                                taskDefinitionName : apiTaskDefinitionName,
-                                dockerImageName : apiImageName,
-                                awsRegion : awsRegion
+                            apiCurrentTaskRevision = updateTaskDefinition(
+                                taskDefinitionName: apiTaskDefinitionName,
+                                dockerImageName   : apiImageName,
+                                awsRegion         : awsRegion
                             )
-                            updateServiceOnECS (
-                                ecsClusterName : clusterName,
-                                ecsServiceName : apiServiceName,
+                            updateServiceOnECS(
+                                ecsClusterName     : clusterName,
+                                ecsServiceName     : apiServiceName,
                                 taskDefinitionName : apiTaskDefinitionName,
-                                currentTaskRevision : apiCurrentTaskRevision,
-                                awsRegion : awsRegion
+                                currentTaskRevision: apiCurrentTaskRevision,
+                                awsRegion          : awsRegion
                             )
                         }
                     }
@@ -252,17 +230,17 @@ pipeline {
                 stage("Deploy Celery") {
                     steps {
                         script {
-                            celeryCurrentTaskRevision = updateTaskDefinition (
-                                taskDefinitionName : celeryTaskDefinitionName,
-                                dockerImageName : apiImageName,
-                                awsRegion : awsRegion
+                            celeryCurrentTaskRevision = updateTaskDefinition(
+                                taskDefinitionName: celeryTaskDefinitionName,
+                                dockerImageName   : apiImageName,
+                                awsRegion         : awsRegion
                             )
-                            updateServiceOnECS (
-                                ecsClusterName : clusterName,
-                                ecsServiceName : celeryServiceName,
+                            updateServiceOnECS(
+                                ecsClusterName     : clusterName,
+                                ecsServiceName     : celeryServiceName,
                                 taskDefinitionName : celeryTaskDefinitionName,
-                                currentTaskRevision : celeryCurrentTaskRevision,
-                                awsRegion : awsRegion
+                                currentTaskRevision: celeryCurrentTaskRevision,
+                                awsRegion          : awsRegion
                             )
                         }
                     }
@@ -270,17 +248,17 @@ pipeline {
                 stage("Deploy Beat") {
                     steps {
                         script {
-                            cbeatCurrentTaskRevision = updateTaskDefinition (
-                                taskDefinitionName : cbeatTaskDefinitionName,
-                                dockerImageName : apiImageName,
-                                awsRegion : awsRegion
+                            cbeatCurrentTaskRevision = updateTaskDefinition(
+                                taskDefinitionName: cbeatTaskDefinitionName,
+                                dockerImageName   : apiImageName,
+                                awsRegion         : awsRegion
                             )
-                            updateServiceOnECS (
-                                ecsClusterName : clusterName,
-                                ecsServiceName : cbeatServiceName,
+                            updateServiceOnECS(
+                                ecsClusterName     : clusterName,
+                                ecsServiceName     : cbeatServiceName,
                                 taskDefinitionName : cbeatTaskDefinitionName,
-                                currentTaskRevision : cbeatCurrentTaskRevision,
-                                awsRegion : awsRegion
+                                currentTaskRevision: cbeatCurrentTaskRevision,
+                                awsRegion          : awsRegion
                             )
                         }
                     }
@@ -288,12 +266,8 @@ pipeline {
             }
         }
     }
+
     post {
-        always {
-            sendSlackMessage (
-                messageType: "post",
-                slackEnvironment: "prod"
-            )
-        }
+        always { sendSlackMessage(messageType: "post", slackEnvironment: projectEnv) }
     }
 }
