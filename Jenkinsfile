@@ -65,7 +65,10 @@ def webCurrentTaskRevision
 def adminCurrentTaskRevision
 
 pipeline {
-    agent any
+    // Pinned to the controller (label 'master' on this pre-2.307 Jenkins): jenkins-oregon-node
+    // has no [default] AWS profile, so jenkins-library's ECR login fails there with
+    // "password is empty". Revert to `agent any` once that node has AWS credentials.
+    agent { label 'master' }
 
     stages {
         stage("Send Build started message") {
