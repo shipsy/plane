@@ -70,7 +70,7 @@ pipeline {
     // --profile default` fails ("password is empty"). The controller has the profile
     // (api-gateway's EU/Sydney jobs build there fine). Revert to `agent any` once the
     // Oregon node has AWS credentials.
-    agent { label 'built-in' }
+    agent { label 'master' }   // pre-2.307 Jenkins: the controller's label is 'master', not 'built-in'
 
     stages {
         stage("Send Build started message") {
