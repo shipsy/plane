@@ -2,6 +2,7 @@
 import csv
 import io
 import zipfile
+import zoneinfo
 
 # Django imports
 from django.conf import settings
@@ -81,9 +82,13 @@ def _build_list_view_base_queryset(slug, user, project_ids):
     return apply_user_hub_filters(qs, user, workspace_slug=slug)
 
 
-def dateTimeConverter(time):
+def dateTimeConverter(time, tz_name=None):
+    # Render in the issue's project timezone on a 24-hour clock. The export
+    # runs in Celery with no active timezone, so values arrive in UTC.
     if time:
-        return time.strftime("%a, %d %b %Y %I:%M:%S %Z%z")
+        if tz_name and tz_name != "UTC":
+            time = time.astimezone(zoneinfo.ZoneInfo(tz_name))
+        return time.strftime("%a, %d %b %Y %H:%M:%S UTC%z")
 
 
 def dateConverter(time):
@@ -352,13 +357,17 @@ COMPLEX_RESOLVERS = {
     ),
     "created_on": _Resolver(
         label="Created On",
-        values_fields=["created_at"],
-        extractor=lambda i: dateTimeConverter(i.get("created_at")),
+        values_fields=["created_at", "project__timezone"],
+        extractor=lambda i: dateTimeConverter(
+            i.get("created_at"), i.get("project__timezone")
+        ),
     ),
     "updated_on": _Resolver(
         label="Updated On",
-        values_fields=["updated_at"],
-        extractor=lambda i: dateTimeConverter(i.get("updated_at")),
+        values_fields=["updated_at", "project__timezone"],
+        extractor=lambda i: dateTimeConverter(
+            i.get("updated_at"), i.get("project__timezone")
+        ),
     ),
     # Counts (need `.annotate(...)`).
     "link": _Resolver(
@@ -431,8 +440,10 @@ def _introspect_field(key):
             label=getattr(field, "verbose_name", key).title()
                   if isinstance(getattr(field, "verbose_name", ""), str)
                   else _prettify(key),
-            values_fields=[key],
-            extractor=(lambda k: lambda i: dateTimeConverter(i.get(k)))(key) if is_datetime
+            values_fields=[key, "project__timezone"] if is_datetime else [key],
+            extractor=(
+                lambda k: lambda i: dateTimeConverter(i.get(k), i.get("project__timezone"))
+            )(key) if is_datetime
                       else (lambda k: lambda i: dateConverter(i.get(k)))(key),
         )
 
